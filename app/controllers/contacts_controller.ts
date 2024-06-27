@@ -84,7 +84,7 @@ export default class ContactsController {
     return await Contact.create(data)
   }
 
-  async getValidation(ctx: HttpContext) {
+  async getValidation() {
     console.log('getValidation called')
     let test = await Contact.query().where('validated', false)
     return test
