@@ -75,8 +75,8 @@ export default class ContactsController {
       .where('firstname', data.first_name)
       .andWhere('lastname', data.last_name)
       .andWhere('email', data.email)
-      .andWhere('phone', data.phone)
-      .andWhere('messenger', data.messenger)
+      .andWhere('phone', data.phone!)
+      .andWhere('messenger', data.messenger!)
       .first()
 
     if (existing) return ctx.response.send('Contact already exists.')
