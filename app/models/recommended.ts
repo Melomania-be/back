@@ -1,5 +1,7 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column } from '@adonisjs/lucid/orm'
+import { BaseModel, column, manyToMany } from '@adonisjs/lucid/orm'
+import Instrument from './instrument.js'
+import { ManyToMany } from '@adonisjs/lucid/types/relations'
 
 export default class Recommended extends BaseModel {
   @column({ isPrimary: true })
@@ -19,6 +21,11 @@ export default class Recommended extends BaseModel {
 
   @column()
   declare messenger: string
+
+  @manyToMany(() => Instrument, {
+    pivotTable: 'recommendeds_instruments',
+  })
+  declare instruments: ManyToMany<typeof Instrument>
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime

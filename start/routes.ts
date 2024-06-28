@@ -24,6 +24,7 @@ const TypeOfPiecesController = () => import('#controllers/type_of_pieces_control
 const InstrumentsController = () => import('#controllers/instruments_controller')
 const MailingsController = () => import('#controllers/mailings_controller')
 const ListsController = () => import('#controllers/lists_controller')
+const SectionGroupsController = () => import('#controllers/section_groups_controller')
 
 router
   .group(() => {
@@ -81,7 +82,7 @@ router
         router.group(() => {
           router.get('/projects', [ProjectsController, 'getAll'])
           router.get('/projects/:id/management', [ProjectsController, 'getOne'])
-          router.post('/projects/creation', [ProjectsController, 'create'])
+          router.post('/projects/create', [ProjectsController, 'create'])
         })
 
         router.group(() => {
@@ -170,7 +171,14 @@ router
           router.put('/lists', [ListsController, 'createOrUpdate'])
           router.delete('/lists/:id', [ListsController, 'delete'])
         })
-      })
+
+        router.group(() => {
+          router.get('/sectionGroups', [SectionGroupsController, 'getAll'])
+          router.get('/sectionGroups/:id', [SectionGroupsController, 'getOne'])
+          router.put('/sectionGroups', [SectionGroupsController, 'createOrUpdate'])
+        })
+   })
+    
 
       .use(
         middleware.auth({

@@ -38,8 +38,6 @@ export async function getAll<Model extends LucidModel>(
     ordered?: boolean
   }
 ): Promise<ModelQueryBuilderContract<Model, InstanceType<Model>>> {
-  if (Model) {
-  }
   options = {
     filtered: options?.filtered ?? true,
     paginated: options?.paginated ?? true,

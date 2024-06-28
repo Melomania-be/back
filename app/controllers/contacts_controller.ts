@@ -62,6 +62,14 @@ export default class ContactsController {
   async delete({ params, response }: HttpContext) {
     let contact = await Contact.find(params.id)
     if (contact) {
+      let participations = await contact.related('participant').query()
+
+      for (let participation of participations) {
+        await participation.related('answer').query().delete()
+        await participation.related('rehearsals').query().delete()
+        await participation.delete()
+      }
+      
       await contact.delete()
       return response.send('contact deleted')
     }
@@ -75,8 +83,8 @@ export default class ContactsController {
       .where('firstname', data.first_name)
       .andWhere('lastname', data.last_name)
       .andWhere('email', data.email)
-      .andWhere('phone', data.phone!)
-      .andWhere('messenger', data.messenger!)
+      .andWhere('phone', data.phone)
+      .andWhere('messenger', data.messenger)
       .first()
 
     if (existing) return ctx.response.send('Contact already exists.')
@@ -84,9 +92,11 @@ export default class ContactsController {
     return await Contact.create(data)
   }
 
-  async getValidation() {
+  async getValidation(ctx: HttpContext) {
     console.log('getValidation called')
-    let test = await Contact.query().where('validated', false)
+    let test = await Contact.query().where('validated', false).preload('instruments', (instrumentsQuery) => {
+      instrumentsQuery.pivotColumns(['proficiency_level'])
+    })
     return test
   }
 }
