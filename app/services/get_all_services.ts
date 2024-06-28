@@ -43,6 +43,10 @@ export async function getAll<Model extends LucidModel>(
     paginated: options?.paginated ?? true,
     ordered: options?.ordered ?? true,
   }
+  if (Model !== baseQuery.model) {
+    throw new Error('The model and the baseQuery must be the same')
+  }
+
   const { filter, limit, page, order, orderBy } = await request.validateUsing(getAllValidator)
 
   let bddRequest = baseQuery
