@@ -1,14 +1,14 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import Contact from '#models/contact'
 import List from '#models/list'
-import { Filter, getAll, RelationFilter } from '#services/get_all_services'
+import { Filter, simpleFilter, RelationFilter } from '#services/simple_filter'
 import { createListValidator } from '#validators/list'
 
 export default class ListsController {
   async getAll(ctx: HttpContext) {
     let baseQuery = List.query().preload('contacts')
 
-    return await getAll(ctx, List, baseQuery, new Filter(List, ['name']), [
+    return await simpleFilter(ctx, List, baseQuery, new Filter(List, ['name']), [
       new RelationFilter('contacts', Contact, ['first_name', 'last_name']),
     ])
   }

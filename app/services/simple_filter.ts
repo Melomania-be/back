@@ -26,7 +26,7 @@ import string from '@adonisjs/core/helpers/string'
   }} options
   **/
 
-export async function getAll<Model extends LucidModel>(
+export async function simpleFilter<Model extends LucidModel>(
   { request }: HttpContext,
   Model: Model,
   baseQuery: ModelQueryBuilderContract<Model, InstanceType<Model>>,

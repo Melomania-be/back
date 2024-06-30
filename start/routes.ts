@@ -42,8 +42,6 @@ router
       router.post('/recommend_someone', [RecommendSomeonesController, 'create'])
 
       router.get('/call_sheets/:id/:visitorId', [CallsheetsController, 'getOne'])
-
-      router.get('/test', [ProjectsController, 'getAll'])
     })
 
     //protected routes

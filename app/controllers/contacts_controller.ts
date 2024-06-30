@@ -1,7 +1,7 @@
 // import type { HttpContext } from '@adonisjs/core/http'
 import Contact from '#models/contact'
 import Instrument from '#models/instrument'
-import { getAll, Filter, RelationFilter } from '#services/get_all_services'
+import { simpleFilter, Filter, RelationFilter } from '#services/simple_filter'
 import { createContactValidator } from '#validators/contact'
 import { HttpContext } from '@adonisjs/core/http'
 
@@ -11,7 +11,7 @@ export default class ContactsController {
       instrumentsQuery.pivotColumns(['proficiency_level'])
     })
 
-    return await getAll(
+    return await simpleFilter(
       ctx,
       Contact,
       baseQuery,

@@ -3,21 +3,21 @@
 import Project from '#models/project'
 import { HttpContext } from '@adonisjs/core/http'
 import { createProjectValidator } from '#validators/project'
-import { getAll, Filter } from '#services/get_all_services'
+import { simpleFilter, Filter } from '#services/simple_filter'
 import { ExtractModelRelations } from '@adonisjs/lucid/types/relations'
 
 export default class ProjectsController {
   async getAll(ctx: HttpContext) {
     let baseQuery = Project.query()
-    .preload('concerts')
-    .preload('pieces')
-    .preload('participants')
-    .preload('registration')
-    .preload('rehearsals')
-    .preload('sectionGroup' as ExtractModelRelations<Project>)
-    .preload('callsheets')
+      .preload('concerts')
+      .preload('pieces')
+      .preload('participants')
+      .preload('registration')
+      .preload('rehearsals')
+      .preload('sectionGroup' as ExtractModelRelations<Project>)
+      .preload('callsheets')
 
-    return await getAll(ctx, Project, baseQuery, new Filter(Project, ['name']), [], {
+    return await simpleFilter(ctx, Project, baseQuery, new Filter(Project, ['name']), [], {
       filtered: true,
       paginated: true,
       ordered: true,
@@ -25,14 +25,15 @@ export default class ProjectsController {
   }
 
   async getOne({ params }: HttpContext) {
-    const data = await Project.query().where('id', params.id)
-    .preload('concerts')
-    .preload('pieces')
-    .preload('participants')
-    .preload('registration')
-    .preload('rehearsals')
-    .preload('sectionGroup' as ExtractModelRelations<Project>)
-    .preload('callsheets')
+    const data = await Project.query()
+      .where('id', params.id)
+      .preload('concerts')
+      .preload('pieces')
+      .preload('participants')
+      .preload('registration')
+      .preload('rehearsals')
+      .preload('sectionGroup' as ExtractModelRelations<Project>)
+      .preload('callsheets')
     return data
   }
 
