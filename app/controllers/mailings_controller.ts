@@ -6,7 +6,7 @@ export default class MailingsController {
 
     await mail.send((message) => {
       message
-        .to('iemelian.rambeau@student.junia.com')
+        .to('')
         .from('info@melomania.be')
         .subject('Verify your email address')
         .html('<p>Please verify your email address by clicking on the link below.</p>')
