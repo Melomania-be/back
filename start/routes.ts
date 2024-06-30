@@ -175,8 +175,7 @@ router
           router.get('/sectionGroups/:id', [SectionGroupsController, 'getOne'])
           router.put('/sectionGroups', [SectionGroupsController, 'createOrUpdate'])
         })
-   })
-    
+      })
 
       .use(
         middleware.auth({

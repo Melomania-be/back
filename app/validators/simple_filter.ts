@@ -1,6 +1,6 @@
 import vine from '@vinejs/vine'
 
-export const getAllValidator = vine.compile(
+export const simpleFilterValidator = vine.compile(
   vine.object({
     filter: vine.string().optional(),
     page: vine.number().optional(),

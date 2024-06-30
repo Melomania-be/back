@@ -1,4 +1,4 @@
-import { getAllValidator } from '#validators/getter'
+import { simpleFilterValidator } from '#validators/simple_filter'
 import { HttpContext } from '@adonisjs/core/http'
 import { LucidModel, ModelQueryBuilderContract } from '@adonisjs/lucid/types/model'
 import type { Knex } from 'knex'
@@ -47,7 +47,7 @@ export async function simpleFilter<Model extends LucidModel>(
     throw new Error('The model and the baseQuery must be the same')
   }
 
-  const { filter, limit, page, order, orderBy } = await request.validateUsing(getAllValidator)
+  const { filter, limit, page, order, orderBy } = await request.validateUsing(simpleFilterValidator)
 
   let bddRequest = baseQuery
 
