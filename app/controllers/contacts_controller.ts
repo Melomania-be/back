@@ -1,6 +1,7 @@
 // import type { HttpContext } from '@adonisjs/core/http'
 import Contact from '#models/contact'
 import Instrument from '#models/instrument'
+import { advancedFilter } from '#services/advanced_filter'
 import { simpleFilter, Filter, RelationFilter } from '#services/simple_filter'
 import { createContactValidator } from '#validators/contact'
 import { HttpContext } from '@adonisjs/core/http'
@@ -25,10 +26,32 @@ export default class ContactsController {
       .where('id', params.id)
       .preload('instruments')
       .preload('lists')
-      .preload('participant', (query) => {
+      .preload('participants', (query) => {
         query.preload('project').preload('section').preload('answer')
       })
       .firstOrFail()
+  }
+
+  async advancedSearch(ctx: HttpContext) {
+    let baseQuery = Contact.query()
+      .preload('instruments', (instrumentsQuery) => {
+        instrumentsQuery.pivotColumns(['proficiency_level'])
+      })
+      .preload('lists')
+      .preload('participants')
+      .preload('projects')
+
+    return await advancedFilter(ctx, Contact, baseQuery)
+  }
+
+  async getFilterableFields() {
+    return {
+      self: ['id', 'first_name', 'last_name', 'email', 'comments', 'messenger', 'phone'],
+      instruments: ['id', 'family', 'name'],
+      projects: ['id', 'name'],
+      participants: ['id', 'project', 'section', 'answer'],
+      lists: ['id', 'name'],
+    }
   }
 
   async createOrUpdate(ctx: HttpContext) {
@@ -62,7 +85,7 @@ export default class ContactsController {
   async delete({ params, response }: HttpContext) {
     let contact = await Contact.find(params.id)
     if (contact) {
-      let participations = await contact.related('participant').query()
+      let participations = await contact.related('participants').query()
 
       for (let participation of participations) {
         await participation.related('answer').query().delete()

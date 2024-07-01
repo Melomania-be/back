@@ -147,7 +147,7 @@ function queryAndWhere<Model extends LucidModel>(
 ) {
   if (!filter.relation) {
     if (filter.asserter[filter.column]) {
-      query.orWhere(filter.column, filter.operation, filter.filter)
+      query.andWhere(filter.column, filter.operation, filter.filter)
     } else {
       throw new Error('The column does not exist')
     }

@@ -138,9 +138,11 @@ router
         router.group(() => {
           router.get('/contact', [ContactsController, 'getAll'])
           router.get('/contact/validation', [ContactsController, 'getValidation'])
+          router.get('contact/filterable', [ContactsController, 'getFilterableFields'])
           router.get('/contact/:id', [ContactsController, 'getOne'])
           router.put('/contact', [ContactsController, 'createOrUpdate'])
           router.delete('/contact/:id', [ContactsController, 'delete'])
+          router.post('contact', [ContactsController, 'advancedSearch'])
         })
 
         router.group(() => {

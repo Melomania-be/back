@@ -1,9 +1,10 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, hasMany, manyToMany } from '@adonisjs/lucid/orm'
+import { BaseModel, column, hasMany, hasManyThrough, manyToMany } from '@adonisjs/lucid/orm'
 import Instrument from './instrument.js'
-import type { HasMany, ManyToMany } from '@adonisjs/lucid/types/relations'
+import type { HasMany, HasManyThrough, ManyToMany } from '@adonisjs/lucid/types/relations'
 import List from './list.js'
 import Participant from './participant.js'
+import Project from './project.js'
 
 export default class Contact extends BaseModel {
   @column({ isPrimary: true })
@@ -46,7 +47,15 @@ export default class Contact extends BaseModel {
   @hasMany(() => Participant, {
     foreignKey: 'contact_id',
   })
-  declare participant: HasMany<typeof Participant>
+  declare participants: HasMany<typeof Participant>
+
+  @manyToMany(() => Project, {
+    pivotTable: 'participants',
+    pivotTimestamps: true,
+    pivotForeignKey: 'contact_id',
+    pivotRelatedForeignKey: 'project_id',
+  })
+  declare projects: ManyToMany<typeof Project>
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
