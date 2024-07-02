@@ -83,11 +83,9 @@ export default class RegistrationsController {
     const answer = await Answer.create({
       text: data.answer.text,
       form_id: data.answer.form_id,
-      participant_id: participant.id
-    });
-    
-    return ctx.response.json({ success: true, participant, answer });
+      participant_id: participant.id,
+    })
 
-
+    return ctx.response.json({ success: true, participant, answer })
   }
 }
