@@ -41,16 +41,17 @@ export default class ContactsController {
       .preload('participants')
       .preload('projects')
 
-    return await advancedFilter(ctx, Contact, baseQuery)
-  }
+    const data = await advancedFilter(ctx, Contact, baseQuery)
 
-  async getFilterableFields() {
     return {
-      self: ['id', 'first_name', 'last_name', 'email', 'comments', 'messenger', 'phone'],
-      instruments: ['id', 'family', 'name'],
-      projects: ['id', 'name'],
-      participants: ['id', 'project', 'section', 'answer'],
-      lists: ['id', 'name'],
+      data,
+      columns: {
+        self: ['id', 'first_name', 'last_name', 'email', 'comments', 'messenger', 'phone'],
+        instruments: ['id', 'family', 'name'],
+        projects: ['id', 'name'],
+        participants: ['id', 'project', 'section', 'answer'],
+        lists: ['id', 'name'],
+      },
     }
   }
 
