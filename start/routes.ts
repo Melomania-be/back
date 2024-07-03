@@ -130,7 +130,7 @@ router
 
         router.group(() => {
           router.put('/folders', [FoldersController, 'create'])
-          router.patch('/folders', [FoldersController, 'update'])
+          router.post('/folders', [FoldersController, 'update'])
           router.get('/folders', [FoldersController, 'getAll'])
           router.delete('/folders/:id', [FoldersController, 'delete'])
         })
