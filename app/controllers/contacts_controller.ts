@@ -114,13 +114,19 @@ export default class ContactsController {
     return await Contact.create(data)
   }
 
-  async getValidation() {
+  async getValidation(ctx: HttpContext) {
     console.log('getValidation called')
-    let test = await Contact.query()
-      .where('validated', false)
-      .preload('instruments', (instrumentsQuery) => {
-        instrumentsQuery.pivotColumns(['proficiency_level'])
-      })
-    return test
+
+    let baseQuery = Contact.query().where('validated', false).preload('instruments', (instrumentsQuery) => {
+      instrumentsQuery.pivotColumns(['proficiency_level'])
+    })
+
+    return await simpleFilter(
+      ctx,
+      Contact,
+      baseQuery,
+      new Filter(Contact, ['first_name', 'last_name', 'email', 'comments', 'messenger', 'phone']),
+      [new RelationFilter('instruments', Instrument, ['family', 'name'])]
+    )
   }
 }
