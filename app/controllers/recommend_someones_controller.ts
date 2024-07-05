@@ -14,7 +14,7 @@ export default class RecommendSomeonesController {
   }
 
   async getAll(ctx: HttpContext) {
-    let baseQuery = Recommended.query().preload('instruments', (instrumentsQuery))
+    let baseQuery = Recommended.query().preload('instruments')
 
     return await simpleFilter(
       ctx,
@@ -36,7 +36,5 @@ export default class RecommendSomeonesController {
     return response.send('recommended person deleted')
   }
 }
-function instrumentsQuery(builder: ManyToManyQueryBuilderContract<typeof Instrument, any>): void {
-  throw new Error('Function not implemented.')
-}
+
 
