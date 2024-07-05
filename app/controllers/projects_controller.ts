@@ -4,7 +4,8 @@ import Project from '#models/project'
 import { HttpContext } from '@adonisjs/core/http'
 import { createProjectValidator } from '#validators/project'
 import { simpleFilter, Filter } from '#services/simple_filter'
-import { ExtractModelRelations } from '@adonisjs/lucid/types/relations'
+import Participant from '#models/participant'
+import db from '@adonisjs/lucid/services/db'
 
 export default class ProjectsController {
   async getAll(ctx: HttpContext) {
@@ -14,7 +15,7 @@ export default class ProjectsController {
       .preload('participants')
       .preload('registration')
       .preload('rehearsals')
-      .preload('sectionGroup' as ExtractModelRelations<Project>)
+      .preload('sectionGroup')
       .preload('callsheets')
 
     return await simpleFilter(ctx, Project, baseQuery, new Filter(Project, ['name']), [], {
@@ -32,9 +33,69 @@ export default class ProjectsController {
       .preload('participants')
       .preload('registration')
       .preload('rehearsals')
-      .preload('sectionGroup' as ExtractModelRelations<Project>)
+      .preload('sectionGroup')
       .preload('callsheets')
     return data
+  }
+
+  async getDashboard({ params }: HttpContext) {
+    const data = await Project.query()
+      .where('id', params.id)
+      .preload('concerts', (query) => {
+        query.limit(3).orderBy('date', 'desc')
+      })
+      .preload('participants', (query) => {
+        query.where('accepted', false)
+      })
+      .preload('callsheets', (query) => {
+        query.limit(3).orderBy('updated_at', 'desc')
+      })
+      .preload('registration')
+      .preload('rehearsals')
+      .preload('concerts')
+      .preload('sectionGroup', (query) => {
+        query.preload('sections')
+      })
+
+    const participantsNotValidated = await Participant.query()
+      .preload('contact')
+      .where('project_id', params.id)
+      .andWhere('accepted', false)
+
+    const participantsWithoutEmail = await Participant.query()
+      .preload('contact')
+      .where('project_id', params.id)
+      .andWhere('accepted', true)
+      .andWhereHas('contact', (subQuery) => {
+        subQuery.whereNull('email').orWhere('email', '')
+      })
+
+    const participantsNotSeenCallsheet = await Participant.query()
+      .preload('contact')
+      .where('participants.project_id', params.id)
+      .andWhere('accepted', true)
+      .andWhere((subQuery) => {
+        subQuery.where(
+          'last_activity',
+          '<',
+          db
+            .from('callsheets')
+            .select('updated_at')
+            .where('project_id', params.id)
+            .andWhereNotNull('updated_at')
+            .orderBy('updated_at', 'desc')
+            .limit(1)
+        )
+
+        console.log(subQuery.toSQL())
+      })
+
+    return {
+      data,
+      participantsNotValidated,
+      participantsWithoutEmail,
+      participantsNotSeenCallsheet,
+    }
   }
 
   async create(ctx: HttpContext) {

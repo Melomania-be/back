@@ -79,37 +79,38 @@ router
 
         router.group(() => {
           router.get('/projects', [ProjectsController, 'getAll'])
-          router.get('/projects/:id/management', [ProjectsController, 'getOne'])
-          router.post('/projects/create', [ProjectsController, 'create'])
+          router.get('/projects/management/:id', [ProjectsController, 'getDashboard'])
+          router.get('/projects/:id', [ProjectsController, 'getOne'])
+          router.post('/projects', [ProjectsController, 'create'])
         })
 
         router.group(() => {
-          router.get('/projects/:id/management/participants', [ParticipantsController, 'getAll'])
-          router.post('/projects/:id/management/participants/link', [
+          router.get('/projects/management/:id/participants', [ParticipantsController, 'getAll'])
+          router.post('/projects/management/:id/participants/link', [
             ParticipantsController,
             'create',
           ])
-          router.patch('/projects/:id/management/participants/unlink/:participantId', [
+          router.patch('/projects/management/:id/participants/unlink/:participantId', [
             ParticipantsController,
             'unlinkParticipant',
           ])
-          router.get('/projects/:id/management/participants/unique/:participantId', [
+          router.get('/projects/management/:id/participants/unique/:participantId', [
             ParticipantsController,
             'getOne',
           ])
-          router.patch('/projects/:id/management/participants/unique/:participantId', [
+          router.patch('/projects/management/:id/participants/unique/:participantId', [
             ParticipantsController,
             'modify',
           ])
-          router.get('/projects/:id/management/validation', [
+          router.get('/projects/management/:id/validation', [
             ParticipantsController,
             'getApplications',
           ])
-          router.patch('/projects/:id/management/validation/:participantId', [
+          router.patch('/projects/management/:id/validation/:participantId', [
             ParticipantsController,
             'validateParticipant',
           ])
-          router.delete('/projects/:id/management/participants/:participantId', [
+          router.delete('/projects/management/:id/participants/:participantId', [
             ParticipantsController,
             'delete',
           ])
