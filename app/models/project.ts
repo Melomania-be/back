@@ -9,6 +9,7 @@ import type { ManyToMany } from '@adonisjs/lucid/types/relations'
 import Callsheet from './callsheet.js'
 import Participant from './participant.js'
 import Concert from './concert.js'
+import Contact from './contact.js'
 
 export default class Project extends BaseModel {
   @column({ isPrimary: true })
@@ -22,6 +23,12 @@ export default class Project extends BaseModel {
 
   @column()
   declare section_group_id: number
+
+  @manyToMany(() => Contact, {
+    pivotTable: 'responsibles',
+    pivotTimestamps: true,
+  })
+  declare responsibles: ManyToMany<typeof Contact>
 
   @hasMany(() => Concert, {
     foreignKey: 'project_id',

@@ -44,15 +44,19 @@ export default class ProjectsController {
       .preload('concerts', (query) => {
         query.limit(3).orderBy('date', 'desc')
       })
-      .preload('participants', (query) => {
-        query.where('accepted', false)
-      })
+      .preload('participants')
       .preload('callsheets', (query) => {
         query.limit(3).orderBy('updated_at', 'desc')
       })
       .preload('registration')
       .preload('rehearsals')
       .preload('concerts')
+      .preload('responsibles')
+      .preload('pieces', (query) => {
+        query.preload('composer').preload('folder', (subQuery) => {
+          subQuery.preload('files')
+        })
+      })
       .preload('sectionGroup', (query) => {
         query.preload('sections')
       })
