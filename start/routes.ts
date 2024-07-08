@@ -177,6 +177,11 @@ router
           router.get('/sectionGroups/:id', [SectionGroupsController, 'getOne'])
           router.put('/sectionGroups', [SectionGroupsController, 'createOrUpdate'])
         })
+
+        router.group(() => {
+          router.get('/mailing/sendCallsheetNotification/:email/:contact/:project/:callsheet/:to_contact', 
+          [MailingsController, 'sendCallsheetNotification']
+          )
       })
 
       .use(
