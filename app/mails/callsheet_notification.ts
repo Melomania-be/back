@@ -1,22 +1,37 @@
-import Callsheet from '#models/callsheet'
-import Contact from '#models/contact'
-import Project from '#models/project'
 import env from '#start/env'
 import { BaseMail } from '@adonisjs/mail'
+import { fileURLToPath } from 'url';
 import fs from 'fs'
 import path from 'path'
 
 //nouvelle callsheet et admin demande envoie de mail => mail d'information de callsheets
 
 export default class CallsheetNotification extends BaseMail {
-    contact: Contact;
-    project: Project;
-    callsheet: Callsheet;
-    to_contact: Contact;
+    contact : {
+      first_name: string;
+      last_name: string;
+      email: string;
+    };
+    project: {
+      id: number;
+      name: string;
+    };
+    callsheet: {
+      id : number;
+      version: string;
+      project_id: number;
+    }
+    to_contact: {
+      first_name: string;
+      last_name: string;
+      email: string;
+      phone: string;
+      messenger: string;
+    }
     from: string;
     subject: string;
 
-    constructor(email : string, contact : Contact, project : Project, callsheet : Callsheet, to_contact : Contact) {
+    constructor(contact: { first_name: string; last_name: string; email: string } , project: { id: number; name: string } , callsheet: { id: number; version: string; project_id: number } , to_contact: { first_name: string; last_name: string; email: string; phone: string; messenger: string }) {
       super()
       this.from = env.get('SMTP_USERNAME')
       this.subject = 'Callsheet Updated'
@@ -27,6 +42,8 @@ export default class CallsheetNotification extends BaseMail {
     }
   
   prepare() {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
     const htmlFilePath = path.join(__dirname, 'html_templates/callsheet_notification.html')
     let htmlContent = fs.readFileSync(htmlFilePath, 'utf-8')
 

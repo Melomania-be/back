@@ -179,7 +179,7 @@ router
         })
 
         router.group(() => {
-          router.get('/mailing/sendCallsheetNotification/:email/:contact/:project/:callsheet/:to_contact', 
+          router.post('/mailing/sendCallsheetNotification', 
           [MailingsController, 'sendCallsheetNotification']
           )
       })
@@ -189,5 +189,6 @@ router
           guards: ['api'],
         })
       )
-  })
+    })
   .use(middleware.routeLogger())
+  })

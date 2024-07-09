@@ -2,6 +2,7 @@ import Contact from '#models/contact'
 import mail from '@adonisjs/mail/services/main'
 import CallsheetNotification from '../mails/callsheet_notification.js'
 import { HttpContext } from '@adonisjs/core/http'
+import { mailCallsheetValidator } from '#validators/mail'
 
 //CE FICHIER EST POPO
 
@@ -18,18 +19,20 @@ export default class MailingsController {
     })
   }
 
-  async sendCallsheetNotification({params, response} : HttpContext) {
-    let email = params.email
-    let contact = params.contact
-    let project = params.project
-    let callsheet = params.callsheet
-    let to_contact = params.to_contact
-      
-    const notificationMail = new CallsheetNotification(email, contact, project, callsheet, to_contact)
 
-    await mail.send(notificationMail.prepare.bind(notificationMail))
 
-    return response.json({ message: 'Email sent successfully' })
+  async sendCallsheetNotification({ request, response } : HttpContext) {
+    const { contact, project, callsheet, to_contact } = request.only([
+      'contact',
+      'project',
+      'callsheet',
+      'to_contact'
+    ]);
+  
+    const callsheetNotificationMail = new CallsheetNotification(contact, project, callsheet, to_contact);
+    await mail.send(callsheetNotificationMail.prepare.bind(callsheetNotificationMail));
+  
+    return response.json({ message: 'Email sent successfully' });
   }
 
 }
