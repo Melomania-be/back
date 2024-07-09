@@ -117,9 +117,11 @@ export default class ContactsController {
   async getValidation(ctx: HttpContext) {
     console.log('getValidation called')
 
-    let baseQuery = Contact.query().where('validated', false).preload('instruments', (instrumentsQuery) => {
-      instrumentsQuery.pivotColumns(['proficiency_level'])
-    })
+    let baseQuery = Contact.query()
+      .where('validated', false)
+      .preload('instruments', (instrumentsQuery) => {
+        instrumentsQuery.pivotColumns(['proficiency_level'])
+      })
 
     return await simpleFilter(
       ctx,

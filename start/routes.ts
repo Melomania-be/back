@@ -81,7 +81,8 @@ router
           router.get('/projects', [ProjectsController, 'getAll'])
           router.get('/projects/management/:id', [ProjectsController, 'getDashboard'])
           router.get('/projects/:id', [ProjectsController, 'getOne'])
-          router.post('/projects', [ProjectsController, 'create'])
+          router.post('/projects', [ProjectsController, 'createOrUpdate'])
+          router.delete('/projects/:id', [ProjectsController, 'delete'])
         })
 
         router.group(() => {
