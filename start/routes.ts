@@ -182,6 +182,9 @@ router
           router.post('/mailing/sendCallsheetNotification', 
           [MailingsController, 'sendCallsheetNotification']
           )
+          router.post('/mailing/sendRegistrationNotification',
+            [MailingsController, 'sendRegistrationNotification']
+            )
       })
 
       .use(
