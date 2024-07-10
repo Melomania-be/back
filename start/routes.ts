@@ -184,7 +184,11 @@ router
           )
           router.post('/mailing/sendRegistrationNotification',
             [MailingsController, 'sendRegistrationNotification']
-            )
+          )
+          router.post('/mailing/sendRecommendationNotification',
+            [MailingsController, 'sendRecommendationNotification']
+          )
+
       })
 
       .use(

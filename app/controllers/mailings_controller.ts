@@ -4,7 +4,8 @@ import CallsheetNotification from '../mails/callsheet_notification.js'
 import { HttpContext } from '@adonisjs/core/http'
 import { mailCallsheetValidator } from '#validators/mail'
 import env from '#start/env'
-import RegistrationNotification from '#mails/recommendation_notification'
+import RegistrationNotification from '#mails/registration_notification'
+import RecommendationNotification from '#mails/recommendation_notification'
 
 
 export default class MailingsController {
@@ -42,8 +43,8 @@ export default class MailingsController {
     return response.json({ message: 'Email sent successfully' });
   }
 
-  async sendRegistrationNotification({ request, response } : HttpContext) {
-    console.log('sendRegistrationNotification called')
+  async sendRecommendationNotification({ request, response } : HttpContext) {
+    console.log('sendRecommendationNotification called')
     console.log(request.all())
 
     const { contact, registration, project } = request.only([
@@ -56,10 +57,31 @@ export default class MailingsController {
       return response.status(400).json({ message: 'Contact email is required' })
     }
 
-    const registrationNotificationMail = new RegistrationNotification(contact, registration, project);
-    await mail.send(registrationNotificationMail);
+    const recommendationNotificationMail = new RecommendationNotification(contact, registration, project);
+    await mail.send(recommendationNotificationMail);
 
     return response.json({ message: 'Email sent successfully' });
   }
 
+  async sendRegistrationNotification({ request, response } : HttpContext) {
+    console.log('sendRecommendationNotification called')
+
+    const { contact, project, callsheet, to_contact } = request.only([
+      'contact',
+      'project',
+      'callsheet',
+      'to_contact'
+    ]);
+
+    if (!contact.email) {
+      return response.status(400).json({ message: 'Contact email is required' })
+    }
+
+    const registrationNotificationMail = new RegistrationNotification(contact, project, callsheet, to_contact);
+    await mail.send(registrationNotificationMail);
+
+    return response.json({ message: 'Email sent successfully' });
+
+    
+  }
 }

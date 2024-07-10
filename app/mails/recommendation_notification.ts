@@ -6,7 +6,7 @@ import fs from 'fs';
 
 //demande de participation au projet => mail registration
 
-export default class RegistrationNotification extends BaseMail {
+export default class RecommendationNotification extends BaseMail {
 
   contact : {
     first_name: string;
@@ -47,7 +47,7 @@ export default class RegistrationNotification extends BaseMail {
     this.message
     .to(this.contact.email)
     .from(env.get('SMTP_USERNAME'))
-    .subject('Callsheet Updated')
+    .subject('New Project')
     .html(htmlContent)
   }
 }
