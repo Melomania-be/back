@@ -47,15 +47,17 @@ export default class CallsheetNotification extends BaseMail {
     const htmlFilePath = path.join(__dirname, 'html_templates/callsheet_notification.html')
     let htmlContent = fs.readFileSync(htmlFilePath, 'utf-8')
 
-    htmlContent = htmlContent.replace('${contact.first_name}', this.contact.first_name)
-    .replace('${contact.last_name}', this.contact.last_name)
-    .replace('${project}', this.project.name)
-    .replace('${callsheet}', this.callsheet.id.toString())
-    .replace('${to_contact}', '<br>' + this.to_contact.first_name + ' ' + this.to_contact.last_name + '<br> mail : ' + this.to_contact.email + '<br> phone : ' + this.to_contact.phone) + '<br> messenger : ' + this.to_contact.messenger
+    htmlContent = htmlContent
+    .replace(/\${contact.first_name}/g, this.contact.first_name)
+    .replace(/\${contact.last_name}/g, this.contact.last_name)
+    .replace(/\${project}/g, this.project.name)
+    .replace(/\${callsheet}/g, this.callsheet.id.toString())
+    .replace(/\${to_contact}/g, '<br>' + this.to_contact.first_name + ' ' + this.to_contact.last_name + '<br> mail : ' + this.to_contact.email + '<br> phone : ' + this.to_contact.phone) + '<br> messenger : ' + this.to_contact.messenger
 
     this.message
-      .to(this.contact.email)
-      .subject(this.subject)
-      .html(htmlContent)
+    .to(this.contact.email)
+    .from(env.get('SMTP_USERNAME'))
+    .subject('Callsheet Updated')
+    .html(htmlContent)
   }
 }
