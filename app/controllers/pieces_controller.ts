@@ -18,7 +18,12 @@ export default class PiecesController {
       new Filter(Piece, ['name', 'opus', 'year_of_composition', 'composer_id', 'arranger']),
       [new RelationFilter('typeOfPiece', TypeOfPiece, ['name'])],
       //[new RelationFilter('composer', Composer, ['short_name', 'long_name', 'birth_date', 'death_date', 'country', 'main_style'])],
-      //[new RelationFilter('folder', Folder, ['name'])]
+      //[new RelationFilter('folder', Folder, ['name'])], 
+      {
+        filtered: true,
+        paginated: false,
+        ordered: true,
+      }
     )
   }
 

@@ -12,7 +12,11 @@ export default class TypeOfPiecesController {
       ctx,
       TypeOfPiece,
       baseQuery,
-      new Filter(TypeOfPiece, ['name']),
+      new Filter(TypeOfPiece, ['name']), [], {
+        filtered: true,
+        paginated: false,
+        ordered: true,
+      }
     )
   }
 
