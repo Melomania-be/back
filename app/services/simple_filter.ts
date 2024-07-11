@@ -56,37 +56,40 @@ export async function simpleFilter<Model extends LucidModel>(
       throw new Error('You must provide at least one column to filter')
     }
 
-    if (columnFilter) {
-      const asserter = await columnFilter.model.$adapter
-        .modelClient(new columnFilter.model())
-        .columnsInfo(columnFilter.model.table)
+    //allow condition
+    bddRequest.andWhere(async (queryGroup) => {
+      if (columnFilter) {
+        const asserter = await columnFilter.model.$adapter
+          .modelClient(new columnFilter.model())
+          .columnsInfo(columnFilter.model.table)
 
-      columnFilter.columnsToFilter.forEach(async (column) => {
-        if (isColumnNumber(asserter, column) && !Number.isNaN(Number(filter))) {
-          bddRequest = bddRequest.orWhere(column, filter)
-        } else if (isColumnString(asserter, column)) {
-          bddRequest = bddRequest.orWhere(column, 'like', `%${filter}%`)
-        }
-      })
-    }
+        columnFilter.columnsToFilter.forEach(async (column) => {
+          if (isColumnNumber(asserter, column) && !Number.isNaN(Number(filter))) {
+            queryGroup.orWhere(column, filter)
+          } else if (isColumnString(asserter, column)) {
+            queryGroup.orWhere(column, 'like', `%${filter}%`)
+          }
+        })
+      }
 
-    for (const relation of relationFilters ?? []) {
-      const asserter = await relation.model.$adapter
-        .modelClient(new relation.model())
-        .columnsInfo(relation.model.table)
+      for (const relation of relationFilters ?? []) {
+        const asserter = await relation.model.$adapter
+          .modelClient(new relation.model())
+          .columnsInfo(relation.model.table)
 
-      for (const column of relation.columnsToFilter) {
-        if (isColumnNumber(asserter, column) && !Number.isNaN(Number(filter))) {
-          bddRequest = bddRequest.orWhereHas(relation.relationName, (query) => {
-            query.where(column, filter)
-          })
-        } else if (isColumnString(asserter, column)) {
-          bddRequest = bddRequest.orWhereHas(relation.relationName, (query) => {
-            query.where(column, 'like', `%${filter}%`)
-          })
+        for (const column of relation.columnsToFilter) {
+          if (isColumnNumber(asserter, column) && !Number.isNaN(Number(filter))) {
+            queryGroup.orWhereHas(relation.relationName, (query) => {
+              query.where(column, filter)
+            })
+          } else if (isColumnString(asserter, column)) {
+            queryGroup.orWhereHas(relation.relationName, (query) => {
+              query.where(column, 'like', `%${filter}%`)
+            })
+          }
         }
       }
-    }
+    })
   }
 
   if (

@@ -11,19 +11,21 @@ export default class RegistrationsController {
   }
 
   async getOne({ params, response }: HttpContext) {
-    console.log('params???', params)
-    const registrationId = Number(params.id)
+    const projectId = Number(params.id)
 
-    if (Number.isNaN(registrationId)) {
+    if (Number.isNaN(projectId)) {
       return response.send('Invalid registration ID')
     }
 
-    const data = await Registration.query()
-      .where('id', registrationId)
+    return await Registration.query()
+      .whereHas('project', (query) => {
+        query.where('id', projectId)
+      })
       .preload('content')
       .preload('project', (projectQuery) => {
         projectQuery
           .preload('rehearsals')
+          .preload('concerts')
           .preload('pieces')
           .preload('sectionGroup', (sectionQuery) => {
             sectionQuery.preload('sections')
@@ -31,13 +33,6 @@ export default class RegistrationsController {
       })
       .preload('form')
       .first()
-
-    console.log('data : ', data)
-
-    if (!data) {
-      return response.send('Registration not found')
-    }
-    return response.json(data)
   }
 
   async create(ctx: HttpContext) {

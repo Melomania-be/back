@@ -25,6 +25,7 @@ const InstrumentsController = () => import('#controllers/instruments_controller'
 const MailingsController = () => import('#controllers/mailings_controller')
 const ListsController = () => import('#controllers/lists_controller')
 const SectionGroupsController = () => import('#controllers/section_groups_controller')
+const FormsController = () => import('#controllers/forms_controller')
 
 router
   .group(() => {
@@ -60,6 +61,10 @@ router
         })
 
         router.group(() => {
+          router.get('/registration/:id/forms', [FormsController, 'getFromProject'])
+        })
+
+        router.group(() => {
           router.get('projects/management/registration', [RegistrationsController, 'getAll'])
           router.get('projects/management/registration/:id', [RegistrationsController, 'getOne'])
           router.post('projects/management/registration', [RegistrationsController, 'create'])
@@ -79,39 +84,39 @@ router
 
         router.group(() => {
           router.get('/projects', [ProjectsController, 'getAll'])
-          router.get('/projects/management/:id', [ProjectsController, 'getDashboard'])
-          router.get('/projects/:id', [ProjectsController, 'getOne'])
           router.post('/projects', [ProjectsController, 'createOrUpdate'])
+          router.get('/projects/:id/management', [ProjectsController, 'getDashboard'])
+          router.get('/projects/:id', [ProjectsController, 'getOne'])
           router.delete('/projects/:id', [ProjectsController, 'delete'])
         })
 
         router.group(() => {
-          router.get('/projects/management/:id/participants', [ParticipantsController, 'getAll'])
-          router.post('/projects/management/:id/participants/link', [
+          router.get('/projects/:id/management/participants', [ParticipantsController, 'getAll'])
+          router.post('/projects/:id/management/participants/link', [
             ParticipantsController,
             'create',
           ])
-          router.patch('/projects/management/:id/participants/unlink/:participantId', [
+          router.patch('/projects/:id/management/participants/unlink/:participantId', [
             ParticipantsController,
             'unlinkParticipant',
           ])
-          router.get('/projects/management/:id/participants/unique/:participantId', [
+          router.get('/projects/:id/management/participants/unique/:participantId', [
             ParticipantsController,
             'getOne',
           ])
-          router.patch('/projects/management/:id/participants/unique/:participantId', [
+          router.patch('/projects/:id/management/participants/unique/:participantId', [
             ParticipantsController,
             'modify',
           ])
-          router.get('/projects/management/:id/validation', [
+          router.get('/projects/:id/management/validation', [
             ParticipantsController,
             'getApplications',
           ])
-          router.patch('/projects/management/:id/validation/:participantId', [
+          router.patch('/projects/:id/management/validation/:participantId', [
             ParticipantsController,
             'validateParticipant',
           ])
-          router.delete('/projects/management/:id/participants/:participantId', [
+          router.delete('/projects/:id/management/participants/:participantId', [
             ParticipantsController,
             'delete',
           ])

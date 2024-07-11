@@ -3,11 +3,17 @@
 import Participant from '#models/participant'
 import { HttpContext } from '@adonisjs/core/http'
 import { createParticipantValidator } from '#validators/participant'
+import { simpleFilter } from '#services/simple_filter'
 
 export default class ParticipantsController {
   //getAll : gets list of all of the (accepted) participants of this project at /projects/:id/management/participants
-  async getAll({ params }: HttpContext) {
-    return await Participant.query().where('project_id', params.id).andWhere('accepted', true)
+  async getAll(ctx: HttpContext) {
+    const baseQuery = Participant.query()
+      .preload('contact')
+      .where('project_id', ctx.params.id)
+      .andWhere('accepted', true)
+
+    return await simpleFilter(ctx, Participant, baseQuery)
   }
 
   //create : posts a participant in a given project at /projects/:id/management/participants/link
