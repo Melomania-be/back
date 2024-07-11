@@ -3,7 +3,8 @@
 import Participant from '#models/participant'
 import { HttpContext } from '@adonisjs/core/http'
 import { createParticipantValidator } from '#validators/participant'
-import { simpleFilter } from '#services/simple_filter'
+import { Filter, RelationFilter, simpleFilter } from '#services/simple_filter'
+import Contact from '#models/contact'
 
 export default class ParticipantsController {
   //getAll : gets list of all of the (accepted) participants of this project at /projects/:id/management/participants
@@ -13,72 +14,65 @@ export default class ParticipantsController {
       .where('project_id', ctx.params.id)
       .andWhere('accepted', true)
 
-    return await simpleFilter(ctx, Participant, baseQuery)
-  }
-
-  //create : posts a participant in a given project at /projects/:id/management/participants/link
-  async create(ctx: HttpContext) {
-    const data = await ctx.request.validateUsing(createParticipantValidator)
-    const existingParticipant = await Participant.query()
-      .where('contact', data.contact)
-      .andWhere('project', data.project)
-      .first()
-
-    if (existingParticipant) {
-      return ctx.response
-        .status(400)
-        .send({ message: 'This participant is already associated with this project.' })
-    }
-
-    return await Participant.create(data)
-  }
-
-  //unlinkParticipant : transforms the accepted field to true at /projects/:id/management/validation/:id
-  async unlinkParticipant({ params, response }: HttpContext) {
-    const { projectId, participantId } = params
-
-    const participant = await Participant.query()
-      .where('id', participantId)
-      .andWhere('project_id', projectId)
-      .first()
-
-    if (!participant) return response.send("Couldn't find the participant")
-
-    participant.accepted = false
-    await participant.save()
-
-    return response.send('Participant validated')
+    return await simpleFilter(
+      ctx,
+      Participant,
+      baseQuery,
+      new Filter(Participant, ['contact_id']),
+      [new RelationFilter('contact', Contact, ['first_name', 'last_name'])]
+    )
   }
 
   //getOne : gets a participant at /projects/:id/management/participants/unique/:id
   async getOne({ params }: HttpContext) {
-    const { projectId, participantId } = params
+    const { id, participantId } = params
     return await Participant.query()
       .where('id', participantId)
-      .andWhere('project_id', projectId)
+      .andWhere('project_id', id)
       .preload('contact')
       .preload('section')
-      .preload('answer')
+      .preload('answers')
+      .preload('concerts')
+      .preload('rehearsals')
+      .preload('project')
       .first()
   }
 
-  //modify : patch a participant at /projects/:id/management/participants/unique/:id
-  async modify({ params, request, response }: HttpContext) {
-    const { projectId, participantId } = params
+  //createOrUpdate : creates a participant at /projects/:id/management/participants
+  async createOrUpdate({ request, response }: HttpContext) {
     const data = await request.validateUsing(createParticipantValidator)
 
-    const participant = await Participant.query()
-      .where('id', participantId)
-      .andWhere('project_id', projectId)
-      .first()
+    let participant: Participant | null
 
-    if (!participant) {
-      return response.send('Participant not found')
+    if (data.id) {
+      participant = await Participant.find(data.id)
+      if (!participant) return response.abort('Participant not found')
+    } else {
+      participant = await Participant.query()
+        .where('project_id', data.project.id)
+        .andWhere('contact_id', data.contact.id)
+        .first()
+      if (participant) return response.abort('This person already is a participant')
+      else
+        participant = await Participant.create({
+          accepted: data.accepted,
+          contact_id: data.contact.id,
+          project_id: data.project.id,
+          section_id: data.section.id,
+        })
     }
 
-    await participant.merge(data).save()
+    participant.related('answers').createMany(
+      data.answers.map((answers) => ({
+        text: answers.text ? answers.text : '',
+        form_id: answers.formId,
+      }))
+    )
 
-    return response.send('Participant modified : ' + participant)
+    participant.related('concerts').sync(data.concerts.map((concert) => concert.id))
+    participant.related('rehearsals').sync(data.rehearsals.map((rehearsal) => rehearsal.id))
+
+    return response.send('Participant created')
   }
 
   //getApplications : gets list of all contacts that want to be participants at /projects/:id/management/validation
@@ -88,7 +82,7 @@ export default class ParticipantsController {
       .andWhere('accepted', false)
       .preload('contact')
       .preload('section')
-      .preload('answer')
+      .preload('answers')
   }
 
   //validateParticipant : transforms the accepted field to true at /projects/:id/management/validation/:id

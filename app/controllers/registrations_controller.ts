@@ -17,7 +17,7 @@ export default class RegistrationsController {
       return response.send('Invalid registration ID')
     }
 
-    return await Registration.query()
+    const registration = await Registration.query()
       .whereHas('project', (query) => {
         query.where('id', projectId)
       })
@@ -33,6 +33,12 @@ export default class RegistrationsController {
       })
       .preload('form')
       .first()
+
+    if (!registration) {
+      return response.abort('Registration not found', 404)
+    }
+
+    return registration
   }
 
   async create(ctx: HttpContext) {
@@ -71,15 +77,19 @@ export default class RegistrationsController {
     await participant.related('rehearsals').sync(data.rehearsals)
 
     //Puting the answer in the answer table if there is a form to fill
-    if (!data.answer) {
+    if (data.answers.length === 0) {
       return ctx.response.json({ success: true, participant })
     }
 
-    const answer = await Answer.create({
-      text: data.answer.text,
-      form_id: data.answer.form_id,
-      participant_id: participant.id,
-    })
+    const answer = await Answer.createMany(
+      data.answers.map((answerIt) => {
+        return {
+          text: answerIt.text,
+          form_id: answerIt.form_id,
+          participant_id: participant.id,
+        }
+      })
+    )
 
     return ctx.response.json({ success: true, participant, answer })
   }

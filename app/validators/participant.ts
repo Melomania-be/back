@@ -2,11 +2,19 @@ import vine from '@vinejs/vine'
 
 export const createParticipantValidator = vine.compile(
   vine.object({
-    last_activity: vine.date({ formats: ['x'] }),
+    id: vine.number().optional(),
     accepted: vine.boolean(),
-    project: vine.number(),
-    section: vine.number(),
-    contact: vine.number(),
-    answer: vine.number().optional(),
+    project: vine.object({
+      id: vine.number(),
+    }),
+    section: vine.object({
+      id: vine.number(),
+    }),
+    contact: vine.object({
+      id: vine.number(),
+    }),
+    answers: vine.array(vine.object({ formId: vine.number(), text: vine.string().nullable() })),
+    concerts: vine.array(vine.object({ id: vine.number() })),
+    rehearsals: vine.array(vine.object({ id: vine.number() })),
   })
 )

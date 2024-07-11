@@ -92,33 +92,26 @@ router
 
         router.group(() => {
           router.get('/projects/:id/management/participants', [ParticipantsController, 'getAll'])
-          router.post('/projects/:id/management/participants/link', [
+          router.post('/projects/:id/management/participants', [
             ParticipantsController,
-            'create',
+            'createOrUpdate',
           ])
-          router.patch('/projects/:id/management/participants/unlink/:participantId', [
-            ParticipantsController,
-            'unlinkParticipant',
-          ])
-          router.get('/projects/:id/management/participants/unique/:participantId', [
+          router.get('/projects/:id/management/participants/:participantId', [
             ParticipantsController,
             'getOne',
-          ])
-          router.patch('/projects/:id/management/participants/unique/:participantId', [
-            ParticipantsController,
-            'modify',
-          ])
-          router.get('/projects/:id/management/validation', [
-            ParticipantsController,
-            'getApplications',
-          ])
-          router.patch('/projects/:id/management/validation/:participantId', [
-            ParticipantsController,
-            'validateParticipant',
           ])
           router.delete('/projects/:id/management/participants/:participantId', [
             ParticipantsController,
             'delete',
+          ])
+
+          router.get('/projects/:id/management/validation', [
+            ParticipantsController,
+            'getApplications',
+          ])
+          router.get('/projects/:id/management/validation/:participantId', [
+            ParticipantsController,
+            'validateParticipant',
           ])
         })
 

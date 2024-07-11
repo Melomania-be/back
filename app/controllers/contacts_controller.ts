@@ -27,7 +27,7 @@ export default class ContactsController {
       .preload('instruments')
       .preload('lists')
       .preload('participants', (query) => {
-        query.preload('project').preload('section').preload('answer')
+        query.preload('project').preload('section').preload('answers')
       })
       .firstOrFail()
   }
@@ -49,7 +49,7 @@ export default class ContactsController {
         self: ['id', 'first_name', 'last_name', 'email', 'comments', 'messenger', 'phone'],
         instruments: ['id', 'family', 'name'],
         projects: ['id', 'name'],
-        participants: ['id', 'project', 'section', 'answer'],
+        participants: ['id', 'project', 'section', 'answers'],
         lists: ['id', 'name'],
       },
     }
@@ -89,7 +89,7 @@ export default class ContactsController {
       let participations = await contact.related('participants').query()
 
       for (let participation of participations) {
-        await participation.related('answer').query().delete()
+        await participation.related('answers').query().delete()
         await participation.related('rehearsals').query().delete()
         await participation.delete()
       }
