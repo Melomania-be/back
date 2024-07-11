@@ -1,10 +1,25 @@
 import Piece from '#models/piece'
+import Folder from '#models/folder'
+import Composer from '#models/composer'
+import TypeOfPiece from '#models/type_of_piece'
 import { HttpContext } from '@adonisjs/core/http'
 import { createPieceValidator } from '#validators/piece'
+import { simpleFilter, Filter, RelationFilter } from '#services/simple_filter'
 
 export default class PiecesController {
-  async getAll() {
-    return await Piece.query().preload('typeOfPiece').preload('composer').preload('folder')
+
+  async getAll(ctx: HttpContext) {
+    let baseQuery = Piece.query().preload('sections').preload('typeOfPiece').preload('composer').preload('folder')
+
+    return await simpleFilter(
+      ctx,
+      Piece,
+      baseQuery,
+      new Filter(Piece, ['name', 'opus', 'year_of_composition', 'composer_id', 'arranger']),
+      [new RelationFilter('typeOfPiece', TypeOfPiece, ['name'])],
+      //[new RelationFilter('composer', Composer, ['short_name', 'long_name', 'birth_date', 'death_date', 'country', 'main_style'])],
+      //[new RelationFilter('folder', Folder, ['name'])]
+    )
   }
 
   async createOrUpdate(ctx: HttpContext) {
