@@ -1,10 +1,23 @@
 import TypeOfPiece from '#models/type_of_piece'
 import { HttpContext } from '@adonisjs/core/http'
 import { createTypeOfPieceValidator } from '#validators/type_of_piece'
+import { simpleFilter, Filter } from '#services/simple_filter'
 
 export default class TypeOfPiecesController {
-  async getAll() {
-    return await TypeOfPiece.query()
+
+  async getAll(ctx: HttpContext) {
+    let baseQuery = TypeOfPiece.query()
+
+    return await simpleFilter(
+      ctx,
+      TypeOfPiece,
+      baseQuery,
+      new Filter(TypeOfPiece, ['name']), [], {
+        filtered: true,
+        paginated: false,
+        ordered: true,
+      }
+    )
   }
 
   async createOrUpdate(ctx: HttpContext) {
