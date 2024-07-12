@@ -2,10 +2,13 @@ import Contact from '#models/contact'
 import mail from '@adonisjs/mail/services/main'
 import CallsheetNotification from '../mails/callsheet_notification.js'
 import { HttpContext } from '@adonisjs/core/http'
-import { mailCallsheetValidator } from '#validators/mail'
+import { createTemplateValidator, mailCallsheetValidator } from '#validators/mail'
 import env from '#start/env'
 import RegistrationNotification from '#mails/registration_notification'
 import RecommendationNotification from '#mails/recommendation_notification'
+import mail_template from '#models/mail_template'
+import TemplatePreparation from '#mails/template_preparation'
+import Callsheet from '#models/callsheet'
 
 
 export default class MailingsController {
@@ -84,4 +87,59 @@ export default class MailingsController {
 
     
   }
+
+  async getTemplates(){
+    let allTemplates = await mail_template.query().select('*')
+    return allTemplates
+  }
+
+  async sendTemplate({ request, response } : HttpContext) {
+    const {template, subject, contact, project, to_contact } = request.only([
+      'template',
+      'subject',
+      'contact',
+      'project',
+      'to_contact'
+    ]);
+
+    if (!contact.email) {
+      return response.status(400).json({ message: 'Contact email is required' })
+    }
+
+    let contact_db = await Contact.find(contact.id)
+    let template_db = await mail_template.find(template.id)
+    let htmlFromDb = template_db?.content || ''
+    let project_db = await project.find(project.id)
+    let callsheet = await Callsheet.find(project_db.callsheet_id)
+    let registration_id = project_db.registration_id    
+    
+    if (htmlFromDb != '' && callsheet != null && registration_id != null) {
+      if (contact_db?.subscribed == true) {
+        const registrationNotificationMail = new TemplatePreparation(htmlFromDb, subject, contact, project, callsheet, to_contact, registration_id);
+        await mail.send(registrationNotificationMail);
+
+      return response.json({ message: 'Email sent successfully' });
+      }
+      else {
+        return response.json({ message: 'Contact is not subscribed' });
+      }
+    }
+    else {
+      return response.json({ message: 'Template not found or incomplete (callsheet not found or registration form not found)' });
+    }
+  }
+
+  async createOrUpdateTemplate (ctx : HttpContext) {
+    const data = await ctx.request.validateUsing(createTemplateValidator)
+
+    if (!data.id) {
+      return await mail_template.create({ ...data })
+    }
+
+    const template = await mail_template.updateOrCreate({ id: data.id }, { ...data })
+
+    await template.save()
+    return template
+  }
+
 }

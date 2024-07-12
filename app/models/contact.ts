@@ -31,6 +31,9 @@ export default class Contact extends BaseModel {
   @column()
   declare validated: boolean
 
+  @column()
+  declare subscribed: boolean
+
   @manyToMany(() => Instrument, {
     pivotTable: 'plays',
     pivotColumns: ['proficiency_level'],
@@ -62,6 +65,7 @@ export default class Contact extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
 
   serializeExtras() {
     return { pivot_proficiency_level: this.$extras.pivot_proficiency_level }

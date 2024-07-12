@@ -27,3 +27,11 @@ export const mailCallsheetValidator = vine.compile(
         }),
     })
 )
+
+export const createTemplateValidator = vine.compile(
+    vine.object({
+        id: vine.number().optional(),
+        name : vine.string(),
+        content : vine.string(),
+      })
+)

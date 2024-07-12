@@ -53,11 +53,10 @@ export default class RegistrationNotification extends BaseMail {
     let htmlContent = fs.readFileSync(htmlFilePath, 'utf-8')
 
     htmlContent = htmlContent
-    .replace(/\${contact.first_name}/g, this.contact.first_name)
-    .replace(/\${contact.last_name}/g, this.contact.last_name)
-    .replace(/\${project}/g, this.project.name)
-    .replace(/\${callsheet}/g, 'http://tool.ciro3903.odns.fr/call_sheets/' + this.callsheet.id.toString() + '/' + this.contact.id.toString())
-    .replace(/\${to_contact}/g, '<br>' + this.to_contact.first_name + ' ' + this.to_contact.last_name + '<br> mail : ' + this.to_contact.email + '<br> phone : ' + this.to_contact.phone) + '<br> messenger : ' + this.to_contact.messenger
+    .replace(/\${NAME}/g, this.contact.first_name + ' ' + this.contact.last_name)
+    .replace(/\${PROJECT}/g, this.project.name)
+    .replace(/\${CALLSHEET}/g, 'http://tool.ciro3903.odns.fr/call_sheets/' + this.callsheet.id.toString() + '/' + this.contact.id.toString())
+    .replace(/\${TO_CONTACT}/g, '<br>' + this.to_contact.first_name + ' ' + this.to_contact.last_name + '<br> mail : ' + this.to_contact.email + '<br> phone : ' + this.to_contact.phone) + '<br> messenger : ' + this.to_contact.messenger
 
     this.message
     .to(this.contact.email)
