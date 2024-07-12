@@ -42,7 +42,7 @@ router
       router.post('/sign_in', [UsersController, 'signIn'])
       router.post('/recommend_someone', [RecommendSomeonesController, 'create'])
 
-      router.get('/call_sheets/:id/:visitorId', [CallsheetsController, 'getOne'])
+      router.get('/call_sheets/:callsheetId/:visitorId', [CallsheetsController, 'getOne'])
     })
 
     //protected routes
@@ -71,9 +71,12 @@ router
         })
 
         router.group(() => {
-          router.get('/projects/management/call_sheets', [CallsheetsController, 'getAll'])
-          //router.get('/projects/management/call_sheets/:id', [CallsheetsController, 'getOne'])
-          router.post('/projects/management/call_sheets/', [CallsheetsController, 'create'])
+          router.get('/projects/:id/management/call_sheets', [CallsheetsController, 'getAll'])
+          router.get('/projects/:id/management/call_sheets/:callsheetId', [
+            CallsheetsController,
+            'getOne',
+          ])
+          router.post('/projects/:id/management/call_sheets/', [CallsheetsController, 'create'])
         })
 
         router.group(() => {
