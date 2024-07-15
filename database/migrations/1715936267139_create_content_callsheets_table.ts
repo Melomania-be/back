@@ -8,7 +8,12 @@ export default class extends BaseSchema {
       table.increments('id')
       table.string('title')
       table.string('text')
-      table.integer('callsheet_id').unsigned().references('id').inTable('callsheets').onDelete('CASCADE')
+      table
+        .integer('callsheet_id')
+        .unsigned()
+        .references('id')
+        .inTable('callsheets')
+        .onDelete('CASCADE')
 
       table.timestamp('created_at')
       table.timestamp('updated_at')

@@ -76,7 +76,14 @@ router
             CallsheetsController,
             'getOne',
           ])
-          router.post('/projects/:id/management/call_sheets/', [CallsheetsController, 'create'])
+          router.post('/projects/:id/management/call_sheets/', [
+            CallsheetsController,
+            'createOrUpdate',
+          ])
+          router.delete('/projects/:id/management/call_sheets/:callsheetId', [
+            CallsheetsController,
+            'delete',
+          ])
         })
 
         router.group(() => {
