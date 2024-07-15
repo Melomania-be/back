@@ -4,6 +4,7 @@ import { createRegistrationValidator, userRegistrationValidator } from '#validat
 import Contact from '#models/contact'
 import Participant from '#models/participant'
 import Answer from '#models/answer'
+import Project from '#models/project'
 
 export default class RegistrationsController {
   async getAll() {
@@ -41,11 +42,36 @@ export default class RegistrationsController {
     return registration
   }
 
-  async create(ctx: HttpContext) {
+  async createOrUpdate(ctx: HttpContext) {
     const data = await ctx.request.validateUsing(createRegistrationValidator)
-    const registration = await Registration.create(data)
 
-    return registration.related('content').createMany(data.content)
+    let project = await Project.findOrFail(data.params.id)
+
+    let registration = await project.related('registration').query().first()
+
+    if (registration) {
+      await registration.related('content').query().delete()
+      await registration.related('form').query().delete()
+    } else {
+      registration = await project.related('registration').create({})
+    }
+    registration.related('content').createMany(data.content)
+    registration.related('form').createMany(data.form)
+
+    return registration
+  }
+
+  async delete({ params, response }: HttpContext) {
+    const projectId = Number(params.id)
+
+    if (Number.isNaN(projectId)) {
+      return response.send('Invalid project ID')
+    }
+
+    const registration = await Registration.query().where('project_id', projectId).firstOrFail()
+
+    await registration.delete()
+    return response.send('Registration deleted')
   }
 
   async submit(ctx: HttpContext) {
