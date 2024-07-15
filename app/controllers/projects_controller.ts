@@ -33,12 +33,18 @@ export default class ProjectsController {
       .where('id', params.id)
       .preload('concerts')
       .preload('pieces', (query) => {
-        query.preload('composer')
+        query.preload('composer').preload('folder', (subQuery) => {
+          subQuery.preload('files')
+        })
       })
       .preload('participants')
       .preload('registration')
       .preload('rehearsals')
-      .preload('sectionGroup')
+      .preload('sectionGroup', (query) => {
+        query.preload('sections', (subQuery) => {
+          subQuery.preload('instruments')
+        })
+      })
       .preload('callsheets')
       .preload('responsibles')
     return data
