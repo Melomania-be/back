@@ -29,7 +29,9 @@ export default class Recommended extends BaseModel {
   @column()
   declare project_id: number
 
-  @belongsTo(() => Project)
+  @belongsTo(() => Project, {
+    foreignKey: 'project_id',
+  })
   declare project: BelongsTo<typeof Project>
 
   @manyToMany(() => Instrument, {
