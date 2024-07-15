@@ -14,9 +14,11 @@ export default class Form extends BaseModel {
   declare type: string
 
   @column()
-  declare registration_id : number
+  declare registration_id: number
 
-  @belongsTo(() => Registration)
+  @belongsTo(() => Registration, {
+    foreignKey: 'registration_id',
+  })
   declare registration: BelongsTo<typeof Registration>
 
   @column.dateTime({ autoCreate: true })

@@ -1,19 +1,21 @@
-// import type { HttpContext } from '@adonisjs/core/http'
 import { HttpContext } from '@adonisjs/core/http'
 import Callsheet from '#models/callsheet'
 import { createCallsheetValidator, getCallsheetValidator } from '#validators/callsheet'
 import Contact from '#models/contact'
+import { simpleFilter, Filter } from '#services/simple_filter'
 
 export default class CallsheetsController {
-  async getAll() {
-    return await Callsheet.all()
+  async getAll(ctx: HttpContext) {
+    let baseQuery = Callsheet.query().where('project_id', ctx.params.id)
+
+    return await simpleFilter(ctx, Callsheet, baseQuery, new Filter(Callsheet, ['version']))
   }
 
   async getOne(ctx: HttpContext) {
     const { params } = await ctx.request.validateUsing(getCallsheetValidator)
 
     const callsheet = await Callsheet.query()
-      .where('id', params.id)
+      .where('id', params.callsheetId)
       .preload('contents')
       .preload('project', (projectQuery) => {
         projectQuery
@@ -27,28 +29,30 @@ export default class CallsheetsController {
             })
           })
       })
-      .first()
+      .firstOrFail()
 
     if (!callsheet) return ctx.response.notFound()
 
-    const contact = await Contact.find(params.visitorId)
+    if (params.visitorId) {
+      const contact = await Contact.find(params.visitorId)
 
-    if (contact) {
-      const project = await callsheet.related('project').query().first()
+      if (contact) {
+        const project = await callsheet.related('project').query().first()
 
-      if (project) {
-        const participant = await project
-          .related('participants')
-          .query()
-          .where('contact_id', contact.id)
-          .first()
+        if (project) {
+          const participant = await project
+            .related('participants')
+            .query()
+            .where('contact_id', contact.id)
+            .first()
 
-        if (participant) {
-          participant.last_activity = new Date()
-          await callsheet.related('participants').save(participant)
+          if (participant) {
+            participant.last_activity = new Date()
+            await callsheet.related('participants').save(participant)
 
-          await participant.related('hasSeenCallsheets').detach([callsheet.id])
-          await participant.related('hasSeenCallsheets').attach([callsheet.id])
+            await participant.related('hasSeenCallsheets').detach([callsheet.id])
+            await participant.related('hasSeenCallsheets').attach([callsheet.id])
+          }
         }
       }
     }

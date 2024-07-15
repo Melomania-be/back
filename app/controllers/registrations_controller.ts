@@ -11,19 +11,21 @@ export default class RegistrationsController {
   }
 
   async getOne({ params, response }: HttpContext) {
-    console.log('params???', params)
-    const registrationId = Number(params.id)
+    const projectId = Number(params.id)
 
-    if (Number.isNaN(registrationId)) {
+    if (Number.isNaN(projectId)) {
       return response.send('Invalid registration ID')
     }
 
-    const data = await Registration.query()
-      .where('id', registrationId)
+    const registration = await Registration.query()
+      .whereHas('project', (query) => {
+        query.where('id', projectId)
+      })
       .preload('content')
       .preload('project', (projectQuery) => {
         projectQuery
           .preload('rehearsals')
+          .preload('concerts')
           .preload('pieces')
           .preload('sectionGroup', (sectionQuery) => {
             sectionQuery.preload('sections')
@@ -32,12 +34,11 @@ export default class RegistrationsController {
       .preload('form')
       .first()
 
-    console.log('data : ', data)
-
-    if (!data) {
-      return response.send('Registration not found')
+    if (!registration) {
+      return response.abort('Registration not found', 404)
     }
-    return response.json(data)
+
+    return registration
   }
 
   async create(ctx: HttpContext) {
@@ -76,15 +77,19 @@ export default class RegistrationsController {
     await participant.related('rehearsals').sync(data.rehearsals)
 
     //Puting the answer in the answer table if there is a form to fill
-    if (!data.answer) {
+    if (data.answers.length === 0) {
       return ctx.response.json({ success: true, participant })
     }
 
-    const answer = await Answer.create({
-      text: data.answer.text,
-      form_id: data.answer.form_id,
-      participant_id: participant.id,
-    })
+    const answer = await Answer.createMany(
+      data.answers.map((answerIt) => {
+        return {
+          text: answerIt.text,
+          form_id: answerIt.form_id,
+          participant_id: participant.id,
+        }
+      })
+    )
 
     return ctx.response.json({ success: true, participant, answer })
   }

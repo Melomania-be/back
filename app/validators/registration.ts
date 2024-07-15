@@ -26,11 +26,11 @@ export const userRegistrationValidator = vine.compile(
     rehearsals: vine.array(vine.number()),
     project_id: vine.number(),
     section_id: vine.number(),
-    answer: vine
-      .object({
+    answers: vine.array(
+      vine.object({
         text: vine.string() || vine.boolean(),
         form_id: vine.number(),
       })
-      .optional(),
+    ),
   })
 )

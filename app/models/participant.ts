@@ -7,6 +7,7 @@ import Answer from '#models/answer'
 import Contact from '#models/contact'
 import Rehearsal from '#models/rehearsal'
 import Callsheet from './callsheet.js'
+import Concert from './concert.js'
 
 export default class Participant extends BaseModel {
   @column({ isPrimary: true })
@@ -50,6 +51,14 @@ export default class Participant extends BaseModel {
   })
   declare rehearsals: ManyToMany<typeof Rehearsal>
 
+  @manyToMany(() => Concert, {
+    pivotTable: 'participates_in_concerts',
+    pivotForeignKey: 'participant_id',
+    pivotRelatedForeignKey: 'concert_id',
+    pivotTimestamps: true,
+  })
+  declare concerts: ManyToMany<typeof Concert>
+
   @manyToMany(() => Callsheet, {
     pivotTable: 'seens',
     pivotTimestamps: true,
@@ -59,7 +68,7 @@ export default class Participant extends BaseModel {
   @hasMany(() => Answer, {
     foreignKey: 'participant_id',
   })
-  declare answer: HasMany<typeof Answer>
+  declare answers: HasMany<typeof Answer>
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime

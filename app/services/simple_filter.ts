@@ -56,37 +56,54 @@ export async function simpleFilter<Model extends LucidModel>(
       throw new Error('You must provide at least one column to filter')
     }
 
+    let asserter: {
+      [column: string]: Knex.ColumnInfo
+    }
+
     if (columnFilter) {
-      const asserter = await columnFilter.model.$adapter
+      asserter = await columnFilter.model.$adapter
         .modelClient(new columnFilter.model())
         .columnsInfo(columnFilter.model.table)
-
-      columnFilter.columnsToFilter.forEach(async (column) => {
-        if (isColumnNumber(asserter, column) && !Number.isNaN(Number(filter))) {
-          bddRequest = bddRequest.orWhere(column, filter)
-        } else if (isColumnString(asserter, column)) {
-          bddRequest = bddRequest.orWhere(column, 'like', `%${filter}%`)
-        }
-      })
     }
+
+    let asserters: {
+      [column: string]: Knex.ColumnInfo
+    }[] = []
 
     for (const relation of relationFilters ?? []) {
-      const asserter = await relation.model.$adapter
-        .modelClient(new relation.model())
-        .columnsInfo(relation.model.table)
+      asserters.push(
+        await relation.model.$adapter
+          .modelClient(new relation.model())
+          .columnsInfo(relation.model.table)
+      )
+    }
 
-      for (const column of relation.columnsToFilter) {
-        if (isColumnNumber(asserter, column) && !Number.isNaN(Number(filter))) {
-          bddRequest = bddRequest.orWhereHas(relation.relationName, (query) => {
-            query.where(column, filter)
-          })
-        } else if (isColumnString(asserter, column)) {
-          bddRequest = bddRequest.orWhereHas(relation.relationName, (query) => {
-            query.where(column, 'like', `%${filter}%`)
-          })
+    bddRequest.andWhere((queryGroup) => {
+      if (columnFilter) {
+        columnFilter.columnsToFilter.forEach((column) => {
+          if (isColumnNumber(asserter, column) && !Number.isNaN(Number(filter))) {
+            queryGroup.orWhere(column, filter)
+          } else if (isColumnString(asserter, column)) {
+            queryGroup.orWhere(column, 'like', `%${filter}%`)
+          }
+        })
+      }
+
+      for (const [index, relation] of (relationFilters ?? []).entries()) {
+        for (const column of relation.columnsToFilter) {
+          if (isColumnNumber(asserters[index], column) && !Number.isNaN(Number(filter))) {
+            queryGroup.orWhereHas(relation.relationName, (query) => {
+              query.where(column, filter)
+            })
+          } else if (isColumnString(asserters[index], column)) {
+            queryGroup.orWhereHas(relation.relationName, (query) => {
+              query.where(column, 'like', `%${filter}%`)
+            })
+          }
         }
       }
-    }
+      console.log(queryGroup.toSQL())
+    })
   }
 
   if (
@@ -95,9 +112,9 @@ export async function simpleFilter<Model extends LucidModel>(
     orderBy !== '' &&
     (order === 'asc' || order === 'desc')
   ) {
-    bddRequest = bddRequest.orderBy(string.snakeCase(orderBy), order)
+    bddRequest.orderBy(string.snakeCase(orderBy), order)
   } else {
-    bddRequest = bddRequest.orderBy('id', 'asc')
+    bddRequest.orderBy('id', 'asc')
   }
 
   if (options?.paginated !== false && limit && page) {

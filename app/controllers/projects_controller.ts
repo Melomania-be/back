@@ -6,6 +6,9 @@ import { createProjectValidator } from '#validators/project'
 import { simpleFilter, Filter } from '#services/simple_filter'
 import Participant from '#models/participant'
 import db from '@adonisjs/lucid/services/db'
+import SectionGroup from '#models/section_group'
+import Piece from '#models/piece'
+import { DateTime } from 'luxon'
 
 export default class ProjectsController {
   async getAll(ctx: HttpContext) {
@@ -29,12 +32,15 @@ export default class ProjectsController {
     const data = await Project.query()
       .where('id', params.id)
       .preload('concerts')
-      .preload('pieces')
+      .preload('pieces', (query) => {
+        query.preload('composer')
+      })
       .preload('participants')
       .preload('registration')
       .preload('rehearsals')
       .preload('sectionGroup')
       .preload('callsheets')
+      .preload('responsibles')
     return data
   }
 
@@ -102,15 +108,62 @@ export default class ProjectsController {
     }
   }
 
-  async create(ctx: HttpContext) {
+  async createOrUpdate(ctx: HttpContext) {
+    console.log(ctx.request.all())
+
     const data = await ctx.request.validateUsing(createProjectValidator)
 
-    const existingProject = await Project.query().where('name', data.name).first()
+    console.log(data)
 
-    if (existingProject) {
-      return ctx.response.status(400).send({ message: 'Project with this name already exists.' })
+    let project: Project
+
+    if (!data.id) {
+      project = await Project.create({ name: data.name })
+    } else {
+      project = await Project.updateOrCreate({ id: data.id }, { name: data.name })
     }
 
-    return await Project.create(data)
+    const sectionGroup = await SectionGroup.find(data.section_group_id)
+
+    if (sectionGroup === null) {
+      return ctx.response.status(400).send({ message: 'Section group not found' })
+    }
+
+    await project.related('sectionGroup').dissociate()
+    await project.related('sectionGroup').associate(sectionGroup)
+
+    const responsibles = await Participant.query().whereIn('id', data.responsibles_ids)
+
+    await project.related('responsibles').detach()
+    await project.related('responsibles').sync(responsibles.map((r) => r.id))
+
+    const pieces = await Piece.query().whereIn('id', data.pieces_ids)
+
+    await project.related('pieces').detach()
+    await project.related('pieces').sync(pieces.map((p) => p.id))
+
+    await project.related('concerts').query().delete()
+    await project
+      .related('concerts')
+      .updateOrCreateMany(data.concerts.map((c) => ({ ...c, date: DateTime.fromJSDate(c.date) })))
+
+    await project.related('rehearsals').query().delete()
+    await project
+      .related('rehearsals')
+      .updateOrCreateMany(data.rehearsals.map((r) => ({ ...r, date: DateTime.fromJSDate(r.date) })))
+
+    return await project.save()
+  }
+
+  async delete({ params }: HttpContext) {
+    const project = await Project.find(params.id)
+
+    if (project === null) {
+      return { message: 'Project not found' }
+    }
+
+    await project.delete()
+
+    return { message: 'Project deleted' }
   }
 }

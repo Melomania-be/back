@@ -17,8 +17,8 @@ export const createCallsheetValidator = vine.compile(
 export const getCallsheetValidator = vine.compile(
   vine.object({
     params: vine.object({
-      id: vine.number(),
-      visitorId: vine.number(),
+      visitorId: vine.number().optional(),
+      callsheetId: vine.number(),
     }),
   })
 )
