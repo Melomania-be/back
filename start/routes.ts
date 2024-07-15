@@ -25,6 +25,7 @@ const InstrumentsController = () => import('#controllers/instruments_controller'
 const MailingsController = () => import('#controllers/mailings_controller')
 const ListsController = () => import('#controllers/lists_controller')
 const SectionGroupsController = () => import('#controllers/section_groups_controller')
+const TemplateController = () => import('#controllers/template_controller')
 
 router
   .group(() => {
@@ -189,8 +190,14 @@ router
           router.post('/mailing/sendRecommendationNotification',
             [MailingsController, 'sendRecommendationNotification']
           )
+        })
 
-      })
+        router.group(() => {
+          router.get('/templates', [TemplateController, 'getTemplates'])
+          router.post('/templates/send', [TemplateController, 'sendTemplate'])
+          router.post('/templates/createOrUpdate', [TemplateController, 'createOrUpdateTemplate'])
+          router.get('/templates/:id', [TemplateController, 'delete'])  
+        })
 
       .use(
         middleware.auth({
