@@ -12,6 +12,13 @@ export default class extends BaseSchema {
       table.string('email', 255).defaultTo('')
       table.string('phone', 255).defaultTo('')
       table.string('messenger', 255).defaultTo('')
+      table.string('comment', 255).defaultTo('')
+      table
+        .integer('project_id')
+        .unsigned()
+        .references('id')
+        .inTable('projects')
+        .onDelete('CASCADE')
 
       table.timestamp('created_at')
       table.timestamp('updated_at')

@@ -1,7 +1,8 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, manyToMany } from '@adonisjs/lucid/orm'
+import { BaseModel, belongsTo, column, manyToMany } from '@adonisjs/lucid/orm'
 import Instrument from './instrument.js'
-import type { ManyToMany } from '@adonisjs/lucid/types/relations'
+import type { BelongsTo, ManyToMany } from '@adonisjs/lucid/types/relations'
+import Project from './project.js'
 
 export default class Recommended extends BaseModel {
   @column({ isPrimary: true })
@@ -21,6 +22,15 @@ export default class Recommended extends BaseModel {
 
   @column()
   declare messenger: string
+
+  @column()
+  declare comment: string
+
+  @column()
+  declare project_id: number
+
+  @belongsTo(() => Project)
+  declare project: BelongsTo<typeof Project>
 
   @manyToMany(() => Instrument, {
     pivotTable: 'recommendeds_instruments',
