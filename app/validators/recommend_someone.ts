@@ -7,6 +7,8 @@ export const createRecommendedValidator = vine.compile(
     email: vine.string().optional(),
     phone: vine.string().optional(),
     messenger: vine.string().optional(),
+    comment: vine.string().optional(),
+    project_id: vine.string(),
     instruments: vine
       .array(
         vine.object({
