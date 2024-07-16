@@ -14,7 +14,7 @@ export default class TypeOfPiecesController {
       baseQuery,
       new Filter(TypeOfPiece, ['name']), [], {
         filtered: true,
-        paginated: false,
+        paginated: true,
         ordered: true,
       }
     )
