@@ -17,7 +17,7 @@ export default class ComposersController {
       baseQuery,
       new Filter(Composer, ['short_name', 'long_name', 'birth_date', 'death_date', 'country', 'main_style']),[], {
         filtered: true,
-        paginated: false,
+        paginated: true,
         ordered: true,
       }
     )

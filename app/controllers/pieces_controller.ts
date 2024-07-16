@@ -33,7 +33,7 @@ export default class PiecesController {
       ],
       {
         filtered: true,
-        paginated: false,
+        paginated: true,
         ordered: true,
       }
     )

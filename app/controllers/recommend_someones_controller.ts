@@ -20,7 +20,7 @@ export default class RecommendSomeonesController {
       ctx,
       Recommended,
       baseQuery,
-      new Filter(Recommended, ['first_name', 'last_name', 'email', 'messenger', 'phone']),
+      new Filter(Recommended, ['first_name', 'last_name', 'email', 'messenger', 'phone', 'project_id']),
       [new RelationFilter('instruments', Instrument, ['family', 'name'])]
     )
   }
