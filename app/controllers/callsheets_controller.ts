@@ -15,7 +15,8 @@ export default class CallsheetsController {
     const { params } = await ctx.request.validateUsing(getCallsheetValidator)
 
     const callsheet = await Callsheet.query()
-      .where('id', params.callsheetId)
+      .where('project_id', params.id)
+      .orderBy('updated_at', 'desc')
       .preload('contents')
       .preload('project', (projectQuery) => {
         projectQuery

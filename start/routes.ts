@@ -26,6 +26,7 @@ const MailingsController = () => import('#controllers/mailings_controller')
 const ListsController = () => import('#controllers/lists_controller')
 const SectionGroupsController = () => import('#controllers/section_groups_controller')
 const FormsController = () => import('#controllers/forms_controller')
+const SectionsController = () => import('#controllers/sections_controller')
 
 router
   .group(() => {
@@ -42,7 +43,7 @@ router
       router.post('/sign_in', [UsersController, 'signIn'])
       router.post('/recommend_someone', [RecommendSomeonesController, 'create'])
 
-      router.get('/call_sheets/:callsheetId/:visitorId', [CallsheetsController, 'getOne'])
+      router.get('/call_sheets/:id/:visitorId', [CallsheetsController, 'getOne'])
     })
 
     //protected routes
@@ -125,6 +126,8 @@ router
             ParticipantsController,
             'validateParticipant',
           ])
+
+          router.get('/projects/:id/management/attendance', [ProjectsController, 'getAttendance'])
         })
 
         router.group(() => {
@@ -158,7 +161,7 @@ router
 
         router.group(() => {
           router.get('/instrument', [InstrumentsController, 'getAll'])
-          router.put('/instrument', [InstrumentsController, 'createOrUpdate'])
+          router.post('/instrument', [InstrumentsController, 'createOrUpdate'])
           router.delete('/instrument/:id', [InstrumentsController, 'delete'])
         })
 
@@ -186,7 +189,14 @@ router
         router.group(() => {
           router.get('/sectionGroups', [SectionGroupsController, 'getAll'])
           router.get('/sectionGroups/:id', [SectionGroupsController, 'getOne'])
-          router.put('/sectionGroups', [SectionGroupsController, 'createOrUpdate'])
+          router.post('/sectionGroups', [SectionGroupsController, 'createOrUpdate'])
+          router.delete('/sectionGroups/:id', [SectionGroupsController, 'delete'])
+        })
+
+        router.group(() => {
+          router.get('/sections', [SectionsController, 'getAll'])
+          router.delete('/sections/:id', [SectionsController, 'delete'])
+          router.post('/sections', [SectionsController, 'createOrUpdate'])
         })
       })
 
