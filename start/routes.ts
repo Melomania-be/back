@@ -195,8 +195,8 @@ router
         router.group(() => {
           router.get('/templates', [TemplateController, 'getTemplates'])
           router.post('/templates/send', [TemplateController, 'sendTemplate'])
-          router.post('/templates/createOrUpdate', [TemplateController, 'createOrUpdateTemplate'])
-          router.get('/templates/:id', [TemplateController, 'delete'])  
+          router.put('/templates/createOrUpdate', [TemplateController, 'createOrUpdateTemplate'])
+          router.delete('/templates/:id', [TemplateController, 'delete'])  
         })
 
       .use(

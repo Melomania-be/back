@@ -61,12 +61,12 @@ export default class TemplatesController {
     return template
   }
 
-  async delete({ params } : HttpContext) {
+  async delete({ params, response } : HttpContext) {
     let template = await mail_template.find(params.id)
     if (template) {
       await template.delete()
-      return 'template deleted'
+      return response.send('template deleted')
     }
-    return 'template not found'
+    return response.send('template not found')
   }
 }
