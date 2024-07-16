@@ -65,9 +65,11 @@ router
         })
 
         router.group(() => {
-          router.get('projects/management/registration', [RegistrationsController, 'getAll'])
-          router.get('projects/management/registration/:id', [RegistrationsController, 'getOne'])
-          router.post('projects/management/registration', [RegistrationsController, 'create'])
+          router.delete('projects/:id/management/registration', [RegistrationsController, 'delete'])
+          router.post('projects/:id/management/registration', [
+            RegistrationsController,
+            'createOrUpdate',
+          ])
         })
 
         router.group(() => {
@@ -76,7 +78,14 @@ router
             CallsheetsController,
             'getOne',
           ])
-          router.post('/projects/:id/management/call_sheets/', [CallsheetsController, 'create'])
+          router.post('/projects/:id/management/call_sheets', [
+            CallsheetsController,
+            'createOrUpdate',
+          ])
+          router.delete('/projects/:id/management/call_sheets/:callsheetId', [
+            CallsheetsController,
+            'delete',
+          ])
         })
 
         router.group(() => {

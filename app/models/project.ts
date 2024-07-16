@@ -19,9 +19,6 @@ export default class Project extends BaseModel {
   declare name: string
 
   @column()
-  declare registration_id: number
-
-  @column()
   declare section_group_id: number
 
   @manyToMany(() => Contact, {
@@ -41,7 +38,7 @@ export default class Project extends BaseModel {
   declare sectionGroup: BelongsTo<typeof SectionGroup>
 
   @hasOne(() => Registration, {
-    foreignKey: 'id',
+    foreignKey: 'project_id',
   })
   declare registration: HasOne<typeof Registration>
 

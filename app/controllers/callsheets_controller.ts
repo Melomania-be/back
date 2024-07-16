@@ -60,9 +60,32 @@ export default class CallsheetsController {
     return ctx.response.json(callsheet)
   }
 
-  async create(ctx: HttpContext) {
+  async createOrUpdate(ctx: HttpContext) {
     const data = await ctx.request.validateUsing(createCallsheetValidator)
-    const callsheet = await Callsheet.create(data)
-    return callsheet.related('contents').createMany(data.content)
+    let callsheet: Callsheet
+    if (data.id) {
+      const tmpCallsheet = await Callsheet.find(data.id)
+      if (tmpCallsheet) {
+        callsheet = await tmpCallsheet.merge({ version: data.version }).save()
+
+        await callsheet.related('contents').query().delete()
+      } else {
+        return ctx.response.notFound()
+      }
+    } else {
+      callsheet = await Callsheet.create({ project_id: data.project_id, version: data.version })
+    }
+
+    return callsheet
+      .related('contents')
+      .createMany(data.contents.map((content) => ({ text: content.text, title: content.title })))
+  }
+
+  async delete(ctx: HttpContext) {
+    const callsheet = await Callsheet.find(ctx.params.callsheetId)
+    if (!callsheet) return ctx.response.notFound()
+
+    await callsheet.delete()
+    return ctx.response.noContent()
   }
 }
