@@ -174,6 +174,7 @@ router
         })
 
         router.post('/mailing', [MailingsController, 'send'])
+        router.post('/mailing/sendLaterTemplateToList', [MailingsController, 'sendLaterTemplateToList'])
 
         router.get('/sign_out', [UsersController, 'signOut'])
 

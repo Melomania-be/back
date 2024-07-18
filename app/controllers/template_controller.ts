@@ -12,42 +12,6 @@ export default class TemplatesController {
     return allTemplates
   }
 
-  async sendTemplate({ request, response } : HttpContext) {
-    const {template, subject, contact, project, to_contact } = request.only([
-      'template',
-      'subject',
-      'contact',
-      'project',
-      'to_contact'
-    ]);
-
-    if (!contact.email) {
-      return response.status(400).json({ message: 'Contact email is required' })
-    }
-
-    let contact_db = await Contact.find(contact.id)
-    let template_db = await mail_template.find(template.id)
-    let htmlFromDb = template_db?.content || ''
-    let project_db = await project.find(project.id)
-    let callsheet = await Callsheet.find(project_db.callsheet_id)
-    let registration_id = project_db.registration_id    
-    
-    if (htmlFromDb != '' && callsheet != null && registration_id != null) {
-      if (contact_db?.subscribed == true) {
-        const registrationNotificationMail = new TemplatePreparation(htmlFromDb, subject, contact, project, callsheet, to_contact, registration_id);
-        await mail.send(registrationNotificationMail);
-
-      return response.json({ message: 'Email sent successfully' });
-      }
-      else {
-        return response.json({ message: 'Contact is not subscribed' });
-      }
-    }
-    else {
-      return response.json({ message: 'Template not found or incomplete (callsheet not found or registration form not found)' });
-    }
-  }
-
   async createOrUpdateTemplate (ctx : HttpContext) {
     const data = await ctx.request.validateUsing(createTemplateValidator)
 
