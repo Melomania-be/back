@@ -8,7 +8,7 @@ export default class extends BaseSchema {
       table.increments('id')
       table.string('title')
       table.string('text')
-      table.integer('registration_id').unsigned().references('registrations.id')
+      table.integer('registration_id').unsigned().references('registrations.id').onDelete('CASCADE')
       table.timestamp('created_at')
       table.timestamp('updated_at')
     })

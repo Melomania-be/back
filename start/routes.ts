@@ -25,6 +25,8 @@ const InstrumentsController = () => import('#controllers/instruments_controller'
 const MailingsController = () => import('#controllers/mailings_controller')
 const ListsController = () => import('#controllers/lists_controller')
 const SectionGroupsController = () => import('#controllers/section_groups_controller')
+const FormsController = () => import('#controllers/forms_controller')
+const SectionsController = () => import('#controllers/sections_controller')
 const TemplateController = () => import('#controllers/template_controller')
 
 router
@@ -40,7 +42,7 @@ router
       router.put('/registration/submit', [RegistrationsController, 'submit'])
 
       router.post('/sign_in', [UsersController, 'signIn'])
-      router.post('/recommend_someone', [RecommendSomeonesController, 'create'])
+      router.post('/:id/recommend_someone', [RecommendSomeonesController, 'create'])
 
       router.get('/call_sheets/:id/:visitorId', [CallsheetsController, 'getOne'])
     })
@@ -61,15 +63,31 @@ router
         })
 
         router.group(() => {
-          router.get('projects/management/registration', [RegistrationsController, 'getAll'])
-          router.get('projects/management/registration/:id', [RegistrationsController, 'getOne'])
-          router.post('projects/management/registration', [RegistrationsController, 'create'])
+          router.get('/registration/:id/forms', [FormsController, 'getFromProject'])
         })
 
         router.group(() => {
-          router.get('/projects/management/call_sheets', [CallsheetsController, 'getAll'])
-          //router.get('/projects/management/call_sheets/:id', [CallsheetsController, 'getOne'])
-          router.post('/projects/management/call_sheets/', [CallsheetsController, 'create'])
+          router.delete('projects/:id/management/registration', [RegistrationsController, 'delete'])
+          router.post('projects/:id/management/registration', [
+            RegistrationsController,
+            'createOrUpdate',
+          ])
+        })
+
+        router.group(() => {
+          router.get('/projects/:id/management/call_sheets', [CallsheetsController, 'getAll'])
+          router.get('/projects/:id/management/call_sheets/:callsheetId', [
+            CallsheetsController,
+            'getOne',
+          ])
+          router.post('/projects/:id/management/call_sheets', [
+            CallsheetsController,
+            'createOrUpdate',
+          ])
+          router.delete('/projects/:id/management/call_sheets/:callsheetId', [
+            CallsheetsController,
+            'delete',
+          ])
         })
 
         router.group(() => {
@@ -80,40 +98,37 @@ router
 
         router.group(() => {
           router.get('/projects', [ProjectsController, 'getAll'])
-          router.get('/projects/:id/management', [ProjectsController, 'getOne'])
-          router.post('/projects/create', [ProjectsController, 'create'])
+          router.post('/projects', [ProjectsController, 'createOrUpdate'])
+          router.get('/projects/:id/management', [ProjectsController, 'getDashboard'])
+          router.get('/projects/:id', [ProjectsController, 'getOne'])
+          router.delete('/projects/:id', [ProjectsController, 'delete'])
         })
 
         router.group(() => {
           router.get('/projects/:id/management/participants', [ParticipantsController, 'getAll'])
-          router.post('/projects/:id/management/participants/link', [
+          router.post('/projects/:id/management/participants', [
             ParticipantsController,
-            'create',
+            'createOrUpdate',
           ])
-          router.patch('/projects/:id/management/participants/unlink/:participantId', [
-            ParticipantsController,
-            'unlinkParticipant',
-          ])
-          router.get('/projects/:id/management/participants/unique/:participantId', [
+          router.get('/projects/:id/management/participants/:participantId', [
             ParticipantsController,
             'getOne',
-          ])
-          router.patch('/projects/:id/management/participants/unique/:participantId', [
-            ParticipantsController,
-            'modify',
-          ])
-          router.get('/projects/:id/management/validation', [
-            ParticipantsController,
-            'getApplications',
-          ])
-          router.patch('/projects/:id/management/validation/:participantId', [
-            ParticipantsController,
-            'validateParticipant',
           ])
           router.delete('/projects/:id/management/participants/:participantId', [
             ParticipantsController,
             'delete',
           ])
+
+          router.get('/projects/:id/management/validation', [
+            ParticipantsController,
+            'getApplications',
+          ])
+          router.get('/projects/:id/management/validation/:participantId', [
+            ParticipantsController,
+            'validateParticipant',
+          ])
+
+          router.get('/projects/:id/management/attendance', [ProjectsController, 'getAttendance'])
         })
 
         router.group(() => {
@@ -131,7 +146,7 @@ router
 
         router.group(() => {
           router.put('/folders', [FoldersController, 'create'])
-          router.patch('/folders', [FoldersController, 'update'])
+          router.post('/folders', [FoldersController, 'update'])
           router.get('/folders', [FoldersController, 'getAll'])
           router.delete('/folders/:id', [FoldersController, 'delete'])
         })
@@ -139,7 +154,6 @@ router
         router.group(() => {
           router.get('/contact', [ContactsController, 'getAll'])
           router.get('/contact/validation', [ContactsController, 'getValidation'])
-          router.get('contact/filterable', [ContactsController, 'getFilterableFields'])
           router.get('/contact/:id', [ContactsController, 'getOne'])
           router.put('/contact', [ContactsController, 'createOrUpdate'])
           router.delete('/contact/:id', [ContactsController, 'delete'])
@@ -149,7 +163,7 @@ router
 
         router.group(() => {
           router.get('/instrument', [InstrumentsController, 'getAll'])
-          router.put('/instrument', [InstrumentsController, 'createOrUpdate'])
+          router.post('/instrument', [InstrumentsController, 'createOrUpdate'])
           router.delete('/instrument/:id', [InstrumentsController, 'delete'])
         })
 
@@ -177,7 +191,14 @@ router
         router.group(() => {
           router.get('/sectionGroups', [SectionGroupsController, 'getAll'])
           router.get('/sectionGroups/:id', [SectionGroupsController, 'getOne'])
-          router.put('/sectionGroups', [SectionGroupsController, 'createOrUpdate'])
+          router.post('/sectionGroups', [SectionGroupsController, 'createOrUpdate'])
+          router.delete('/sectionGroups/:id', [SectionGroupsController, 'delete'])
+        })
+
+        router.group(() => {
+          router.get('/sections', [SectionsController, 'getAll'])
+          router.delete('/sections/:id', [SectionsController, 'delete'])
+          router.post('/sections', [SectionsController, 'createOrUpdate'])
         })
 
         router.group(() => {

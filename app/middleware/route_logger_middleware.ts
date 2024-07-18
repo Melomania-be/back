@@ -6,7 +6,10 @@ export default class RouteLoggerMiddleware {
     /**
      * Middleware logic goes here (before the next call)
      */
-    ctx.logger.log('info', `${ctx.request.ip()} accessed : ${ctx.request.url()}`)
+    ctx.logger.log(
+      'info',
+      `${ctx.request.ip()} accessed : ${ctx.request.method()} ${ctx.request.url()}`
+    )
     /**
      * Call next method in the pipeline and return its output
      */
