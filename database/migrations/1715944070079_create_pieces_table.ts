@@ -9,9 +9,13 @@ export default class extends BaseSchema {
       table.string('name')
       table.string('opus')
       table.string('year_of_composition')
-      table.integer('composer_id').unsigned().references('composers.id')
-      table.integer('type_of_piece_id').unsigned().references('type_of_pieces.id')
-      table.integer('folder_id').unsigned().references('folders.id')
+      table.integer('composer_id').unsigned().references('composers.id').onDelete('SET NULL')
+      table
+        .integer('type_of_piece_id')
+        .unsigned()
+        .references('type_of_pieces.id')
+        .onDelete('SET NULL')
+      table.integer('folder_id').unsigned().references('folders.id').onDelete('SET NULL')
       table.string('arranger')
 
       table.timestamp('created_at')

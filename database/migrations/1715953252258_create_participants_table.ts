@@ -9,7 +9,7 @@ export default class extends BaseSchema {
       table.timestamp('last_activity').nullable()
       table.boolean('accepted')
       table.integer('project_id').unsigned().references('projects.id').onDelete('CASCADE')
-      table.integer('section_id').unsigned().references('sections.id')
+      table.integer('section_id').unsigned().references('sections.id').onDelete('RESTRICT')
       table.integer('contact_id').unsigned().references('contacts.id').onDelete('CASCADE')
       table.timestamp('created_at')
       table.timestamp('updated_at')
