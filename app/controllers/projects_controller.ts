@@ -10,6 +10,7 @@ import SectionGroup from '#models/section_group'
 import Piece from '#models/piece'
 import { DateTime } from 'luxon'
 import Contact from '#models/contact'
+import Folder from '#models/folder'
 
 export default class ProjectsController {
   async getAll(ctx: HttpContext) {
@@ -48,6 +49,9 @@ export default class ProjectsController {
       })
       .preload('callsheets')
       .preload('responsibles')
+      .preload('folder', (query) => {
+        query.preload('files')
+      })
     return data
   }
 
@@ -72,6 +76,9 @@ export default class ProjectsController {
       })
       .preload('sectionGroup', (query) => {
         query.preload('sections')
+      })
+      .preload('folder', (query) => {
+        query.preload('files')
       })
 
     const participantsNotValidated = await Participant.query()
@@ -203,6 +210,17 @@ export default class ProjectsController {
         date: DateTime.fromJSDate(rehearsal.date),
         place: rehearsal.place,
       })
+    }
+
+    if (data.folder_id) {
+      const folder = await Folder.find(data.folder_id)
+      if (folder) {
+        await project.related('folder').associate(folder)
+      } else {
+        await project.related('folder').dissociate()
+      }
+    } else {
+      await project.related('folder').dissociate()
     }
 
     return await project.save()

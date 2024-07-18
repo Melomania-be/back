@@ -12,6 +12,7 @@ export default class extends BaseSchema {
         .unsigned()
         .references('section_groups.id')
         .onDelete('RESTRICT')
+      table.integer('folder_id').unsigned().references('folders.id').onDelete('SET NULL')
       table.timestamp('created_at')
       table.timestamp('updated_at')
     })

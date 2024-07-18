@@ -20,7 +20,14 @@ export default class RecommendSomeonesController {
       ctx,
       Recommended,
       baseQuery,
-      new Filter(Recommended, ['first_name', 'last_name', 'email', 'messenger', 'phone', 'project_id']),
+      new Filter(Recommended, [
+        'first_name',
+        'last_name',
+        'email',
+        'messenger',
+        'phone',
+        'project_id',
+      ]),
       [new RelationFilter('instruments', Instrument, ['family', 'name'])]
     )
   }
@@ -36,5 +43,3 @@ export default class RecommendSomeonesController {
     return response.send('recommended person deleted')
   }
 }
-
-

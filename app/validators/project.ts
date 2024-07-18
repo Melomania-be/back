@@ -23,5 +23,6 @@ export const createProjectValidator = vine.compile(
       })
     ),
     responsibles_ids: vine.array(vine.number()),
+    folder_id: vine.number().optional(),
   })
 )
