@@ -13,7 +13,6 @@ import List from '#models/list'
 import OutgoingMail from '#models/outgoing_mail'
 import { DateTime } from 'luxon'
 
-
 export default class MailingsController {
   async send() {
     console.log('send called')
@@ -27,155 +26,172 @@ export default class MailingsController {
     })
   }
 
-  async sendLaterTemplateToList({ request, response } : HttpContext) {
-    const {template, list_contacts, project, to_contact } = request.only([
+  async sendLaterTemplateToList({ request, response }: HttpContext) {
+    const { template, listContacts, project, toContact } = request.only([
       'template',
-      'list_contacts',
+      'listContacts',
       'project',
-      'to_contact'
-    ]);
+      'toContact',
+    ])
 
-    let template_db = await mail_template.find(template.id)
-    let list_db = await List.find(list_contacts.id)
-    let htmlFromDb = template_db?.content || ''
-    let project_db = await project.find(project.id)
-    let callsheet = await Callsheet.find(project_db.callsheet_id)
-    let registration_id = project_db.registration_id
+    let templateDb = await mail_template.find(template.id)
+    let listDb = await List.find(listContacts.id)
+    let htmlFromDb = templateDb?.content || ''
+    let projectDb = await project.find(project.id)
+    let callsheet = await Callsheet.find(projectDb.callsheet_id)
+    let registrationId = projectDb.registration_id
 
-    if (list_db != null) {
-      for (let contact of list_db.contacts) {
+    if (listDb !== null) {
+      for (let contact of listDb.contacts) {
         if (contact.email) {
-          let contact_db = await Contact.find(contact.id)
-          if (htmlFromDb != '' && callsheet != null && registration_id != null) {
-            if (contact_db?.subscribed == true) {
-              const registrationNotificationMail = new TemplatePreparation(htmlFromDb, subject, contact, project, callsheet, to_contact, registration_id);
-              
-              const outgoing_mail = new OutgoingMail();
-              outgoing_mail.type = 'template';
-              outgoing_mail.receiver_id = contact.id;
-              outgoing_mail.project_id = project.id;
-              outgoing_mail.template_id = template.id;
-              outgoing_mail.sent = false;
-              outgoing_mail.createdAt = DateTime.local();
-              outgoing_mail.updatedAt = DateTime.local();
+          let contactDb = await Contact.find(contact.id)
+          if (htmlFromDb !== '' && callsheet !== null && registrationId !== null) {
+            if (contactDb?.subscribed === true) {
+              const registrationNotificationMail = new TemplatePreparation(
+                htmlFromDb,
+                contact,
+                project,
+                callsheet,
+                toContact,
+                registrationId
+              )
 
-              await OutgoingMail.create(outgoing_mail)
+              const outgoingMail = new OutgoingMail()
+              outgoingMail.type = 'template'
+              outgoingMail.receiver_id = contact.id
+              outgoingMail.project_id = project.id
+              outgoingMail.template_id = template.id
+              outgoingMail.sent = false
+              outgoingMail.createdAt = DateTime.local()
+              outgoingMail.updatedAt = DateTime.local()
+
+              await OutgoingMail.create(outgoingMail)
 
               await mail.sendLater(registrationNotificationMail, async () => {
-                outgoing_mail.sent = true;
-                outgoing_mail.updatedAt = DateTime.local();
-                await outgoing_mail.save();
-              });
-            }   
+                outgoingMail.sent = true
+                outgoingMail.updatedAt = DateTime.local()
+                await outgoingMail.save()
+              })
+            }
           }
         }
       }
+    } else {
+      return response.json({ message: 'List not found' })
     }
-    else {
-      return response.json({ message: 'List not found' });
-    }
-
   }
 
-  async sendTemplate({ request, response } : HttpContext) {
-    const {template, subject, contact, project, to_contact } = request.only([
+  async sendTemplate({ request, response }: HttpContext) {
+    const { template, contact, project, toContact } = request.only([
       'template',
-      'subject',
       'contact',
       'project',
-      'to_contact'
-    ]);
+      'toContact',
+    ])
 
     if (!contact.email) {
       return response.status(400).json({ message: 'Contact email is required' })
     }
 
-    let contact_db = await Contact.find(contact.id)
-    let template_db = await mail_template.find(template.id)
-    let htmlFromDb = template_db?.content || ''
-    let project_db = await project.find(project.id)
-    let callsheet = await Callsheet.find(project_db.callsheet_id)
-    let registration_id = project_db.registration_id    
-    
-    if (htmlFromDb != '' && callsheet != null && registration_id != null) {
-      if (contact_db?.subscribed == true) {
-        const registrationNotificationMail = new TemplatePreparation(htmlFromDb, subject, contact, project, callsheet, to_contact, registration_id);
-        await mail.send(registrationNotificationMail);
+    let contactDb = await Contact.find(contact.id)
+    let templateDb = await mail_template.find(template.id)
+    let htmlFromDb = templateDb?.content || ''
+    let projectDb = await project.find(project.id)
+    let callsheet = await Callsheet.find(projectDb.callsheet_id)
+    let registrationId = projectDb.registration_id
 
-      return response.json({ message: 'Email sent successfully' });
+    if (htmlFromDb !== '' && callsheet !== null && registrationId !== null) {
+      if (contactDb?.subscribed === true) {
+        const registrationNotificationMail = new TemplatePreparation(
+          htmlFromDb,
+          contact,
+          project,
+          callsheet,
+          toContact,
+          registrationId
+        )
+        await mail.send(registrationNotificationMail)
+
+        return response.json({ message: 'Email sent successfully' })
+      } else {
+        return response.json({ message: 'Contact is not subscribed' })
       }
-      else {
-        return response.json({ message: 'Contact is not subscribed' });
-      }
-    }
-    else {
-      return response.json({ message: 'Template not found or incomplete (callsheet not found or registration form not found)' });
+    } else {
+      return response.json({
+        message:
+          'Template not found or incomplete (callsheet not found or registration form not found)',
+      })
     }
   }
 
-
-  async sendCallsheetNotification({ request, response } : HttpContext) {
+  async sendCallsheetNotification({ request, response }: HttpContext) {
     console.log('sendCallsheetNotification called')
     console.log(request.all())
 
-
-    const { contact, project, callsheet, to_contact } = request.only([
+    const { contact, project, callsheet, toContact } = request.only([
       'contact',
       'project',
       'callsheet',
-      'to_contact'
-    ]);
+      'toContact',
+    ])
 
     if (!contact.email) {
       return response.status(400).json({ message: 'Contact email is required' })
     }
-  
-    const callsheetNotificationMail = new CallsheetNotification(contact, project, callsheet, to_contact);
-    await mail.send(callsheetNotificationMail)  ;
-  
-    return response.json({ message: 'Email sent successfully' });
+
+    const callsheetNotificationMail = new CallsheetNotification(
+      contact,
+      project,
+      callsheet,
+      toContact
+    )
+    await mail.send(callsheetNotificationMail)
+
+    return response.json({ message: 'Email sent successfully' })
   }
 
-  async sendRecommendationNotification({ request, response } : HttpContext) {
+  async sendRecommendationNotification({ request, response }: HttpContext) {
     console.log('sendRecommendationNotification called')
     console.log(request.all())
 
-    const { contact, registration, project } = request.only([
-      'contact',
-      'registration',
-      'project'
-    ]);
+    const { contact, registration, project } = request.only(['contact', 'registration', 'project'])
 
     if (!contact.email) {
       return response.status(400).json({ message: 'Contact email is required' })
     }
 
-    const recommendationNotificationMail = new RecommendationNotification(contact, registration, project);
-    await mail.send(recommendationNotificationMail);
+    const recommendationNotificationMail = new RecommendationNotification(
+      contact,
+      registration,
+      project
+    )
+    await mail.send(recommendationNotificationMail)
 
-    return response.json({ message: 'Email sent successfully' });
+    return response.json({ message: 'Email sent successfully' })
   }
 
-  async sendRegistrationNotification({ request, response } : HttpContext) {
+  async sendRegistrationNotification({ request, response }: HttpContext) {
     console.log('sendRecommendationNotification called')
 
-    const { contact, project, callsheet, to_contact } = request.only([
+    const { contact, project, callsheet, toContact } = request.only([
       'contact',
       'project',
       'callsheet',
-      'to_contact'
-    ]);
+      'toContact',
+    ])
 
     if (!contact.email) {
       return response.status(400).json({ message: 'Contact email is required' })
     }
 
-    const registrationNotificationMail = new RegistrationNotification(contact, project, callsheet, to_contact);
-    await mail.send(registrationNotificationMail);
+    const registrationNotificationMail = new RegistrationNotification(
+      contact,
+      project,
+      callsheet,
+      toContact
+    )
+    await mail.send(registrationNotificationMail)
 
-    return response.json({ message: 'Email sent successfully' });
-
-    
+    return response.json({ message: 'Email sent successfully' })
   }
-
 }

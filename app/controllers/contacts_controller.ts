@@ -132,7 +132,6 @@ export default class ContactsController {
     )
   }
 
-  
   async unsubscribe_from_mails({ params, response }: HttpContext) {
     let contact = await Contact.query().where('email', params.email).first()
     if (contact) {
@@ -142,5 +141,4 @@ export default class ContactsController {
     }
     return response.send('contact not found')
   }
-  
 }

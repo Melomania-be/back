@@ -33,7 +33,7 @@ export default class OutgoingMail extends BaseModel {
   declare template_id: number
 
   @column()
-  declare sent : boolean
+  declare sent: boolean
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime

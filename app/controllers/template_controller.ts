@@ -1,18 +1,18 @@
-import mail from "#config/mail";
-import TemplatePreparation from "#mails/template_preparation";
-import Callsheet from "#models/callsheet";
-import Contact from "#models/contact";
-import mail_template from "#models/mail_template";
-import { createTemplateValidator } from "#validators/mail";
-import { HttpContext } from "@adonisjs/core/http";
+import mail from '#config/mail'
+import TemplatePreparation from '#mails/template_preparation'
+import Callsheet from '#models/callsheet'
+import Contact from '#models/contact'
+import mail_template from '#models/mail_template'
+import { createTemplateValidator } from '#validators/mail'
+import { HttpContext } from '@adonisjs/core/http'
 
-export default class TemplatesController {  
-  async getTemplates(){
+export default class TemplatesController {
+  async getTemplates() {
     let allTemplates = await mail_template.query().select('*')
     return allTemplates
   }
 
-  async createOrUpdateTemplate (ctx : HttpContext) {
+  async createOrUpdateTemplate(ctx: HttpContext) {
     const data = await ctx.request.validateUsing(createTemplateValidator)
 
     if (!data.id) {
@@ -25,7 +25,7 @@ export default class TemplatesController {
     return template
   }
 
-  async delete({ params, response } : HttpContext) {
+  async delete({ params, response }: HttpContext) {
     let template = await mail_template.find(params.id)
     if (template) {
       await template.delete()
