@@ -22,6 +22,9 @@ export default class Project extends BaseModel {
   @column()
   declare section_group_id: number
 
+  @column()
+  declare folder_id: number
+
   @manyToMany(() => Contact, {
     pivotTable: 'responsibles',
     pivotTimestamps: true,
