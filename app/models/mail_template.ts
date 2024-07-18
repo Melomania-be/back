@@ -7,7 +7,7 @@ export default class MailTemplate extends BaseModel {
 
   @column()
   declare name: string
-  
+
   @column()
   declare content: string
 

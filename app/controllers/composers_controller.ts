@@ -6,16 +6,23 @@ import { createComposerValidator } from '#validators/composer'
 import { simpleFilter, Filter } from '#services/simple_filter'
 
 export default class ComposersController {
-
   async getAll(ctx: HttpContext) {
     let baseQuery = Composer.query()
-
 
     let res = await simpleFilter(
       ctx,
       Composer,
       baseQuery,
-      new Filter(Composer, ['short_name', 'long_name', 'birth_date', 'death_date', 'country', 'main_style']),[], {
+      new Filter(Composer, [
+        'short_name',
+        'long_name',
+        'birth_date',
+        'death_date',
+        'country',
+        'main_style',
+      ]),
+      [],
+      {
         filtered: true,
         paginated: true,
         ordered: true,

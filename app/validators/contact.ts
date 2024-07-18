@@ -1,5 +1,4 @@
 import vine from '@vinejs/vine'
-import { subscribe } from 'diagnostics_channel'
 
 /**
  * Validates the post's creation action
@@ -14,7 +13,7 @@ export const createContactValidator = vine.compile(
     messenger: vine.string().optional(),
     comments: vine.string().optional(),
     validated: vine.boolean(),
-    subscribed : vine.boolean(),
+    subscribed: vine.boolean(),
     instruments: vine
       .array(
         vine.object({
