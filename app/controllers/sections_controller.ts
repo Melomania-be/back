@@ -3,7 +3,7 @@ import { createSectionValidator } from '#validators/section'
 import { HttpContext } from '@adonisjs/core/http'
 
 export default class SectionsController {
-  async getAll(ctx: HttpContext) {
+  async getAll() {
     return await Section.query().preload('instruments')
   }
 

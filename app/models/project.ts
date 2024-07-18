@@ -10,6 +10,7 @@ import Callsheet from './callsheet.js'
 import Participant from './participant.js'
 import Concert from './concert.js'
 import Contact from './contact.js'
+import Folder from './folder.js'
 
 export default class Project extends BaseModel {
   @column({ isPrimary: true })
@@ -26,6 +27,11 @@ export default class Project extends BaseModel {
     pivotTimestamps: true,
   })
   declare responsibles: ManyToMany<typeof Contact>
+
+  @belongsTo(() => Folder, {
+    foreignKey: 'folder_id',
+  })
+  declare folder: BelongsTo<typeof Folder>
 
   @hasMany(() => Concert, {
     foreignKey: 'project_id',
