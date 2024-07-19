@@ -12,6 +12,7 @@ import Callsheet from '#models/callsheet'
 import List from '#models/list'
 import OutgoingMail from '#models/outgoing_mail'
 import { DateTime } from 'luxon'
+import Project from '#models/project'
 
 export default class MailingsController {
   async send() {
@@ -27,30 +28,45 @@ export default class MailingsController {
   }
 
   async sendLaterTemplateToList({ request, response }: HttpContext) {
-    const { template, listContacts, project, toContact } = request.only([
+    const { template, listContacts, hasProject, hasCallsheet, project, toContact } = request.only([
       'template',
       'listContacts',
+      'hasProject',
+      'hasCallsheet',
       'project',
       'toContact',
     ])
 
     let templateDb = await mail_template.find(template.id)
     let listDb = await List.find(listContacts.id)
+    let allContacts = await listDb?.related('contacts').query()
     let htmlFromDb = templateDb?.content || ''
-    let projectDb = await project.find(project.id)
-    let callsheet = await Callsheet.find(projectDb.callsheet_id)
-    let registrationId = projectDb.registration_id
+    let projectDb = project
+    let callsheet = null
+    let registrationId = null
 
-    if (listDb !== null) {
-      for (let contact of listDb.contacts) {
+    if (hasProject) {
+      projectDb = await Project.find(project.id)
+      registrationId = projectDb.registration_id
+    }
+
+    if (hasCallsheet) {
+      if (projectDb.callsheet_id) callsheet = await Callsheet.find(projectDb.callsheet_id)
+    }
+
+    console.log('allContacts', allContacts)
+
+    if (allContacts !== null && allContacts !== undefined) {
+      for (let contact of allContacts) {
         if (contact.email) {
+          console.log('contact', contact)
           let contactDb = await Contact.find(contact.id)
-          if (htmlFromDb !== '' && callsheet !== null && registrationId !== null) {
+          if (htmlFromDb !== '') {
             if (contactDb?.subscribed === true) {
               const registrationNotificationMail = new TemplatePreparation(
                 htmlFromDb,
                 contact,
-                project,
+                projectDb,
                 callsheet,
                 toContact,
                 registrationId
@@ -59,8 +75,12 @@ export default class MailingsController {
               const outgoingMail = new OutgoingMail()
               outgoingMail.type = 'template'
               outgoingMail.receiver_id = contact.id
-              outgoingMail.project_id = project.id
-              outgoingMail.template_id = template.id
+              if (hasProject) {
+                outgoingMail.project_id = project.id
+              } else {
+                outgoingMail.project_id = null
+              }
+              outgoingMail.mail_template_id = template.id
               outgoingMail.sent = false
               outgoingMail.createdAt = DateTime.local()
               outgoingMail.updatedAt = DateTime.local()
