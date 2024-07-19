@@ -157,7 +157,7 @@ router.group(() => {
         router.put('/contact', [ContactsController, 'createOrUpdate'])
         router.delete('/contact/:id', [ContactsController, 'delete'])
         router.post('contact', [ContactsController, 'advancedSearch'])
-        router.put('unsubscribe', [ContactsController, 'unsubscribe_from_mails'])
+        router.put('/unsubscribe', [ContactsController, 'unsubscribe_from_mails'])
       })
 
       router.group(() => {

@@ -132,13 +132,15 @@ export default class ContactsController {
     )
   }
 
-  async unsubscribe_from_mails({ params, response }: HttpContext) {
-    let contact = await Contact.query().where('email', params.email).first()
+  async unsubscribe_from_mails({ request, response }: HttpContext) {
+    console.log('unsubscribe_from_mails called')
+    const { email }: { email: string } = request.only(['email'])
+    let contact = await Contact.query().where('email', email).first()
     if (contact) {
       contact.subscribed = false
       await contact.save()
-      return response.send('contact unsubscribed')
+      return response.status(200).send('contact unsubscribed')
     }
-    return response.send('contact not found')
+    return response.status(404).send('contact not found')
   }
 }

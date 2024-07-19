@@ -2,8 +2,6 @@ import env from '#start/env'
 import { BaseMail } from '@adonisjs/mail'
 import Callsheet from '#models/callsheet'
 
-//pour toute template de mail
-
 export default class TemplatePreparation extends BaseMail {
   contact: {
     id: number
@@ -61,14 +59,15 @@ export default class TemplatePreparation extends BaseMail {
   }
 
   prepare() {
+    const url = env.get('URL') || ''
+
     let htmlContent = this.htmlFromDb
       .replace(/\${NAME}/g, this.contact.first_name + ' ' + this.contact.last_name)
+      .replace(/\${URL}/g, url)
       .replace(/\${PROJECT}/g, this.project?.name ?? '')
       .replace(
         /\${CALLSHEET}/g,
-        this.callsheet
-          ? `http://tool.ciro3903.odns.fr/call_sheets/${this.callsheet.id}/${this.contact.id}`
-          : ''
+        this.callsheet ? `${URL}/call_sheets/${this.callsheet.id}/${this.contact.id}` : ''
       )
       .replace(
         /\${TO_CONTACT}/g,
@@ -86,13 +85,10 @@ export default class TemplatePreparation extends BaseMail {
     if (this.registration) {
       htmlContent = htmlContent.replace(
         /\${REGISTRATION}/g,
-        `http://tool.ciro3903.odns.fr/registration/${this.registration.id}`
+        `${URL}/registration/${this.registration.id}`
       )
     } else {
-      htmlContent = htmlContent.replace(
-        /\${REGISTRATION}/g,
-        'http://tool.ciro3903.odns.fr/registration/default_value'
-      )
+      htmlContent = htmlContent.replace(/\${REGISTRATION}/g, `${URL}/registration/default_value`)
     }
     this.message
       .to(this.contact.email)

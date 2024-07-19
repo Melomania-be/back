@@ -28,6 +28,7 @@ export default class MailingsController {
   }
 
   async sendLaterTemplateToList({ request, response }: HttpContext) {
+    console.log('sendLaterTemplateToList called')
     const { template, listContacts, hasProject, hasCallsheet, project, toContact } = request.only([
       'template',
       'listContacts',
@@ -54,12 +55,9 @@ export default class MailingsController {
       if (projectDb.callsheet_id) callsheet = await Callsheet.find(projectDb.callsheet_id)
     }
 
-    console.log('allContacts', allContacts)
-
     if (allContacts !== null && allContacts !== undefined) {
       for (let contact of allContacts) {
         if (contact.email) {
-          console.log('contact', contact)
           let contactDb = await Contact.find(contact.id)
           if (htmlFromDb !== '') {
             if (contactDb?.subscribed === true) {
@@ -87,9 +85,8 @@ export default class MailingsController {
 
               await OutgoingMail.create(outgoingMail)
 
-              await mail.sendLater(registrationNotificationMail, async () => {
-                await this.updateOutgoingMail(outgoingMail)
-              })
+              await mail.sendLater(registrationNotificationMail)
+              await this.updateOutgoingMail(outgoingMail)
             }
           }
         }
