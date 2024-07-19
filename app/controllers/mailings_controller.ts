@@ -88,9 +88,7 @@ export default class MailingsController {
               await OutgoingMail.create(outgoingMail)
 
               await mail.sendLater(registrationNotificationMail, async () => {
-                outgoingMail.sent = true
-                outgoingMail.updatedAt = DateTime.local()
-                await outgoingMail.save()
+                await this.updateOutgoingMail(outgoingMail)
               })
             }
           }
@@ -98,6 +96,18 @@ export default class MailingsController {
       }
     } else {
       return response.json({ message: 'List not found' })
+    }
+  }
+
+  async updateOutgoingMail(outgoingMail: OutgoingMail) {
+    try {
+      let updateMail = await OutgoingMail.findOrFail(outgoingMail.id)
+      updateMail.sent = true
+      updateMail.updatedAt = DateTime.local()
+      console.log('updateMail', updateMail)
+      await updateMail.save()
+    } catch (error) {
+      console.log('error', error)
     }
   }
 
