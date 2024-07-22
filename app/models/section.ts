@@ -17,7 +17,7 @@ export default class Section extends BaseModel {
   @manyToMany(() => Instrument, {
     pivotTable: 'played_in_sections',
     localKey: 'id',
-    pivotForeignKey: 'sections_id',
+    pivotForeignKey: 'section_id',
     relatedKey: 'id',
     pivotRelatedForeignKey: 'instrument_id',
     pivotTimestamps: true,
