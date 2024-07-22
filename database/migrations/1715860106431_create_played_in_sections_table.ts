@@ -5,10 +5,10 @@ export default class extends BaseSchema {
 
   async up() {
     this.schema.createTable(this.tableName, (table) => {
-      table.integer('sections_id').unsigned().references('sections.id').onDelete('CASCADE')
+      table.integer('section_id').unsigned().references('sections.id').onDelete('CASCADE')
       table.integer('instrument_id').unsigned().references('instruments.id').onDelete('CASCADE')
 
-      table.primary(['sections_id', 'instrument_id'])
+      table.primary(['section_id', 'instrument_id'])
 
       table.timestamp('created_at')
       table.timestamp('updated_at')

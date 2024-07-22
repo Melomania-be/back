@@ -1,5 +1,4 @@
 import vine from '@vinejs/vine'
-import { subscribe } from 'diagnostics_channel'
 
 /**
  * Validates the post's creation action
