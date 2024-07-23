@@ -157,7 +157,7 @@ router.group(() => {
         router.put('/contact', [ContactsController, 'createOrUpdate'])
         router.delete('/contact/:id', [ContactsController, 'delete'])
         router.post('contact', [ContactsController, 'advancedSearch'])
-        router.put('unsubscribe', [ContactsController, 'unsubscribe_from_mails'])
+        router.put('/unsubscribe', [ContactsController, 'unsubscribe_from_mails'])
       })
 
       router.group(() => {
@@ -172,7 +172,26 @@ router.group(() => {
         router.delete('users/:id', [UsersController, 'delete'])
       })
 
-      router.post('/mailing', [MailingsController, 'send'])
+      router.group(() => {
+        router.get('projects/:id/management/mailing', [MailingsController, 'getOutgoing'])
+        router.post('/mailing', [MailingsController, 'send'])
+        router.post('/mailing/sendLaterTemplateToList', [
+          MailingsController,
+          'sendLaterTemplateToList',
+        ])
+        router.post('/mailing/sendCallsheetNotification', [
+          MailingsController,
+          'sendCallsheetNotification',
+        ])
+        router.post('/mailing/sendRegistrationNotification', [
+          MailingsController,
+          'sendRegistrationNotification',
+        ])
+        router.post('/mailing/sendRecommendationNotification', [
+          MailingsController,
+          'sendRecommendationNotification',
+        ])
+      })
 
       router.get('/sign_out', [UsersController, 'signOut'])
 
@@ -200,25 +219,9 @@ router.group(() => {
         router.post('/sections', [SectionsController, 'createOrUpdate'])
       })
 
-      router.group(() => {
-        router.post('/mailing/sendCallsheetNotification', [
-          MailingsController,
-          'sendCallsheetNotification',
-        ])
-        router.post('/mailing/sendRegistrationNotification', [
-          MailingsController,
-          'sendRegistrationNotification',
-        ])
-        router.post('/mailing/sendRecommendationNotification', [
-          MailingsController,
-          'sendRecommendationNotification',
-        ])
-      })
-
       router
         .group(() => {
           router.get('/templates', [TemplateController, 'getTemplates'])
-          router.post('/templates/send', [TemplateController, 'sendTemplate'])
           router.put('/templates/createOrUpdate', [TemplateController, 'createOrUpdateTemplate'])
           router.delete('/templates/:id', [TemplateController, 'delete'])
         })

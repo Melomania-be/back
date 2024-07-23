@@ -2,8 +2,6 @@ import env from '#start/env'
 import { BaseMail } from '@adonisjs/mail'
 import Callsheet from '#models/callsheet'
 
-//pour toute template de mail
-
 export default class TemplatePreparation extends BaseMail {
   contact: {
     id: number
@@ -11,85 +9,91 @@ export default class TemplatePreparation extends BaseMail {
     last_name: string
     email: string
   }
-  project: {
-    id: number
-    name: string
-  }
-  to_contact: {
-    first_name: string
-    last_name: string
+  project:
+    | {
+        id: number
+        name: string
+      }
+    | null
+    | undefined
+  toContact: {
+    firstName: string
+    lastName: string
     email: string
     phone: string
     messenger: string
   }
-  registration: {
-    id: number
-    project_id: number
-  }
+  registration:
+    | {
+        id: number
+        project_id: number
+      }
+    | null
+    | undefined
   from: string
-  subject: string
   htmlFromDb: string
-  callsheet: Callsheet
+  callsheet: Callsheet | null | undefined
 
   constructor(
     htmlFromDb: string,
-    subject: string,
     contact: { id: number; first_name: string; last_name: string; email: string },
-    project: { id: number; name: string },
-    callsheet: Callsheet,
+    project: { id: number; name: string } | null | undefined,
+    callsheet: Callsheet | null,
     to_contact: {
-      first_name: string
-      last_name: string
+      firstName: string
+      lastName: string
       email: string
       phone: string
       messenger: string
     },
-    registration: { id: number; project_id: number }
+    registration: { id: number; project_id: number } | null | undefined
   ) {
     super()
     this.from = env.get('SMTP_USERNAME')
     this.contact = contact
     this.project = project
     this.callsheet = callsheet
-    this.to_contact = to_contact
+    this.toContact = to_contact
     this.registration = registration
-    this.subject = subject
     this.htmlFromDb = htmlFromDb
   }
 
   prepare() {
-    let htmlContent =
-      this.htmlFromDb
-        .replace(/\${NAME}/g, this.contact.first_name + ' ' + this.contact.last_name)
-        .replace(/\${PROJECT}/g, this.project.name)
-        .replace(
-          /\${CALLSHEET}/g,
-          'http://tool.ciro3903.odns.fr/call_sheets/' +
-            this.callsheet.id.toString() +
-            '/' +
-            this.contact.id.toString()
-        )
-        .replace(
-          /\${TO_CONTACT}/g,
-          '<br>' +
-            this.to_contact.first_name +
-            ' ' +
-            this.to_contact.last_name +
-            '<br> mail : ' +
-            this.to_contact.email +
-            '<br> phone : ' +
-            this.to_contact.phone
-        ) +
-      '<br> messenger : ' +
-      this.to_contact.messenger.replace(
-        /\${REGISTRATION}/g,
-        'http://tool.ciro3903.odns.fr/registration/' + this.registration.id.toString()
-      )
+    const url = env.get('URL') || ''
 
+    let htmlContent = this.htmlFromDb
+      .replace(/\${NAME}/g, this.contact.first_name + ' ' + this.contact.last_name)
+      .replace(/\${URL}/g, url)
+      .replace(/\${PROJECT}/g, this.project?.name ?? '')
+      .replace(
+        /\${CALLSHEET}/g,
+        this.callsheet ? `${URL}/call_sheets/${this.callsheet.id}/${this.contact.id}` : ''
+      )
+      .replace(
+        /\${TO_CONTACT}/g,
+        '<br>' +
+          this.toContact.firstName +
+          ' ' +
+          this.toContact.lastName +
+          '<br> mail : ' +
+          this.toContact.email +
+          '<br> phone : ' +
+          this.toContact.phone +
+          '<br> messenger :  ' +
+          this.toContact.messenger
+      )
+    if (this.registration) {
+      htmlContent = htmlContent.replace(
+        /\${REGISTRATION}/g,
+        `${URL}/registration/${this.registration.id}`
+      )
+    } else {
+      htmlContent = htmlContent.replace(/\${REGISTRATION}/g, `${URL}/registration/default_value`)
+    }
     this.message
       .to(this.contact.email)
       .from(env.get('SMTP_USERNAME'))
-      .subject(this.subject)
+      .subject('Notification')
       .html(htmlContent)
   }
 }

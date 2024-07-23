@@ -14,7 +14,7 @@ export default class extends BaseSchema {
         .unsigned()
         .references('mail_templates.id')
         .onDelete('CASCADE')
-
+      table.boolean('sent')
       table.timestamp('created_at')
       table.timestamp('updated_at')
     })
