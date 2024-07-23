@@ -248,7 +248,7 @@ export default class ProjectsController {
         query.preload('participants')
       })
       .preload('participants', (query) => {
-        query.preload('contact')
+        query.where('accepted', true).preload('contact')
       })
       .firstOrFail()
   }

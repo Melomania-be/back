@@ -122,7 +122,7 @@ router.group(() => {
           ParticipantsController,
           'getApplications',
         ])
-        router.get('/projects/:id/management/validation/:participantId', [
+        router.post('/projects/:id/management/validation', [
           ParticipantsController,
           'validateParticipant',
         ])
