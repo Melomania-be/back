@@ -99,19 +99,19 @@ export default class ProjectsController {
       .where('participants.project_id', params.id)
       .andWhere('accepted', true)
       .andWhere((subQuery) => {
-        subQuery.where(
-          'last_activity',
-          '<',
-          db
-            .from('callsheets')
-            .select('updated_at')
-            .where('project_id', params.id)
-            .andWhereNotNull('updated_at')
-            .orderBy('updated_at', 'desc')
-            .limit(1)
-        )
-
-        console.log(subQuery.toSQL())
+        subQuery
+          .where(
+            'last_activity',
+            '<',
+            db
+              .from('callsheets')
+              .select('updated_at')
+              .where('project_id', params.id)
+              .andWhereNotNull('updated_at')
+              .orderBy('updated_at', 'desc')
+              .limit(1)
+          )
+          .orDoesntHave('hasSeenCallsheets')
       })
 
     return {
@@ -123,11 +123,7 @@ export default class ProjectsController {
   }
 
   async createOrUpdate(ctx: HttpContext) {
-    console.log(ctx.request.all())
-
     const data = await ctx.request.validateUsing(createProjectValidator)
-
-    console.log(data)
 
     let project: Project
 
@@ -146,11 +142,7 @@ export default class ProjectsController {
     await project.related('sectionGroup').dissociate()
     await project.related('sectionGroup').associate(sectionGroup)
 
-    console.log(data.responsibles_ids)
-
     const responsibles = await Contact.findMany(data.responsibles_ids)
-
-    console.log(responsibles)
 
     await project.related('responsibles').detach()
     await project.related('responsibles').attach(responsibles.map((r) => r.id))
