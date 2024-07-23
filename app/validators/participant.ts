@@ -18,3 +18,12 @@ export const createParticipantValidator = vine.compile(
     rehearsals: vine.array(vine.object({ id: vine.number() })),
   })
 )
+
+export const validateParticipantValidator = vine.compile(
+  vine.object({
+    id: vine.number(),
+    params: vine.object({
+      id: vine.number(),
+    }),
+  })
+)

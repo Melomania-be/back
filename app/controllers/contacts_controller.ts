@@ -106,7 +106,6 @@ export default class ContactsController {
     const existing = await Contact.query()
       .where('firstname', data.first_name)
       .andWhere('lastname', data.last_name)
-      .andWhere('email', data.email)
       .first()
 
     if (existing) return ctx.response.send('Contact already exists.')

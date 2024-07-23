@@ -2,7 +2,7 @@
 
 import Participant from '#models/participant'
 import { HttpContext } from '@adonisjs/core/http'
-import { createParticipantValidator } from '#validators/participant'
+import { createParticipantValidator, validateParticipantValidator } from '#validators/participant'
 import { Filter, RelationFilter, simpleFilter } from '#services/simple_filter'
 import Contact from '#models/contact'
 
@@ -11,6 +11,7 @@ export default class ParticipantsController {
   async getAll(ctx: HttpContext) {
     const baseQuery = Participant.query()
       .preload('contact')
+      .preload('section')
       .where('project_id', ctx.params.id)
       .andWhere('accepted', true)
 
@@ -69,6 +70,8 @@ export default class ParticipantsController {
       }))
     )
 
+    participant.related('concerts').detach()
+    participant.related('rehearsals').detach()
     participant.related('concerts').sync(data.concerts.map((concert) => concert.id))
     participant.related('rehearsals').sync(data.rehearsals.map((rehearsal) => rehearsal.id))
 
@@ -82,16 +85,18 @@ export default class ParticipantsController {
       .andWhere('accepted', false)
       .preload('contact')
       .preload('section')
-      .preload('answers')
+      .preload('answers', (query) => query.preload('form'))
+      .preload('concerts')
+      .preload('rehearsals')
   }
 
   //validateParticipant : transforms the accepted field to true at /projects/:id/management/validation/:id
-  async validateParticipant({ params, response }: HttpContext) {
-    const { projectId, participantId } = params
+  async validateParticipant({ request, response }: HttpContext) {
+    const data = await request.validateUsing(validateParticipantValidator)
 
     const participant = await Participant.query()
-      .where('id', participantId)
-      .andWhere('project_id', projectId)
+      .where('id', data.id)
+      .andWhere('project_id', data.params.id)
       .first()
 
     if (!participant) return response.send("Couldn't find the participant")
@@ -104,10 +109,10 @@ export default class ParticipantsController {
 
   //delete : deletes a participant from the given project at /projects/:id/management/participants/:id
   async delete({ params, response }: HttpContext) {
-    const { projectId, participantId } = params
+    const { id, participantId } = params
     const participant = await Participant.query()
       .where('id', participantId)
-      .andWhere('project_id', projectId)
+      .andWhere('project_id', id)
       .first()
 
     if (!participant) {
