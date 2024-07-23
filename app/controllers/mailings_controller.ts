@@ -2,8 +2,8 @@ import Contact from '#models/contact'
 import mail from '@adonisjs/mail/services/main'
 import CallsheetNotification from '../mails/callsheet_notification.js'
 import { HttpContext } from '@adonisjs/core/http'
-import { createTemplateValidator, mailCallsheetValidator } from '#validators/mail'
-import env from '#start/env'
+//import { createTemplateValidator, mailCallsheetValidator } from '#validators/mail'
+//import env from '#start/env'
 import RegistrationNotification from '#mails/registration_notification'
 import RecommendationNotification from '#mails/recommendation_notification'
 import mail_template from '#models/mail_template'
@@ -13,6 +13,7 @@ import List from '#models/list'
 import OutgoingMail from '#models/outgoing_mail'
 import { DateTime } from 'luxon'
 import Project from '#models/project'
+import Responsibles from '#models/responsibles'
 
 export default class MailingsController {
   async send() {
@@ -108,73 +109,81 @@ export default class MailingsController {
     }
   }
 
-  async sendTemplate({ request, response }: HttpContext) {
-    const { template, contact, project, toContact } = request.only([
-      'template',
-      'contact',
-      'project',
-      'toContact',
-    ])
-
-    if (!contact.email) {
-      return response.status(400).json({ message: 'Contact email is required' })
-    }
-
-    let contactDb = await Contact.find(contact.id)
-    let templateDb = await mail_template.find(template.id)
-    let htmlFromDb = templateDb?.content || ''
-    let projectDb = await project.find(project.id)
-    let callsheet = await Callsheet.find(projectDb.callsheet_id)
-    let registrationId = projectDb.registration_id
-
-    if (htmlFromDb !== '' && callsheet !== null && registrationId !== null) {
-      if (contactDb?.subscribed === true) {
-        const registrationNotificationMail = new TemplatePreparation(
-          htmlFromDb,
-          contact,
-          project,
-          callsheet,
-          toContact,
-          registrationId
-        )
-        await mail.send(registrationNotificationMail)
-
-        return response.json({ message: 'Email sent successfully' })
-      } else {
-        return response.json({ message: 'Contact is not subscribed' })
-      }
-    } else {
-      return response.json({
-        message:
-          'Template not found or incomplete (callsheet not found or registration form not found)',
-      })
-    }
-  }
-
   async sendCallsheetNotification({ request, response }: HttpContext) {
     console.log('sendCallsheetNotification called')
     console.log(request.all())
 
-    const { contact, project, callsheet, toContact } = request.only([
-      'contact',
-      'project',
-      'callsheet',
-      'toContact',
-    ])
+    const { projectId } = request.only(['projectId'])
 
+    console.log('projectId', projectId)
+
+    let project = await Project.query().where('id', projectId).preload('participants').first()
+    let participants = project?.participants
+    let callsheet = await Callsheet.query()
+      .where('project_id', projectId)
+      .orderBy('created_at', 'desc')
+      .first()
+    let responsibles = await Responsibles.query().where('project_id', projectId).preload('contact')
+    let toContact: Array<{
+      first_name: string
+      last_name: string
+      email: string
+      phone: string
+      messenger: string
+    }> = []
+
+    if (callsheet === null || undefined) {
+      return response.status(400).json({ message: 'No callsheet found' })
+    }
+
+    if (project === null || undefined) {
+      return response.status(400).json({ message: 'No project found' })
+    }
+
+    if (responsibles === null || undefined) {
+      return response.status(400).json({ message: 'No responsibles found' })
+    }
+
+    for (let responsible of responsibles) {
+      toContact.push({
+        first_name: responsible.contact.first_name,
+        last_name: responsible.contact.last_name,
+        email: responsible.contact.email,
+        phone: responsible.contact.phone,
+        messenger: responsible.contact.messenger,
+      })
+    }
+
+    console.log('toContact', toContact)
+    if (participants !== null && participants !== undefined) {
+      for (let participant of participants) {
+        let contact = await Contact.find(participant.contact_id)
+        if (contact?.email && contact?.subscribed === true) {
+          const callsheetNotificationMail = new CallsheetNotification(
+            contact,
+            project,
+            callsheet,
+            toContact
+          )
+          await mail.sendLater(callsheetNotificationMail)
+        }
+      }
+    } else {
+      return response.status(400).json({ message: 'No participants found' })
+    }
+
+    return response.json({ message: 'Email sent successfully' })
+
+    /*
     if (!contact.email) {
       return response.status(400).json({ message: 'Contact email is required' })
     }
 
-    const callsheetNotificationMail = new CallsheetNotification(
-      contact,
-      project,
-      callsheet,
-      toContact
-    )
+    const callsheetNotificationMail = new CallsheetNotification(project_id)
     await mail.send(callsheetNotificationMail)
 
     return response.json({ message: 'Email sent successfully' })
+    */
   }
 
   async sendRecommendationNotification({ request, response }: HttpContext) {

@@ -15,7 +15,7 @@ export default class OutgoingMail extends BaseModel {
   declare project_id: number | null
 
   @column()
-  declare mail_template_id: number
+  declare mail_template_id: number | null
 
   @column()
   declare sent: boolean
