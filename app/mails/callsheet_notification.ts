@@ -80,7 +80,7 @@ export default class CallsheetNotification extends BaseMail {
               <br> Phone: ${contact.phone}
               <br> Messenger: ${contact.messenger}`
       })
-      .join('<br><br>') // Joining each contact detail with extra line breaks for separation
+      .join('<br><br>')
 
     htmlContent = htmlContent
       .replace(/\${URL}/g, url)

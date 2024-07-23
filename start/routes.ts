@@ -172,11 +172,26 @@ router.group(() => {
         router.delete('users/:id', [UsersController, 'delete'])
       })
 
-      router.post('/mailing', [MailingsController, 'send'])
-      router.post('/mailing/sendLaterTemplateToList', [
-        MailingsController,
-        'sendLaterTemplateToList',
-      ])
+      router.group(() => {
+        router.get('projects/:id/management/mailing', [MailingsController, 'getOutgoing'])
+        router.post('/mailing', [MailingsController, 'send'])
+        router.post('/mailing/sendLaterTemplateToList', [
+          MailingsController,
+          'sendLaterTemplateToList',
+        ])
+        router.post('/mailing/sendCallsheetNotification', [
+          MailingsController,
+          'sendCallsheetNotification',
+        ])
+        router.post('/mailing/sendRegistrationNotification', [
+          MailingsController,
+          'sendRegistrationNotification',
+        ])
+        router.post('/mailing/sendRecommendationNotification', [
+          MailingsController,
+          'sendRecommendationNotification',
+        ])
+      })
 
       router.get('/sign_out', [UsersController, 'signOut'])
 
@@ -202,21 +217,6 @@ router.group(() => {
         router.get('/sections', [SectionsController, 'getAll'])
         router.delete('/sections/:id', [SectionsController, 'delete'])
         router.post('/sections', [SectionsController, 'createOrUpdate'])
-      })
-
-      router.group(() => {
-        router.post('/mailing/sendCallsheetNotification', [
-          MailingsController,
-          'sendCallsheetNotification',
-        ])
-        router.post('/mailing/sendRegistrationNotification', [
-          MailingsController,
-          'sendRegistrationNotification',
-        ])
-        router.post('/mailing/sendRecommendationNotification', [
-          MailingsController,
-          'sendRecommendationNotification',
-        ])
       })
 
       router
