@@ -88,7 +88,7 @@ export default class CallsheetNotification extends BaseMail {
       .replace(/\${PROJECT}/g, this.project.name)
       .replace(
         /\${CALLSHEET}/g,
-        URL + '/call_sheets/' + this.callsheet.id.toString() + '/' + this.contact.id.toString()
+        url + '/call_sheets/' + this.callsheet.id.toString() + '/' + this.contact.id.toString()
       )
       .replace(/\${TO_CONTACT}/g, toContactDetails)
 

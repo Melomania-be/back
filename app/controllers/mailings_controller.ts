@@ -132,16 +132,17 @@ export default class MailingsController {
       messenger: string
     }> = []
 
-    if (callsheet === null || undefined) {
-      return response.status(400).json({ message: 'No callsheet found' })
+    if (!callsheet) {
+      return response.status(400).json({ message: 'No callsheet found' });
     }
-
-    if (project === null || undefined) {
-      return response.status(400).json({ message: 'No project found' })
+    if (!project) {
+      return response.status(400).json({ message: 'No project found' });
     }
-
-    if (responsibles === null || undefined) {
-      return response.status(400).json({ message: 'No responsibles found' })
+    if (!responsibles) {
+      return response.status(400).json({ message: 'No responsibles found' });
+    }
+    if (!participants) {
+      return response.status(400).json({ message: 'No participants found' });
     }
 
     for (let responsible of responsibles) {
@@ -165,7 +166,22 @@ export default class MailingsController {
             callsheet,
             toContact
           )
+          const outgoingMail = new OutgoingMail()
+          outgoingMail.type = 'callsheet_notification'
+          outgoingMail.receiver_id = contact.id
+          if (project) {
+            outgoingMail.project_id = project.id
+          } else {
+            outgoingMail.project_id = null
+          }
+          outgoingMail.mail_template_id = null
+          outgoingMail.sent = false
+          outgoingMail.createdAt = DateTime.local()
+          outgoingMail.updatedAt = DateTime.local()
+
+          await OutgoingMail.create(outgoingMail)
           await mail.sendLater(callsheetNotificationMail)
+          await this.updateOutgoingMail(outgoingMail)
         }
       }
     } else {
@@ -173,17 +189,6 @@ export default class MailingsController {
     }
 
     return response.json({ message: 'Email sent successfully' })
-
-    /*
-    if (!contact.email) {
-      return response.status(400).json({ message: 'Contact email is required' })
-    }
-
-    const callsheetNotificationMail = new CallsheetNotification(project_id)
-    await mail.send(callsheetNotificationMail)
-
-    return response.json({ message: 'Email sent successfully' })
-    */
   }
 
   async sendRecommendationNotification({ request, response }: HttpContext) {
