@@ -56,9 +56,9 @@ export default class RegistrationNotification extends BaseMail {
    * the email is sent or queued.
    */
   prepare() {
-    const __filename = fileURLToPath(import.meta.url)
-    const __dirname = path.dirname(__filename)
-    const htmlFilePath = path.join(__dirname, 'html_templates/confirmation_notification.html')
+    const filename = fileURLToPath(import.meta.url)
+    const dirname = path.dirname(filename)
+    const htmlFilePath = path.join(dirname, 'html_templates/confirmation_notification.html')
     let htmlContent = fs.readFileSync(htmlFilePath, 'utf-8')
 
     htmlContent =
