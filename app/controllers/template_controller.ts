@@ -1,7 +1,3 @@
-import mail from '#config/mail'
-import TemplatePreparation from '#mails/template_preparation'
-import Callsheet from '#models/callsheet'
-import Contact from '#models/contact'
 import mail_template from '#models/mail_template'
 import { createTemplateValidator } from '#validators/mail'
 import { HttpContext } from '@adonisjs/core/http'

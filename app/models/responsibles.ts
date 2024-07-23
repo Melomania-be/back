@@ -1,8 +1,6 @@
 import { DateTime } from 'luxon'
 import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
-import Form from '#models/form'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
-import Participant from './participant.js'
 import Project from './project.js'
 import Contact from './contact.js'
 

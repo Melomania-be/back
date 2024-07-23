@@ -2,8 +2,6 @@ import Contact from '#models/contact'
 import mail from '@adonisjs/mail/services/main'
 import CallsheetNotification from '../mails/callsheet_notification.js'
 import { HttpContext } from '@adonisjs/core/http'
-//import { createTemplateValidator, mailCallsheetValidator } from '#validators/mail'
-//import env from '#start/env'
 import RegistrationNotification from '#mails/registration_notification'
 import RecommendationNotification from '#mails/recommendation_notification'
 import mail_template from '#models/mail_template'
@@ -14,7 +12,6 @@ import OutgoingMail from '#models/outgoing_mail'
 import { DateTime } from 'luxon'
 import Project from '#models/project'
 import Responsibles from '#models/responsibles'
-import { emitKeypressEvents } from 'node:readline'
 
 export default class MailingsController {
   async send() {
