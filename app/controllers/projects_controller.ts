@@ -52,6 +52,7 @@ export default class ProjectsController {
       .preload('folder', (query) => {
         query.preload('files')
       })
+      .firstOrFail()
     return data
   }
 
