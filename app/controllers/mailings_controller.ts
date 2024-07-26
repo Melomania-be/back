@@ -2,7 +2,6 @@ import Contact from '#models/contact'
 import mail from '@adonisjs/mail/services/main'
 import CallsheetNotification from '../mails/callsheet_notification.js'
 import { HttpContext } from '@adonisjs/core/http'
-import RegistrationNotification from '#mails/registration_notification'
 import RecommendationNotification from '#mails/recommendation_notification'
 import RecommendedNotification from '#mails/recommended_notification'
 import mail_template from '#models/mail_template'
@@ -13,6 +12,7 @@ import OutgoingMail from '#models/outgoing_mail'
 import { DateTime } from 'luxon'
 import Project from '#models/project'
 import Responsibles from '#models/responsibles'
+import ParticipationValidationNotification from '#mails/participation_validation_notification'
 
 export default class MailingsController {
   async send() {
@@ -279,31 +279,6 @@ export default class MailingsController {
     return response.json({ message: 'Email sent successfully' })
   }
 
-  async sendRegistrationNotification({ request, response }: HttpContext) {
-    console.log('sendRecommendationNotification called aka recruitement')
-
-    const { contact, project, callsheet, toContact } = request.only([
-      'contact',
-      'project',
-      'callsheet',
-      'toContact',
-    ])
-
-    if (!contact.email) {
-      return response.status(400).json({ message: 'Contact email is required' })
-    }
-
-    const registrationNotificationMail = new RegistrationNotification(
-      contact,
-      project,
-      callsheet,
-      toContact
-    )
-    await mail.send(registrationNotificationMail)
-
-    return response.json({ message: 'Email sent successfully' })
-  }
-
   async sendRecommendedNotification({ request, response }: HttpContext) {
     //function to send a mail to a recommended person (recommendeds) to join a project
     console.log('sendRecommendedNotification called')
@@ -346,8 +321,7 @@ export default class MailingsController {
 
     const outgoingMail = new OutgoingMail()
     outgoingMail.type = 'recommendation_notification'
-    //outgoingMail.receiver_id = null
-    //créer nouvelle colonne?
+    outgoingMail.receiver_id = recommended.id
     outgoingMail.mail_template_id = null
     outgoingMail.sent = false
     outgoingMail.createdAt = DateTime.local()
@@ -360,6 +334,71 @@ export default class MailingsController {
 
     return response.json({
       message: 'Email ' + outgoingMail.type + ' sent successfully to' + recommended.email,
+    })
+  }
+
+  async sendParticipationValidationNotification({ request, response }: HttpContext) {
+    console.log('sendParticipationValidationNotification called')
+    const { projectId, contactId } = request.only(['projectId', 'contactId'])
+
+    let project = await Project.query().where('id', projectId).preload('callsheets').first()
+    let contact = await Contact.find(contactId)
+    let responsibles = await Responsibles.query().where('project_id', projectId).preload('contact')
+    let callsheet = await Callsheet.query()
+      .where('project_id', projectId)
+      .orderBy('created_at', 'desc')
+      .first()
+
+    if (!project) {
+      return response.status(400).json({ message: 'No project found' })
+    }
+    if (!contact) {
+      return response.status(400).json({ message: 'No contact found' })
+    }
+    if (!callsheet) {
+      return response.status(400).json({ message: 'No callsheet found' })
+    }
+
+    let toContact: Array<{
+      first_name: string
+      last_name: string
+      email: string
+      phone: string
+      messenger: string
+    }> = []
+
+    for (let responsible of responsibles) {
+      toContact.push({
+        first_name: responsible.contact.first_name,
+        last_name: responsible.contact.last_name,
+        email: responsible.contact.email,
+        phone: responsible.contact.phone,
+        messenger: responsible.contact.messenger,
+      })
+    }
+
+    const participationValidationNotification = new ParticipationValidationNotification(
+      contact,
+      project,
+      callsheet,
+      toContact
+    )
+
+    const outgoingMail = new OutgoingMail()
+    outgoingMail.type = 'participation_validation_notification'
+    outgoingMail.receiver_id = contact.id
+    outgoingMail.mail_template_id = null
+    outgoingMail.sent = false
+    outgoingMail.createdAt = DateTime.local()
+    outgoingMail.updatedAt = DateTime.local()
+
+    await OutgoingMail.create(outgoingMail)
+
+    await mail.sendLater(participationValidationNotification)
+    await this.updateOutgoingMail(outgoingMail)
+
+    return response.json({
+      message: 'Email ' + outgoingMail.type + ' sent successfully to' + contact.email,
     })
   }
 
