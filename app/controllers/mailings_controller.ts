@@ -4,6 +4,7 @@ import CallsheetNotification from '../mails/callsheet_notification.js'
 import { HttpContext } from '@adonisjs/core/http'
 import RegistrationNotification from '#mails/registration_notification'
 import RecommendationNotification from '#mails/recommendation_notification'
+import RecommendedNotification from '#mails/recommended_notification'
 import mail_template from '#models/mail_template'
 import TemplatePreparation from '#mails/template_preparation'
 import Callsheet from '#models/callsheet'
@@ -251,7 +252,7 @@ export default class MailingsController {
               toContact
             )
             const outgoingMail = new OutgoingMail()
-            outgoingMail.type = 'recommendation_notification'
+            outgoingMail.type = 'recruitment_notification'
             outgoingMail.receiver_id = contact.id
             if (project) {
               outgoingMail.project_id = project.id
@@ -279,7 +280,7 @@ export default class MailingsController {
   }
 
   async sendRegistrationNotification({ request, response }: HttpContext) {
-    console.log('sendRecommendationNotification called')
+    console.log('sendRecommendationNotification called aka recruitement')
 
     const { contact, project, callsheet, toContact } = request.only([
       'contact',
@@ -303,6 +304,65 @@ export default class MailingsController {
     return response.json({ message: 'Email sent successfully' })
   }
 
+  async sendRecommendedNotification({ request, response }: HttpContext) {
+    //function to send a mail to a recommended person (recommendeds) to join a project
+    console.log('sendRecommendedNotification called')
+    const { projectId, recommendedId } = request.only(['projectId', 'recommendedId'])
+
+    let project = await Project.query().where('id', projectId).preload('registration').first()
+    let recommended = await Contact.find(recommendedId)
+    let responsibles = await Responsibles.query().where('project_id', projectId).preload('contact')
+    if (!project) {
+      return response.status(400).json({ message: 'No project found' })
+    }
+    if (!recommended) {
+      return response.status(400).json({ message: 'No recommended contact found' })
+    }
+
+    let toContact: Array<{
+      first_name: string
+      last_name: string
+      email: string
+      phone: string
+      messenger: string
+    }> = []
+
+    for (let responsible of responsibles) {
+      toContact.push({
+        first_name: responsible.contact.first_name,
+        last_name: responsible.contact.last_name,
+        email: responsible.contact.email,
+        phone: responsible.contact.phone,
+        messenger: responsible.contact.messenger,
+      })
+    }
+
+    const recommendedNotification = new RecommendedNotification(
+      recommended,
+      project.registration,
+      project,
+      toContact
+    )
+
+    const outgoingMail = new OutgoingMail()
+    outgoingMail.type = 'recommendation_notification'
+    //outgoingMail.receiver_id = null
+    //créer nouvelle colonne?
+    outgoingMail.mail_template_id = null
+    outgoingMail.sent = false
+    outgoingMail.createdAt = DateTime.local()
+    outgoingMail.updatedAt = DateTime.local()
+
+    await OutgoingMail.create(outgoingMail)
+
+    await mail.sendLater(recommendedNotification)
+    await this.updateOutgoingMail(outgoingMail)
+
+    return response.json({
+      message: 'Email ' + outgoingMail.type + ' sent successfully to' + recommended.email,
+    })
+  }
+
   async getOutgoing(ctx: HttpContext) {
     let data: {
       lastCallsheetNotificationSent: string | null
@@ -317,7 +377,7 @@ export default class MailingsController {
       .first()
 
     let lastRecommendationNotificationSent = await OutgoingMail.query()
-      .where('type', 'recommendation_notification')
+      .where('type', 'recruitment_notification')
       .where('project_id', ctx.params.id)
       .where('sent', true)
       .orderBy('created_at', 'desc')
