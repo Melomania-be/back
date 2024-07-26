@@ -179,18 +179,31 @@ router.group(() => {
           MailingsController,
           'sendLaterTemplateToList',
         ])
+        //for mails using templates
+
         router.post('/mailing/sendCallsheetNotification', [
           MailingsController,
           'sendCallsheetNotification',
         ])
-        router.post('/mailing/sendRegistrationNotification', [
+        //sends a mail to every validated participant of a project that a new callsheet is up
+
+        router.post('/mailing/sendRecommendedNotification', [
           MailingsController,
-          'sendRegistrationNotification',
+          'sendRecommendedNotification',
         ])
-        router.post('/mailing/sendRecommendationNotification', [
+        //sends a mail to a recommended person that just got validated to join a project
+
+        router.post('/mailing/sendRecruitmentNotification', [
           MailingsController,
           'sendRecommendationNotification',
         ])
+        //sends a mail to every contact in the table contacts (validated AND subscribed) that a new project is up
+
+        router.post('/mailing/sendParticipationValidationNotification', [
+          MailingsController,
+          'sendParticipationValidationNotification',
+        ])
+        //sends a mail to a participant that his participation has been validated by the project manager
       })
 
       router.get('/sign_out', [UsersController, 'signOut'])
