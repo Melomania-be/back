@@ -22,6 +22,7 @@ export default class CallsheetsController {
         projectQuery
           .preload('responsibles')
           .preload('rehearsals')
+          .preload('concerts')
           .preload('pieces', (pieceQuery) => {
             pieceQuery.preload('composer')
             pieceQuery.preload('folder', (folderQuery) => {
@@ -33,6 +34,7 @@ export default class CallsheetsController {
               sectionQuery.preload('instruments')
             })
           })
+          .preload('registration')
       })
       .firstOrFail()
 
