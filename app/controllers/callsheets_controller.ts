@@ -20,9 +20,13 @@ export default class CallsheetsController {
       .preload('contents')
       .preload('project', (projectQuery) => {
         projectQuery
+          .preload('responsibles')
           .preload('rehearsals')
           .preload('pieces', (pieceQuery) => {
             pieceQuery.preload('composer')
+            pieceQuery.preload('folder', (folderQuery) => {
+              folderQuery.preload('files')
+            })
           })
           .preload('sectionGroup', (sectionGroupQuery) => {
             sectionGroupQuery.preload('sections', (sectionQuery) => {

@@ -27,7 +27,9 @@ export default class RegistrationsController {
         projectQuery
           .preload('rehearsals')
           .preload('concerts')
-          .preload('pieces')
+          .preload('pieces', (pieceQuery) => {
+            pieceQuery.preload('composer')
+          })
           .preload('sectionGroup', (sectionQuery) => {
             sectionQuery.preload('sections')
           })
