@@ -12,6 +12,6 @@ deployment:
         - /bin/cp -r $TMPDIR/uploads $DEPLOYPATH/build
         - /bin/rm -r $TMPDIR
         - /usr/sbin/cloudlinux-selector install-modules --json --interpreter nodejs --user ciro3903 --app-root app/back
+        - /usr/sbin/cloudlinux-selector start --json --interpreter nodejs --user ciro3903 --app-root app/back
         - /usr/sbin/cloudlinux-selector run-script --json --interpreter nodejs --user ciro3903 --app-root app/back --script-name build
         - /opt/alt/alt-nodejs20/root/usr/bin/npm --prefix $DEPLOYPATH/back/build ci --omit="dev"
-        - /usr/sbin/cloudlinux-selector start --json --interpreter nodejs --user ciro3903 --app-root app/back
