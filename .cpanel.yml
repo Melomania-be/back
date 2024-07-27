@@ -1,0 +1,14 @@
+---
+deployment:
+      tasks:
+        - export DEPLOYPATH=/home/ciro3903/app
+        - export TMPDIR=/home/ciro3903/app/tmp
+        - /bin/mkdir -p $TMPDIR
+        - /bin/cp -r $DEPLOYPATH/back/build/uploads $TMPDIR
+        - /bin/rm -r $DEPLOYPATH/back
+        - /bin/cp -r /home/ciro3903/repositories/back $DEPLOYPATH
+        - /bin/cp -r $TMPDIR/uploads $DEPLOYPATH/build
+        - /bin/rm -r $TMPDIR
+        - /usr/sbin/cloudlinux-selector install-modules --json --interpreter nodejs --user ciro3903 --app-root app/back
+        - /usr/sbin/cloudlinux-selector run-script --json --interpreter nodejs --user ciro3903 --app-root app/back --script-name build
+        - /opt/alt/alt-nodejs20/root/usr/bin/npm --prefix $DEPLOYPATH/back/build ci --omit="dev"
