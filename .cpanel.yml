@@ -4,6 +4,7 @@ deployment:
         - export DEPLOYPATH=/home/ciro3903/app
         - export TMPDIR=/home/ciro3903/app/tmp
         - /bin/mkdir -p $TMPDIR
+        - /bin/mkdir -p $DEPLOYPATH/back/build/uploads
         - /bin/cp -r $DEPLOYPATH/back/build/uploads $TMPDIR
         - /bin/rm -r $DEPLOYPATH/back
         - /bin/cp -r /home/ciro3903/repositories/back $DEPLOYPATH
