@@ -2,7 +2,6 @@ import Contact from '#models/contact'
 import mail from '@adonisjs/mail/services/main'
 import CallsheetNotification from '../mails/callsheet_notification.js'
 import { HttpContext } from '@adonisjs/core/http'
-import RecommendationNotification from '#mails/recommendation_notification'
 import RecommendedNotification from '#mails/recommended_notification'
 import mail_template from '#models/mail_template'
 import TemplatePreparation from '#mails/template_preparation'
@@ -13,6 +12,7 @@ import { DateTime } from 'luxon'
 import Project from '#models/project'
 import Responsibles from '#models/responsibles'
 import ParticipationValidationNotification from '#mails/participation_validation_notification'
+import RecruitmentNotification from '#mails/recruitment_notification'
 
 export default class MailingsController {
   async send() {
@@ -195,8 +195,8 @@ export default class MailingsController {
     return response.json({ message: 'Email sent successfully' })
   }
 
-  async sendRecommendationNotification({ request, response }: HttpContext) {
-    console.log('sendRecommendationNotification called')
+  async sendRecruitmentNotification({ request, response }: HttpContext) {
+    console.log('sendRecruitmentNotification called')
     const { projectId } = request.only(['projectId'])
     let project = await Project.query().where('id', projectId).first()
 
@@ -245,7 +245,7 @@ export default class MailingsController {
       if (registration.id !== null && registration.id !== undefined) {
         for (let contact of contacts) {
           if (contact?.email && contact?.subscribed === true) {
-            const recommendationNotification = new RecommendationNotification(
+            const recruitmentNotification = new RecruitmentNotification(
               contact,
               registration,
               project,
@@ -265,7 +265,7 @@ export default class MailingsController {
             outgoingMail.updatedAt = DateTime.local()
 
             await OutgoingMail.create(outgoingMail)
-            await mail.sendLater(recommendationNotification)
+            await mail.sendLater(recruitmentNotification)
             this.updateOutgoingMail(outgoingMail)
           }
         }
@@ -405,7 +405,7 @@ export default class MailingsController {
   async getOutgoing(ctx: HttpContext) {
     let data: {
       lastCallsheetNotificationSent: string | null
-      lastRecommendationNotificationSent: string | null
+      lastRecruitmentNotificationSent: string | null
     }
     console.log('getOutgoing called')
     let lastCallsheetNotificationSent = await OutgoingMail.query()
@@ -415,7 +415,7 @@ export default class MailingsController {
       .orderBy('created_at', 'desc')
       .first()
 
-    let lastRecommendationNotificationSent = await OutgoingMail.query()
+    let lastRecruitmentNotificationSent = await OutgoingMail.query()
       .where('type', 'recruitment_notification')
       .where('project_id', ctx.params.id)
       .where('sent', true)
@@ -426,8 +426,8 @@ export default class MailingsController {
       lastCallsheetNotificationSent: lastCallsheetNotificationSent
         ? lastCallsheetNotificationSent.createdAt.toISO()
         : null,
-      lastRecommendationNotificationSent: lastRecommendationNotificationSent
-        ? lastRecommendationNotificationSent.createdAt.toISO()
+      lastRecruitmentNotificationSent: lastRecruitmentNotificationSent
+        ? lastRecruitmentNotificationSent.createdAt.toISO()
         : null,
     }
 

@@ -4,9 +4,9 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 
-//demande générale de participation au projet => mail registration
+//demande générale de participation au projet => mail de recrutement
 
-export default class RecommendationNotification extends BaseMail {
+export default class RecruitmentNotification extends BaseMail {
   contact: {
     first_name: string
     last_name: string
@@ -45,7 +45,7 @@ export default class RecommendationNotification extends BaseMail {
     super()
     this.from = env.get('SMTP_USERNAME')
     this.project = project
-    this.subject = 'Registration to ' + project.name
+    this.subject = project.name + 'recruitment notification'
     this.contact = contact
     this.registration = registration
     this.toContact = toContact
@@ -55,7 +55,7 @@ export default class RecommendationNotification extends BaseMail {
     const url = env.get('URL') || ''
     const filename = fileURLToPath(import.meta.url)
     const dirname = path.dirname(filename)
-    const htmlFilePath = path.join(dirname, 'html_templates/recommendation_notification.html')
+    const htmlFilePath = path.join(dirname, 'html_templates/recruitment_notification.html')
     let htmlContent = fs.readFileSync(htmlFilePath, 'utf-8')
     let toContactDetails = ''
 
