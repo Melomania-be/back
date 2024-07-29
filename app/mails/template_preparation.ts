@@ -1,6 +1,9 @@
 import env from '#start/env'
 import { BaseMail } from '@adonisjs/mail'
 import Callsheet from '#models/callsheet'
+import app from '@adonisjs/core/services/app'
+import path from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 export default class TemplatePreparation extends BaseMail {
   contact: {
@@ -60,6 +63,7 @@ export default class TemplatePreparation extends BaseMail {
 
   prepare() {
     const url = env.get('URL') || ''
+    const imageFileRegex = /<img\s+file=([^>]+\.(jpg|png))\s*\/?>/g
 
     let htmlContent = this.htmlFromDb
       .replace(/\${NAME}/g, this.contact.first_name + ' ' + this.contact.last_name)
@@ -90,6 +94,29 @@ export default class TemplatePreparation extends BaseMail {
     } else {
       htmlContent = htmlContent.replace(/\${REGISTRATION}/g, `${URL}/registration/default_value`)
     }
+
+    const matches = htmlContent.match(imageFileRegex)
+
+    if (matches) {
+      for (const match of matches) {
+        const pathMatch = match.match(/file=([^\s>]+)/)
+        if (pathMatch) {
+          const filePath = pathMatch[1]
+          const fileURL = pathToFileURL(filePath).href
+          const cid = `image-${Date.now()}`
+          htmlContent = htmlContent.replace(
+            match,
+            match.replace(/file=([^\s>]+)/, `src="cid:${cid}"`)
+          )
+          this.message.attach(fileURLToPath(fileURL), {
+            contentType: 'image/png',
+            filename: path.basename(filePath),
+            headers: { 'Content-ID': cid },
+          })
+        }
+      }
+    }
+
     this.message
       .to(this.contact.email)
       .from(env.get('SMTP_USERNAME'))
