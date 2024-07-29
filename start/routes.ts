@@ -174,7 +174,9 @@ router.group(() => {
 
       router.group(() => {
         router.get('projects/:id/management/mailing', [MailingsController, 'getOutgoing'])
-        router.post('/mailing', [MailingsController, 'send'])
+        router.post('/mailing', [MailingsController, 'sendUnique'])
+        //for unique mails to a list of contacts
+
         router.post('/mailing/sendLaterTemplateToList', [
           MailingsController,
           'sendLaterTemplateToList',
@@ -195,7 +197,7 @@ router.group(() => {
 
         router.post('/mailing/sendRecruitmentNotification', [
           MailingsController,
-          'sendRecommendationNotification',
+          'sendRecruitmentNotification',
         ])
         //sends a mail to every contact in the table contacts (validated AND subscribed) that a new project is up
 

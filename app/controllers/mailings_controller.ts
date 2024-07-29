@@ -13,18 +13,46 @@ import Project from '#models/project'
 import Responsibles from '#models/responsibles'
 import ParticipationValidationNotification from '#mails/participation_validation_notification'
 import RecruitmentNotification from '#mails/recruitment_notification'
+import UniquePreparation from '#mails/unique_preparation'
 
 export default class MailingsController {
-  async send() {
-    console.log('send called')
+  async sendUnique({ request, response }: HttpContext) {
+    console.log('sendUnique called')
+    const { listContacts, subject, content } = request.only(['listContacts', 'subject', 'content'])
 
-    await mail.send((message) => {
-      message
-        .to('')
-        .from('info@melomania.be')
-        .subject('Verify your email address')
-        .html('<p>Please verify your email address by clicking on the link below.</p>')
-    })
+    console.log('listContacts', listContacts)
+    console.log('subject', subject)
+    console.log('content', content)
+
+    let listDb = await List.find(listContacts.id)
+    let allContacts = await listDb?.related('contacts').query()
+
+    console.log('listDb', listDb)
+    console.log('allContacts', allContacts)
+
+    if (allContacts !== null && allContacts !== undefined) {
+      for (let contact of allContacts) {
+        if (contact.email && contact.subscribed) {
+          const uniqueMail = new UniquePreparation(content, subject, contact)
+
+          const outgoingMail = new OutgoingMail()
+          outgoingMail.type = 'unique'
+          outgoingMail.receiver_id = contact.id
+          outgoingMail.sent = false
+          outgoingMail.createdAt = DateTime.local()
+          outgoingMail.updatedAt = DateTime.local()
+
+          await OutgoingMail.create(outgoingMail)
+
+          await mail.sendLater(uniqueMail)
+          await this.updateOutgoingMail(outgoingMail)
+
+          return response.json({ message: 'Email sent successfully' })
+        } else {
+          return response.json({ message: 'List not found' })
+        }
+      }
+    }
   }
 
   async sendLaterTemplateToList({ request, response }: HttpContext) {
@@ -87,6 +115,8 @@ export default class MailingsController {
 
               await mail.sendLater(registrationNotificationMail)
               await this.updateOutgoingMail(outgoingMail)
+
+              return response.json({ message: 'Email sent successfully' })
             }
           }
         }

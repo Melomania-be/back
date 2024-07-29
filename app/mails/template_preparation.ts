@@ -1,7 +1,6 @@
 import env from '#start/env'
 import { BaseMail } from '@adonisjs/mail'
 import Callsheet from '#models/callsheet'
-import app from '@adonisjs/core/services/app'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
