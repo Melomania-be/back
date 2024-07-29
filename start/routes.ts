@@ -28,6 +28,7 @@ const SectionGroupsController = () => import('#controllers/section_groups_contro
 const FormsController = () => import('#controllers/forms_controller')
 const SectionsController = () => import('#controllers/sections_controller')
 const TemplateController = () => import('#controllers/template_controller')
+const DefaultTemplatesController = () => import('#controllers/default_templates_controller')
 
 router.group(() => {
   //open routes
@@ -206,6 +207,13 @@ router.group(() => {
           'sendParticipationValidationNotification',
         ])
         //sends a mail to a participant that his participation has been validated by the project manager
+      })
+
+      router.group(() => {
+        router.get('/mailing/templates/default', [
+          DefaultTemplatesController,
+          'getDefaultTemplates',
+        ])
       })
 
       router.get('/sign_out', [UsersController, 'signOut'])
