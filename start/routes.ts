@@ -41,7 +41,7 @@ router.group(() => {
     router.put('/registration/submit', [RegistrationsController, 'submit'])
 
     router.post('/sign_in', [UsersController, 'signIn'])
-    router.post('/:id/recommend_someone', [RecommendSomeonesController, 'create'])
+    router.post('/recommend_someone', [RecommendSomeonesController, 'create'])
 
     router.get('/call_sheets/:id/:visitorId', [CallsheetsController, 'getOne'])
   })
