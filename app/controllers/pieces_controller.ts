@@ -21,7 +21,7 @@ export default class PiecesController {
       new RelationFilter('folder', Folder, ['name'])], 
       {
         filtered: true,
-        paginated: false,
+        paginated: true,
         ordered: true,
       }
     )
