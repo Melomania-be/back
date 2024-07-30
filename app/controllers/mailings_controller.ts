@@ -105,7 +105,7 @@ export default class MailingsController {
           if (participant.accepted === true) {
             let contact = await Contact.find(participant.contact_id)
             if (contact?.email && contact?.subscribed === true && contact?.validated === true) {
-              const registrationNotificationMail = new TemplatePreparation(
+              const templatePreparation = new TemplatePreparation(
                 htmlFromDb,
                 contact,
                 project,
@@ -125,7 +125,7 @@ export default class MailingsController {
 
               await OutgoingMail.create(outgoingMail)
 
-              await mail.sendLater(registrationNotificationMail)
+              await mail.sendLater(templatePreparation)
               await this.updateOutgoingMail(outgoingMail)
             }
           }
@@ -198,7 +198,7 @@ export default class MailingsController {
         let contactDb = await Contact.find(contact.id)
         if (htmlFromDb !== '') {
           if (contactDb?.email && contactDb?.subscribed === true && contactDb?.validated === true) {
-            const registrationNotificationMail = new TemplatePreparation(
+            const templatePreparation = new TemplatePreparation(
               htmlFromDb,
               contact,
               projectDb,
@@ -222,7 +222,7 @@ export default class MailingsController {
 
             await OutgoingMail.create(outgoingMail)
 
-            await mail.sendLater(registrationNotificationMail)
+            await mail.sendLater(templatePreparation)
             await this.updateOutgoingMail(outgoingMail)
 
             return response.json({ message: 'Email sent successfully' })
