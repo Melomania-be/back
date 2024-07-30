@@ -12,7 +12,7 @@ export default class OutgoingMail extends BaseModel {
   declare receiver_id: number
 
   @column()
-  declare project_id: number | null
+  declare project_id: number | null | undefined
 
   @column()
   declare mail_template_id: number | null

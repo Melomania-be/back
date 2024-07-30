@@ -28,6 +28,7 @@ const SectionGroupsController = () => import('#controllers/section_groups_contro
 const FormsController = () => import('#controllers/forms_controller')
 const SectionsController = () => import('#controllers/sections_controller')
 const TemplateController = () => import('#controllers/template_controller')
+const DefaultTemplatesController = () => import('#controllers/default_templates_controller')
 
 router.group(() => {
   //open routes
@@ -174,7 +175,9 @@ router.group(() => {
 
       router.group(() => {
         router.get('projects/:id/management/mailing', [MailingsController, 'getOutgoing'])
-        router.post('/mailing', [MailingsController, 'send'])
+        router.post('/mailing', [MailingsController, 'sendUnique'])
+        //for unique mails to a list of contacts
+
         router.post('/mailing/sendLaterTemplateToList', [
           MailingsController,
           'sendLaterTemplateToList',
@@ -195,7 +198,7 @@ router.group(() => {
 
         router.post('/mailing/sendRecruitmentNotification', [
           MailingsController,
-          'sendRecommendationNotification',
+          'sendRecruitmentNotification',
         ])
         //sends a mail to every contact in the table contacts (validated AND subscribed) that a new project is up
 
@@ -204,6 +207,24 @@ router.group(() => {
           'sendParticipationValidationNotification',
         ])
         //sends a mail to a participant that his participation has been validated by the project manager
+
+        router.post('/mailing/sendMailToParticipants', [
+          MailingsController,
+          'sendMailToParticipants',
+        ])
+        //sends a mail to every participant of a project
+      })
+
+      router.group(() => {
+        router.get('/mailing/templates/default', [
+          DefaultTemplatesController,
+          'getDefaultTemplates',
+        ])
+
+        router.put('/mailing/templates/default/edit', [
+          DefaultTemplatesController,
+          'editDefaultTemplate',
+        ])
       })
 
       router.get('/sign_out', [UsersController, 'signOut'])
