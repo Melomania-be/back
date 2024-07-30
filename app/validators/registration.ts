@@ -34,7 +34,7 @@ export const userRegistrationValidator = vine.compile(
     section_id: vine.number(),
     answers: vine.array(
       vine.object({
-        text: vine.string() || vine.boolean(),
+        text: (vine.string() || vine.boolean()).nullable(),
         form_id: vine.number(),
       })
     ),

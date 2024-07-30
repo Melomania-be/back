@@ -112,7 +112,7 @@ export default class RegistrationsController {
     const answer = await Answer.createMany(
       data.answers.map((answerIt) => {
         return {
-          text: answerIt.text,
+          text: answerIt.text ?? '',
           form_id: answerIt.form_id,
           participant_id: participant.id,
         }
