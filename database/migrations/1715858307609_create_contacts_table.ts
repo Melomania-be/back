@@ -14,6 +14,7 @@ export default class extends BaseSchema {
       table.string('messenger', 255).defaultTo('')
       table.string('comments', 255).defaultTo('')
       table.boolean('validated').defaultTo(false).notNullable()
+      table.boolean('subscribed').defaultTo(true).notNullable()
 
       table.timestamp('created_at')
       table.timestamp('updated_at')

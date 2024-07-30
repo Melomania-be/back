@@ -6,6 +6,9 @@ export default class MailTemplate extends BaseModel {
   declare id: number
 
   @column()
+  declare name: string
+
+  @column()
   declare content: string
 
   @column.dateTime({ autoCreate: true })

@@ -8,11 +8,12 @@ export const createContactValidator = vine.compile(
     id: vine.number().optional(),
     first_name: vine.string(),
     last_name: vine.string(),
-    email: vine.string().email(),
+    email: vine.string().email().optional(),
     phone: vine.string().optional(),
     messenger: vine.string().optional(),
     comments: vine.string().optional(),
     validated: vine.boolean(),
+    subscribed: vine.boolean().optional(),
     instruments: vine
       .array(
         vine.object({

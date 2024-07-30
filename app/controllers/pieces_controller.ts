@@ -7,18 +7,30 @@ import { createPieceValidator } from '#validators/piece'
 import { simpleFilter, Filter, RelationFilter } from '#services/simple_filter'
 
 export default class PiecesController {
-
   async getAll(ctx: HttpContext) {
-    let baseQuery = Piece.query().preload('sections').preload('typeOfPiece').preload('composer').preload('folder')
+    let baseQuery = Piece.query()
+      .preload('sections')
+      .preload('typeOfPiece')
+      .preload('composer')
+      .preload('folder')
 
     return await simpleFilter(
       ctx,
       Piece,
       baseQuery,
       new Filter(Piece, ['name', 'opus', 'year_of_composition', 'composer_id', 'arranger']),
-      [new RelationFilter('typeOfPiece', TypeOfPiece, ['name']),
-      new RelationFilter('composer', Composer, ['short_name', 'long_name', 'birth_date', 'death_date', 'country', 'main_style']),
-      new RelationFilter('folder', Folder, ['name'])], 
+      [
+        new RelationFilter('typeOfPiece', TypeOfPiece, ['name']),
+        new RelationFilter('composer', Composer, [
+          'short_name',
+          'long_name',
+          'birth_date',
+          'death_date',
+          'country',
+          'main_style',
+        ]),
+        new RelationFilter('folder', Folder, ['name']),
+      ],
       {
         filtered: true,
         paginated: true,

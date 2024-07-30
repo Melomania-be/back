@@ -4,20 +4,14 @@ import { createTypeOfPieceValidator } from '#validators/type_of_piece'
 import { simpleFilter, Filter } from '#services/simple_filter'
 
 export default class TypeOfPiecesController {
-
   async getAll(ctx: HttpContext) {
     let baseQuery = TypeOfPiece.query()
 
-    return await simpleFilter(
-      ctx,
-      TypeOfPiece,
-      baseQuery,
-      new Filter(TypeOfPiece, ['name']), [], {
-        filtered: true,
-        paginated: true,
-        ordered: true,
-      }
-    )
+    return await simpleFilter(ctx, TypeOfPiece, baseQuery, new Filter(TypeOfPiece, ['name']), [], {
+      filtered: true,
+      paginated: true,
+      ordered: true,
+    })
   }
 
   async createOrUpdate(ctx: HttpContext) {

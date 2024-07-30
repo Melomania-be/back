@@ -106,7 +106,6 @@ export default class ContactsController {
     const existing = await Contact.query()
       .where('firstname', data.first_name)
       .andWhere('lastname', data.last_name)
-      .andWhere('email', data.email)
       .first()
 
     if (existing) return ctx.response.send('Contact already exists.')
@@ -130,5 +129,17 @@ export default class ContactsController {
       new Filter(Contact, ['first_name', 'last_name', 'email', 'comments', 'messenger', 'phone']),
       [new RelationFilter('instruments', Instrument, ['family', 'name'])]
     )
+  }
+
+  async unsubscribe_from_mails({ request, response }: HttpContext) {
+    console.log('unsubscribe_from_mails called')
+    const { email }: { email: string } = request.only(['email'])
+    let contact = await Contact.query().where('email', email).first()
+    if (contact) {
+      contact.subscribed = false
+      await contact.save()
+      return response.status(200).send('contact unsubscribed')
+    }
+    return response.status(404).send('contact not found')
   }
 }

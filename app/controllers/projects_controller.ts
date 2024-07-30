@@ -9,6 +9,8 @@ import db from '@adonisjs/lucid/services/db'
 import SectionGroup from '#models/section_group'
 import Piece from '#models/piece'
 import { DateTime } from 'luxon'
+import Contact from '#models/contact'
+import Folder from '#models/folder'
 
 export default class ProjectsController {
   async getAll(ctx: HttpContext) {
@@ -47,6 +49,10 @@ export default class ProjectsController {
       })
       .preload('callsheets')
       .preload('responsibles')
+      .preload('folder', (query) => {
+        query.preload('files')
+      })
+      .firstOrFail()
     return data
   }
 
@@ -72,6 +78,9 @@ export default class ProjectsController {
       .preload('sectionGroup', (query) => {
         query.preload('sections')
       })
+      .preload('folder', (query) => {
+        query.preload('files')
+      })
 
     const participantsNotValidated = await Participant.query()
       .preload('contact')
@@ -91,19 +100,19 @@ export default class ProjectsController {
       .where('participants.project_id', params.id)
       .andWhere('accepted', true)
       .andWhere((subQuery) => {
-        subQuery.where(
-          'last_activity',
-          '<',
-          db
-            .from('callsheets')
-            .select('updated_at')
-            .where('project_id', params.id)
-            .andWhereNotNull('updated_at')
-            .orderBy('updated_at', 'desc')
-            .limit(1)
-        )
-
-        console.log(subQuery.toSQL())
+        subQuery
+          .where(
+            'last_activity',
+            '<',
+            db
+              .from('callsheets')
+              .select('updated_at')
+              .where('project_id', params.id)
+              .andWhereNotNull('updated_at')
+              .orderBy('updated_at', 'desc')
+              .limit(1)
+          )
+          .orDoesntHave('hasSeenCallsheets')
       })
 
     return {
@@ -115,11 +124,7 @@ export default class ProjectsController {
   }
 
   async createOrUpdate(ctx: HttpContext) {
-    console.log(ctx.request.all())
-
     const data = await ctx.request.validateUsing(createProjectValidator)
-
-    console.log(data)
 
     let project: Project
 
@@ -138,25 +143,78 @@ export default class ProjectsController {
     await project.related('sectionGroup').dissociate()
     await project.related('sectionGroup').associate(sectionGroup)
 
-    const responsibles = await Participant.query().whereIn('id', data.responsibles_ids)
+    const responsibles = await Contact.findMany(data.responsibles_ids)
 
     await project.related('responsibles').detach()
-    await project.related('responsibles').sync(responsibles.map((r) => r.id))
+    await project.related('responsibles').attach(responsibles.map((r) => r.id))
 
     const pieces = await Piece.query().whereIn('id', data.pieces_ids)
 
     await project.related('pieces').detach()
     await project.related('pieces').sync(pieces.map((p) => p.id))
 
-    await project.related('concerts').query().delete()
-    await project
-      .related('concerts')
-      .updateOrCreateMany(data.concerts.map((c) => ({ ...c, date: DateTime.fromJSDate(c.date) })))
+    const concerts = await project.related('concerts').query()
 
-    await project.related('rehearsals').query().delete()
-    await project
-      .related('rehearsals')
-      .updateOrCreateMany(data.rehearsals.map((r) => ({ ...r, date: DateTime.fromJSDate(r.date) })))
+    for (const concert of concerts) {
+      if (data.concerts.filter((c) => c.id === concert.id).length === 0) {
+        await concert.delete()
+      } else {
+        const dataConcert = data.concerts.find((c) => c.id === concert.id)
+        if (dataConcert) {
+          concert.merge({
+            comment: dataConcert.comment,
+            date: DateTime.fromJSDate(dataConcert.date),
+            place: dataConcert.place,
+          })
+          await concert.save()
+        }
+      }
+    }
+
+    for (const concert of data.concerts.filter((c) => c.id === undefined)) {
+      await project.related('concerts').create({
+        comment: concert.comment,
+        date: DateTime.fromJSDate(concert.date),
+        place: concert.place,
+      })
+    }
+
+    const rehearsals = await project.related('rehearsals').query()
+
+    for (const rehearsal of rehearsals) {
+      if (data.rehearsals.filter((r) => r.id === rehearsal.id).length === 0) {
+        await rehearsal.delete()
+      } else {
+        const dataRehearsal = data.rehearsals.find((r) => r.id === rehearsal.id)
+        if (dataRehearsal) {
+          rehearsal.merge({
+            comment: dataRehearsal.comment,
+            date: DateTime.fromJSDate(dataRehearsal.date),
+            place: dataRehearsal.place,
+          })
+          await rehearsal.save()
+        }
+      }
+    }
+
+    for (const rehearsal of data.rehearsals.filter((r) => r.id === undefined)) {
+      await project.related('rehearsals').create({
+        comment: rehearsal.comment,
+        date: DateTime.fromJSDate(rehearsal.date),
+        place: rehearsal.place,
+      })
+    }
+
+    if (data.folder_id) {
+      const folder = await Folder.find(data.folder_id)
+      if (folder) {
+        await project.related('folder').associate(folder)
+      } else {
+        await project.related('folder').dissociate()
+      }
+    } else {
+      await project.related('folder').dissociate()
+    }
 
     return await project.save()
   }
@@ -171,5 +229,20 @@ export default class ProjectsController {
     await project.delete()
 
     return { message: 'Project deleted' }
+  }
+
+  async getAttendance(ctx: HttpContext) {
+    return await Project.query()
+      .where('id', ctx.params.id)
+      .preload('rehearsals', (query) => {
+        query.preload('participants')
+      })
+      .preload('concerts', (query) => {
+        query.preload('participants')
+      })
+      .preload('participants', (query) => {
+        query.where('accepted', true).preload('contact')
+      })
+      .firstOrFail()
   }
 }

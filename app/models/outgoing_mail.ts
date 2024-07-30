@@ -1,25 +1,24 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, hasOne } from '@adonisjs/lucid/orm'
-import Contact from './contact.js'
-import Project from './project.js'
-import MailTemplate from './mail_template.js'
-import type { HasOne } from '@adonisjs/lucid/types/relations'
+import { BaseModel, column } from '@adonisjs/lucid/orm'
 
 export default class OutgoingMail extends BaseModel {
   @column({ isPrimary: true })
-  declare id: number
+  declare id: number | null
 
   @column()
   declare type: string
 
-  @hasOne(() => Contact)
-  declare receiver_id: HasOne<typeof Contact>
+  @column()
+  declare receiver_id: number
 
-  @hasOne(() => Project)
-  declare project_id: HasOne<typeof Project>
+  @column()
+  declare project_id: number | null
 
-  @hasOne(() => MailTemplate)
-  declare template_id: HasOne<typeof MailTemplate>
+  @column()
+  declare mail_template_id: number | null
+
+  @column()
+  declare sent: boolean
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime

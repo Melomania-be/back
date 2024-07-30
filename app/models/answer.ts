@@ -17,7 +17,9 @@ export default class Answer extends BaseModel {
   @column()
   declare participant_id: number
 
-  @belongsTo(() => Form)
+  @belongsTo(() => Form, {
+    foreignKey: 'form_id',
+  })
   declare form: BelongsTo<typeof Form>
 
   @belongsTo(() => Participant, {

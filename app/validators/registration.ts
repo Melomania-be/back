@@ -2,15 +2,21 @@ import vine from '@vinejs/vine'
 
 export const createRegistrationValidator = vine.compile(
   vine.object({
-    //status : vine.boolean(),
-    last_send_date: vine.date({ formats: ['x'] }),
     content: vine.array(
       vine.object({
-        id: vine.number(),
         title: vine.string(),
         text: vine.string(),
       })
     ),
+    form: vine.array(
+      vine.object({
+        text: vine.string(),
+        type: vine.string(),
+      })
+    ),
+    params: vine.object({
+      id: vine.number(),
+    }),
   })
 )
 

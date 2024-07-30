@@ -10,6 +10,7 @@ import Callsheet from './callsheet.js'
 import Participant from './participant.js'
 import Concert from './concert.js'
 import Contact from './contact.js'
+import Folder from './folder.js'
 
 export default class Project extends BaseModel {
   @column({ isPrimary: true })
@@ -19,16 +20,21 @@ export default class Project extends BaseModel {
   declare name: string
 
   @column()
-  declare registration_id: number
+  declare section_group_id: number
 
   @column()
-  declare section_group_id: number
+  declare folder_id: number
 
   @manyToMany(() => Contact, {
     pivotTable: 'responsibles',
     pivotTimestamps: true,
   })
   declare responsibles: ManyToMany<typeof Contact>
+
+  @belongsTo(() => Folder, {
+    foreignKey: 'folder_id',
+  })
+  declare folder: BelongsTo<typeof Folder>
 
   @hasMany(() => Concert, {
     foreignKey: 'project_id',
@@ -41,7 +47,7 @@ export default class Project extends BaseModel {
   declare sectionGroup: BelongsTo<typeof SectionGroup>
 
   @hasOne(() => Registration, {
-    foreignKey: 'id',
+    foreignKey: 'project_id',
   })
   declare registration: HasOne<typeof Registration>
 

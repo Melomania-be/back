@@ -31,6 +31,9 @@ export default class Contact extends BaseModel {
   @column()
   declare validated: boolean
 
+  @column()
+  declare subscribed: boolean
+
   @manyToMany(() => Instrument, {
     pivotTable: 'plays',
     pivotColumns: ['proficiency_level'],
