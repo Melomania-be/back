@@ -20,4 +20,16 @@ export default class DefaultTemplatesController {
 
     return templates
   }
+
+  async editDefaultTemplate({ request }: HttpContext) {
+    let { name, content } = request.only(['name', 'content'])
+    let filename = fileURLToPath(import.meta.url)
+    let dirname = path.dirname(filename)
+    let templatesDir = path.join(dirname, '../mails/html_templates')
+    let filePath = path.join(templatesDir, name)
+
+    fs.writeFileSync(filePath, content)
+
+    return { success: true }
+  }
 }

@@ -214,6 +214,11 @@ router.group(() => {
           DefaultTemplatesController,
           'getDefaultTemplates',
         ])
+
+        router.put('/mailing/templates/default/edit', [
+          DefaultTemplatesController,
+          'editDefaultTemplate',
+        ])
       })
 
       router.get('/sign_out', [UsersController, 'signOut'])
