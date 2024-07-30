@@ -207,6 +207,12 @@ router.group(() => {
           'sendParticipationValidationNotification',
         ])
         //sends a mail to a participant that his participation has been validated by the project manager
+
+        router.post('/mailing/sendMailToParticipants', [
+          MailingsController,
+          'sendMailToParticipants',
+        ])
+        //sends a mail to every participant of a project
       })
 
       router.group(() => {

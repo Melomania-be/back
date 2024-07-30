@@ -32,7 +32,7 @@ export default class MailingsController {
 
     if (allContacts !== null && allContacts !== undefined) {
       for (let contact of allContacts) {
-        if (contact.email && contact.subscribed) {
+        if (contact.email && contact.subscribed === true && contact.validated === true) {
           const uniqueMail = new UniquePreparation(content, subject, contact)
 
           const outgoingMail = new OutgoingMail()
@@ -51,6 +51,116 @@ export default class MailingsController {
         } else {
           return response.json({ message: 'List not found' })
         }
+      }
+    }
+  }
+
+  async sendMailToParticipants({ request, response }: HttpContext) {
+    console.log('sendMailToParticipants called')
+    const { projectId, type, templateId, subject, content } = request.only([
+      'projectId',
+      'type',
+      'templateId',
+      'subject',
+      'content',
+    ])
+
+    let project = await Project.find(projectId)
+    let participants = await project?.related('participants').query().where('accepted', true)
+
+    if (type === 'template') {
+      let templateDb = await mail_template.find(templateId)
+      let htmlFromDb = templateDb?.content || ''
+      let callsheet = await Callsheet.query()
+        .where('project_id', projectId)
+        .orderBy('created_at', 'desc')
+        .first()
+
+      let responsibles = await Responsibles.query()
+        .where('project_id', projectId)
+        .preload('contact')
+
+      let toContact: Array<{
+        firstName: string
+        lastName: string
+        email: string
+        phone: string
+        messenger: string
+      }> = []
+
+      for (let responsible of responsibles) {
+        toContact.push({
+          firstName: responsible.contact.first_name,
+          lastName: responsible.contact.last_name,
+          email: responsible.contact.email,
+          phone: responsible.contact.phone,
+          messenger: responsible.contact.messenger,
+        })
+      }
+
+      let registrationId = project?.registration
+
+      if (participants !== null && participants !== undefined) {
+        for (let participant of participants) {
+          if (participant.accepted === true) {
+            let contact = await Contact.find(participant.contact_id)
+            if (contact?.email && contact?.subscribed === true && contact?.validated === true) {
+              const registrationNotificationMail = new TemplatePreparation(
+                htmlFromDb,
+                contact,
+                project,
+                callsheet,
+                toContact[0],
+                registrationId
+              )
+
+              const outgoingMail = new OutgoingMail()
+              outgoingMail.type = 'template'
+              outgoingMail.receiver_id = contact.id
+              outgoingMail.project_id = project?.id
+              outgoingMail.mail_template_id = templateId
+              outgoingMail.sent = false
+              outgoingMail.createdAt = DateTime.local()
+              outgoingMail.updatedAt = DateTime.local()
+
+              await OutgoingMail.create(outgoingMail)
+
+              await mail.sendLater(registrationNotificationMail)
+              await this.updateOutgoingMail(outgoingMail)
+            }
+          }
+        }
+      } else {
+        return response.json({ message: 'No participants found' })
+      }
+    }
+
+    if (type === 'unique') {
+      if (participants !== null && participants !== undefined) {
+        for (let participant of participants) {
+          if (participant.accepted === true) {
+            let contact = await Contact.find(participant.contact_id)
+            if (contact?.email && contact?.subscribed === true && contact?.validated === true) {
+              const uniqueMail = new UniquePreparation(content, subject, contact)
+
+              const outgoingMail = new OutgoingMail()
+              outgoingMail.type = 'unique'
+              outgoingMail.receiver_id = contact.id
+              outgoingMail.project_id = project?.id
+              outgoingMail.mail_template_id = null
+              outgoingMail.sent = false
+              outgoingMail.createdAt = DateTime.local()
+              outgoingMail.updatedAt = DateTime.local()
+
+              await OutgoingMail.create(outgoingMail)
+
+              await mail.sendLater(uniqueMail)
+              await this.updateOutgoingMail(outgoingMail)
+            }
+          }
+        }
+      } else {
+        return response.json({ message: 'No participants found' })
       }
     }
   }
@@ -85,39 +195,37 @@ export default class MailingsController {
 
     if (allContacts !== null && allContacts !== undefined) {
       for (let contact of allContacts) {
-        if (contact.email) {
-          let contactDb = await Contact.find(contact.id)
-          if (htmlFromDb !== '') {
-            if (contactDb?.subscribed === true) {
-              const registrationNotificationMail = new TemplatePreparation(
-                htmlFromDb,
-                contact,
-                projectDb,
-                callsheet,
-                toContact,
-                registrationId
-              )
+        let contactDb = await Contact.find(contact.id)
+        if (htmlFromDb !== '') {
+          if (contactDb?.email && contactDb?.subscribed === true && contactDb?.validated === true) {
+            const registrationNotificationMail = new TemplatePreparation(
+              htmlFromDb,
+              contact,
+              projectDb,
+              callsheet,
+              toContact,
+              registrationId
+            )
 
-              const outgoingMail = new OutgoingMail()
-              outgoingMail.type = 'template'
-              outgoingMail.receiver_id = contact.id
-              if (hasProject) {
-                outgoingMail.project_id = project.id
-              } else {
-                outgoingMail.project_id = null
-              }
-              outgoingMail.mail_template_id = template.id
-              outgoingMail.sent = false
-              outgoingMail.createdAt = DateTime.local()
-              outgoingMail.updatedAt = DateTime.local()
-
-              await OutgoingMail.create(outgoingMail)
-
-              await mail.sendLater(registrationNotificationMail)
-              await this.updateOutgoingMail(outgoingMail)
-
-              return response.json({ message: 'Email sent successfully' })
+            const outgoingMail = new OutgoingMail()
+            outgoingMail.type = 'template'
+            outgoingMail.receiver_id = contact.id
+            if (hasProject) {
+              outgoingMail.project_id = project.id
+            } else {
+              outgoingMail.project_id = null
             }
+            outgoingMail.mail_template_id = template.id
+            outgoingMail.sent = false
+            outgoingMail.createdAt = DateTime.local()
+            outgoingMail.updatedAt = DateTime.local()
+
+            await OutgoingMail.create(outgoingMail)
+
+            await mail.sendLater(registrationNotificationMail)
+            await this.updateOutgoingMail(outgoingMail)
+
+            return response.json({ message: 'Email sent successfully' })
           }
         }
       }
@@ -193,7 +301,7 @@ export default class MailingsController {
     if (acceptedParticipants !== null && acceptedParticipants !== undefined) {
       for (let participant of acceptedParticipants) {
         let contact = await Contact.find(participant.contact_id)
-        if (contact?.email && contact?.subscribed === true) {
+        if (contact?.email && contact?.subscribed === true && contact?.validated === true) {
           const callsheetNotificationMail = new CallsheetNotification(
             contact,
             project,
@@ -274,7 +382,7 @@ export default class MailingsController {
     if (contacts !== null && contacts !== undefined) {
       if (registration.id !== null && registration.id !== undefined) {
         for (let contact of contacts) {
-          if (contact?.email && contact?.subscribed === true) {
+          if (contact?.email && contact?.subscribed === true && contact?.validated === true) {
             const recruitmentNotification = new RecruitmentNotification(
               contact,
               registration,
