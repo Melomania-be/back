@@ -56,7 +56,10 @@ export default class ParticipationValidationNotification extends BaseMail {
     const url = env.get('URL') || ''
     const filename = fileURLToPath(import.meta.url)
     const dirname = path.dirname(filename)
-    const htmlFilePath = path.join(dirname, 'html_templates/recommended_notification.html')
+    const htmlFilePath = path.join(
+      dirname,
+      'html_templates/participation_validation_notification.html'
+    )
     let htmlContent = fs.readFileSync(htmlFilePath, 'utf-8')
     let toContactDetails = ''
 
@@ -89,7 +92,7 @@ export default class ParticipationValidationNotification extends BaseMail {
     this.message
       .to(this.contact.email)
       .from(env.get('SMTP_USERNAME'))
-      .subject('Participation Validation')
+      .subject('Your participation to ' + this.project.name)
       .html(htmlContent)
   }
 }
