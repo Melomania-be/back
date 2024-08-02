@@ -27,7 +27,12 @@ export default class ContactsController {
       .preload('instruments')
       .preload('lists')
       .preload('participants', (query) => {
-        query.preload('project').preload('section').preload('answers')
+        query
+          .preload('project')
+          .preload('section', (subQuery) => {
+            subQuery.preload('instruments')
+          })
+          .preload('answers')
       })
       .firstOrFail()
   }
