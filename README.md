@@ -13,6 +13,7 @@ to install all dependencies
 4. node ace migration:run
 
 to setup the database
+
 6. >npm run dev
 
 to launch the project !
