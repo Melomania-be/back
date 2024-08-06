@@ -1,8 +1,8 @@
+
 This repo contains the back application using the Adonis Framework.
+To learn more about this project go to the [wiki](https://github.com/Melomania-be/back/wiki)
 
-To learn more about this project got to the [wiki](https://github.com/Melomania-be/back/wiki)
-
-How to run
+# How to run
 
 1. >Run npm install
     
