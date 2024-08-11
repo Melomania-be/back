@@ -70,7 +70,7 @@ export default class CallsheetNotification extends BaseMail {
     const url = env.get('URL') || ''
     const filename = fileURLToPath(import.meta.url)
     const dirname = path.dirname(filename)
-    const htmlFilePath = path.join(dirname, 'html_templates/callsheet_notification.html')
+    const htmlFilePath = path.join(dirname, '../html_templates/callsheet_notification.html')
     let htmlContent = fs.readFileSync(htmlFilePath, 'utf-8')
 
     const toContactDetails = this.toContact

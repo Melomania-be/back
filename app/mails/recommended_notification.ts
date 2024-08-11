@@ -56,7 +56,7 @@ export default class RecommendedNotification extends BaseMail {
     const url = env.get('URL') || ''
     const filename = fileURLToPath(import.meta.url)
     const dirname = path.dirname(filename)
-    const htmlFilePath = path.join(dirname, 'html_templates/recommended_notification.html')
+    const htmlFilePath = path.join(dirname, '../html_templates/recommended_notification.html')
     let htmlContent = fs.readFileSync(htmlFilePath, 'utf-8')
     let toContactDetails = ''
 

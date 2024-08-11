@@ -58,7 +58,7 @@ export default class ParticipationValidationNotification extends BaseMail {
     const dirname = path.dirname(filename)
     const htmlFilePath = path.join(
       dirname,
-      'html_templates/participation_validation_notification.html'
+      '../html_templates/participation_validation_notification.html'
     )
     let htmlContent = fs.readFileSync(htmlFilePath, 'utf-8')
     let toContactDetails = ''

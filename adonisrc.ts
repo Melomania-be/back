@@ -75,4 +75,10 @@ export default defineConfig({
     ],
     forceExit: false,
   },
+  metaFiles: [
+    {
+      pattern: 'app/html_templates/**',
+      reloadServer: false,
+    },
+  ],
 })
