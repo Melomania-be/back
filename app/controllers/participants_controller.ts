@@ -63,17 +63,19 @@ export default class ParticipantsController {
         })
     }
 
-    participant.related('answers').createMany(
+    await participant.related('answers').query().delete()
+
+    await participant.related('answers').createMany(
       data.answers.map((answers) => ({
         text: answers.text ? answers.text : '',
         form_id: answers.formId,
       }))
     )
 
-    participant.related('concerts').detach()
-    participant.related('rehearsals').detach()
-    participant.related('concerts').sync(data.concerts.map((concert) => concert.id))
-    participant.related('rehearsals').sync(data.rehearsals.map((rehearsal) => rehearsal.id))
+    await participant.related('concerts').detach()
+    await participant.related('rehearsals').detach()
+    await participant.related('concerts').sync(data.concerts.map((concert) => concert.id))
+    await participant.related('rehearsals').sync(data.rehearsals.map((rehearsal) => rehearsal.id))
 
     return response.send('Participant created')
   }
@@ -122,12 +124,4 @@ export default class ParticipantsController {
     await participant.delete()
     return response.send('Participant deleted from the project')
   }
-
-  // public async getAttendants({params} : HttpContext) {
-  //   return await Participant.query()
-  //     .select('participants.*', 'participates_ins.rehearsal_id')
-  //     .innerJoin('participates_ins', 'participants.id', 'participates_ins.participant_id')
-  //     .innerJoin('rehearsals', 'rehearsals.id', 'participates_ins.rehearsal_id')
-  //     .where('rehearsals.project_id', params.id);
-  // }
 }

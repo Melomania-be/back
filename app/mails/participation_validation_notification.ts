@@ -82,10 +82,7 @@ export default class ParticipationValidationNotification extends BaseMail {
       .replace(/\${PROJECT}/g, this.project.name)
       .replace(
         /\${CALLSHEET}/g,
-        'http://tool.ciro3903.odns.fr/call_sheets/' +
-          this.callsheet.id.toString() +
-          '/' +
-          this.contact.id.toString()
+        url + '/' + this.callsheet.id.toString() + '/' + this.contact.id.toString()
       )
       .replace(/\${TO_CONTACT}/g, '<br>' + toContactDetails)
 
