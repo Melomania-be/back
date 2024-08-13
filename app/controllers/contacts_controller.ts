@@ -63,7 +63,6 @@ export default class ContactsController {
   async mergeContacts(ctx: HttpContext) {
     console.log(ctx.request.all())
 
-
     const data = await ctx.request.validateUsing(mergeContactsValidator)
 
     if (!data.contactId1 && !data.contactId2) {
