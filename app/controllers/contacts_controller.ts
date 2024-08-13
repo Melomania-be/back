@@ -3,7 +3,7 @@ import Contact from '#models/contact'
 import Instrument from '#models/instrument'
 import { advancedFilter } from '#services/advanced_filter'
 import { simpleFilter, Filter, RelationFilter } from '#services/simple_filter'
-import { createContactValidator } from '#validators/contact'
+import { createContactValidator, mergeContactsValidator } from '#validators/contact'
 import { HttpContext } from '@adonisjs/core/http'
 
 export default class ContactsController {
@@ -60,7 +60,73 @@ export default class ContactsController {
     }
   }
 
+  async mergeContacts(ctx: HttpContext) {
+    console.log(ctx.request.all())
+
+
+    const data = await ctx.request.validateUsing(mergeContactsValidator)
+
+    if (!data.contactId1 && !data.contactId2) {
+      return ctx.response.status(400).send('No contact ids provided')
+    }
+
+    if (data.contactId1 === data.contactId2) {
+      return ctx.response.status(400).send('Cannot merge a contact with itself')
+    }
+
+    const contact1 = await Contact.query()
+      .preload('instruments')
+      .preload('lists')
+      .preload('participants')
+      .preload('projects')
+      .where('id', data.contactId1)
+      .firstOrFail()
+    const contact2 = await Contact.query()
+      .preload('instruments')
+      .preload('lists')
+      .preload('participants')
+      .preload('projects')
+      .where('id', data.contactId2)
+      .firstOrFail()
+
+    contact1.first_name = data.first_name ?? contact1.first_name
+    contact1.last_name = data.last_name ?? contact1.last_name
+    contact1.email = data.email ?? contact1.email
+    contact1.phone = data.phone ?? contact1.phone
+    contact1.messenger = data.messenger ?? contact1.messenger
+    contact1.comments = data.comments ?? contact1.comments
+    contact1.validated = true
+    contact1.subscribed = true
+
+    await contact1
+      .related('lists')
+      .sync(contact1.lists.concat(contact2.lists).map((list) => list.id))
+
+    await contact1
+      .related('projects')
+      .sync(contact1.projects.concat(contact2.projects).map((project) => project.id))
+
+    const participants = await contact1.related('participants').query()
+
+    for (let participant of participants) {
+      participant.contact_id = contact1.id
+      await participant.save()
+    }
+
+    await contact1
+      .related('instruments')
+      .sync(contact1.instruments.concat(contact2.instruments).map((instrument) => instrument.id))
+
+    await contact1.save()
+    await contact2.delete()
+
+    return contact1
+  }
+
   async createOrUpdate(ctx: HttpContext) {
+    console.log('createOrUpdate called')
+    console.log(ctx.request.all())
+
     const data = await ctx.request.validateUsing(createContactValidator)
 
     if (!data.id) {

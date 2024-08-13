@@ -154,6 +154,7 @@ router.group(() => {
       router.group(() => {
         router.get('/contact', [ContactsController, 'getAll'])
         router.get('/contact/validation', [ContactsController, 'getValidation'])
+        router.post('/contact/validation/merge', [ContactsController, 'mergeContacts'])
         router.get('/contact/:id', [ContactsController, 'getOne'])
         router.put('/contact', [ContactsController, 'createOrUpdate'])
         router.delete('/contact/:id', [ContactsController, 'delete'])
