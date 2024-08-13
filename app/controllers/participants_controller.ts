@@ -5,6 +5,7 @@ import { HttpContext } from '@adonisjs/core/http'
 import { createParticipantValidator, validateParticipantValidator } from '#validators/participant'
 import { Filter, RelationFilter, simpleFilter } from '#services/simple_filter'
 import Contact from '#models/contact'
+import Section from '#models/section'
 
 export default class ParticipantsController {
   //getAll : gets list of all of the (accepted) participants of this project at /projects/:id/management/participants
@@ -62,6 +63,12 @@ export default class ParticipantsController {
           section_id: data.section.id,
         })
     }
+
+    await participant.related('section').dissociate()
+
+    const section = await Section.findOrFail(data.section.id)
+
+    await participant.related('section').associate(section)
 
     await participant.related('answers').query().delete()
 
