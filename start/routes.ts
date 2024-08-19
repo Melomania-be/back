@@ -179,9 +179,9 @@ router.group(() => {
         router.post('/mailing', [MailingsController, 'sendUnique'])
         //for unique mails to a list of contacts
 
-        router.post('/mailing/sendLaterTemplateToList', [
+        router.post('/mailing/sendTemplateToList', [
           MailingsController,
-          'sendLaterTemplateToList',
+          'sendTemplateToList',
         ])
         //for mails using templates
 

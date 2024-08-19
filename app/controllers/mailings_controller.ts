@@ -20,10 +20,6 @@ export default class MailingsController {
     console.log('sendUnique called')
     const { listContacts, subject, content } = request.only(['listContacts', 'subject', 'content'])
 
-    console.log('listContacts', listContacts)
-    console.log('subject', subject)
-    console.log('content', content)
-
     let listDb = await List.find(listContacts.id)
     let allContacts = await listDb?.related('contacts').query()
 
@@ -32,6 +28,7 @@ export default class MailingsController {
 
     if (allContacts !== null && allContacts !== undefined) {
       for (let contact of allContacts) {
+        console.log('contact', contact)
         if (contact.email && contact.subscribed === true && contact.validated === true) {
           const uniqueMail = new UniquePreparation(content, subject, contact)
 
@@ -44,14 +41,13 @@ export default class MailingsController {
 
           await OutgoingMail.create(outgoingMail)
 
-          await mail.sendLater(uniqueMail)
+          await mail.send(uniqueMail)
           await this.updateOutgoingMail(outgoingMail)
-
-          return response.json({ message: 'Email sent successfully' })
-        } else {
-          return response.json({ message: 'List not found' })
         }
       }
+      return response.json({ message: 'Email sent successfully' })
+    } else {
+      return response.json({ message: 'List not found' })
     }
   }
 
@@ -125,7 +121,7 @@ export default class MailingsController {
 
               await OutgoingMail.create(outgoingMail)
 
-              await mail.sendLater(templatePreparation)
+              await mail.send(templatePreparation)
               await this.updateOutgoingMail(outgoingMail)
             }
           }
@@ -154,19 +150,20 @@ export default class MailingsController {
 
               await OutgoingMail.create(outgoingMail)
 
-              await mail.sendLater(uniqueMail)
+              await mail.send(uniqueMail)
               await this.updateOutgoingMail(outgoingMail)
             }
           }
         }
+        return response.json({ message: 'Email sent successfully' })
       } else {
         return response.json({ message: 'No participants found' })
       }
     }
   }
 
-  async sendLaterTemplateToList({ request, response }: HttpContext) {
-    console.log('sendLaterTemplateToList called')
+  async sendTemplateToList({ request, response }: HttpContext) {
+    console.log('sendTemplateToList called')
     const { template, listContacts, hasProject, hasCallsheet, project, toContact } = request.only([
       'template',
       'listContacts',
@@ -184,6 +181,10 @@ export default class MailingsController {
     let callsheet = null
     let registrationId = null
 
+    console.log('templateDb', templateDb)
+    console.log('listDb', listDb)
+    console.log('allContacts', allContacts)
+
     if (hasProject) {
       projectDb = await Project.find(project.id)
       registrationId = projectDb.registration_id
@@ -195,6 +196,7 @@ export default class MailingsController {
 
     if (allContacts !== null && allContacts !== undefined) {
       for (let contact of allContacts) {
+        console.log('contact', contact)
         let contactDb = await Contact.find(contact.id)
         if (htmlFromDb !== '') {
           if (contactDb?.email && contactDb?.subscribed === true && contactDb?.validated === true) {
@@ -222,13 +224,12 @@ export default class MailingsController {
 
             await OutgoingMail.create(outgoingMail)
 
-            await mail.sendLater(templatePreparation)
+            await mail.send(templatePreparation)
             await this.updateOutgoingMail(outgoingMail)
-
-            return response.json({ message: 'Email sent successfully' })
           }
         }
       }
+      return response.json({ message: 'Email sent successfully' })
     } else {
       return response.json({ message: 'List not found' })
     }
@@ -239,11 +240,13 @@ export default class MailingsController {
       let updateMail = await OutgoingMail.findOrFail(outgoingMail.id)
       updateMail.sent = true
       updateMail.updatedAt = DateTime.local()
-      console.log('updateMail', updateMail)
       await updateMail.save()
+      console.log('updateMail AFTER', updateMail)
     } catch (error) {
       console.log('error', error)
     }
+
+    return
   }
 
   async sendCallsheetNotification({ request, response }: HttpContext) {
@@ -322,7 +325,7 @@ export default class MailingsController {
           outgoingMail.updatedAt = DateTime.local()
 
           await OutgoingMail.create(outgoingMail)
-          await mail.sendLater(callsheetNotificationMail)
+          await mail.send(callsheetNotificationMail)
           await this.updateOutgoingMail(outgoingMail)
         }
       }
@@ -403,7 +406,7 @@ export default class MailingsController {
             outgoingMail.updatedAt = DateTime.local()
 
             await OutgoingMail.create(outgoingMail)
-            await mail.sendLater(recruitmentNotification)
+            await mail.send(recruitmentNotification)
             this.updateOutgoingMail(outgoingMail)
           }
         }
@@ -467,7 +470,7 @@ export default class MailingsController {
 
     await OutgoingMail.create(outgoingMail)
 
-    await mail.sendLater(recommendedNotification)
+    await mail.send(recommendedNotification)
     await this.updateOutgoingMail(outgoingMail)
 
     return response.json({
@@ -532,7 +535,7 @@ export default class MailingsController {
 
     await OutgoingMail.create(outgoingMail)
 
-    await mail.sendLater(participationValidationNotification)
+    await mail.send(participationValidationNotification)
     await this.updateOutgoingMail(outgoingMail)
 
     return response.json({
