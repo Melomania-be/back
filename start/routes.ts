@@ -140,6 +140,7 @@ router.group(() => {
       router.group(() => {
         router.post('/files', [FilesController, 'upload'])
         router.get('/files', [FilesController, 'getAll'])
+        router.put('/files/:id', [FilesController, 'update'])
         router.delete('/files/:id', [FilesController, 'delete'])
         router.get('/files/download/:id', [FilesController, 'download'])
       })
@@ -179,10 +180,7 @@ router.group(() => {
         router.post('/mailing', [MailingsController, 'sendUnique'])
         //for unique mails to a list of contacts
 
-        router.post('/mailing/sendTemplateToList', [
-          MailingsController,
-          'sendTemplateToList',
-        ])
+        router.post('/mailing/sendTemplateToList', [MailingsController, 'sendTemplateToList'])
         //for mails using templates
 
         router.post('/mailing/sendCallsheetNotification', [

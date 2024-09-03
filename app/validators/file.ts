@@ -47,3 +47,12 @@ export const filesUploadValidator = vine.compile(
       .optional(),
   })
 )
+
+export const filesUpdateValidator = vine.compile(
+  vine.object({
+    name: vine.string().optional(),
+    type: vine.string().optional(),
+    content: vine.string().optional(),
+    path: vine.string().optional(),
+  })
+)

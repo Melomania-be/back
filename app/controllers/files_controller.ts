@@ -1,6 +1,6 @@
 // import type { HttpContext } from '@adonisjs/core/http'
 
-import { filesUploadValidator } from '#validators/file'
+import { filesUploadValidator, filesUpdateValidator } from '#validators/file'
 import { cuid } from '@adonisjs/core/helpers'
 import { HttpContext } from '@adonisjs/core/http'
 import app from '@adonisjs/core/services/app'
@@ -42,6 +42,17 @@ export default class FilesController {
 
   async getAll() {
     return await File.all()
+  }
+
+  async update(ctx: HttpContext) {
+    const { id } = ctx.params
+    const data = await ctx.request.validateUsing(filesUpdateValidator)
+    let file = await File.findOrFail(id)
+
+    file.merge(data)
+    await file.save()
+
+    return file
   }
 
   async delete({ params, response }: HttpContext) {
