@@ -26,3 +26,5 @@ yarn-error.log
 
 # upload files
 uploads
+
+app/html_templates/*
