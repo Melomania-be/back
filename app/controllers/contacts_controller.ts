@@ -97,13 +97,17 @@ export default class ContactsController {
     contact1.validated = true
     contact1.subscribed = true
 
-    await contact1
-      .related('lists')
-      .sync(contact1.lists.concat(contact2.lists).map((list) => list.id))
+    await contact1.save()
 
-    await contact1
-      .related('projects')
-      .sync(contact1.projects.concat(contact2.projects).map((project) => project.id))
+    await contact1.related('lists').sync(
+      contact1.lists.concat(contact2.lists).map((list) => list.id),
+      false // Avoid detaching and creating a contact instead of updating it
+    )
+
+    await contact1.related('projects').sync(
+      contact1.projects.concat(contact2.projects).map((project) => project.id),
+      false
+    )
 
     const participants = await contact1.related('participants').query()
 
@@ -112,11 +116,11 @@ export default class ContactsController {
       await participant.save()
     }
 
-    await contact1
-      .related('instruments')
-      .sync(contact1.instruments.concat(contact2.instruments).map((instrument) => instrument.id))
+    await contact1.related('instruments').sync(
+      contact1.instruments.concat(contact2.instruments).map((instrument) => instrument.id),
+      false
+    )
 
-    await contact1.save()
     await contact2.delete()
 
     return contact1
