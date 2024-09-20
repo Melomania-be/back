@@ -103,6 +103,7 @@ export default class RegistrationsController {
     //Checking if the contact is already in the participant db with this project, if not its added
     let participant = await Participant.firstOrCreate(searchParticipant, saveParticipant)
     await participant.related('rehearsals').sync(data.rehearsals)
+    await participant.related('concerts').sync(data.concerts)
 
     //Puting the answer in the answer table if there is a form to fill
     if (data.answers.length === 0) {

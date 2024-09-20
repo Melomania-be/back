@@ -30,6 +30,7 @@ export const userRegistrationValidator = vine.compile(
     messenger: vine.string().optional(),
     validated_contact: vine.boolean(),
     rehearsals: vine.array(vine.number()),
+    concerts: vine.array(vine.number()),
     project_id: vine.number(),
     section_id: vine.number(),
     answers: vine.array(
