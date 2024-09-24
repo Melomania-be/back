@@ -4,7 +4,7 @@ import { HttpContext } from '@adonisjs/core/http'
 
 export default class TemplatesController {
   async getTemplates() {
-    let allTemplates = await mail_template.query().select('*')
+    let allTemplates = await mail_template.query().where('is_default', false).select('*')
     return allTemplates
   }
 

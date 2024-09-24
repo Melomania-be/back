@@ -32,5 +32,6 @@ export const createTemplateValidator = vine.compile(
     id: vine.number().optional(),
     name: vine.string(),
     content: vine.string(),
+    is_default: vine.boolean(),
   })
 )

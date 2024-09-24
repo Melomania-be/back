@@ -11,6 +11,9 @@ export default class MailTemplate extends BaseModel {
   @column()
   declare content: string
 
+  @column()
+  declare is_default: boolean
+
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
 
