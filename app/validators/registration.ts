@@ -29,8 +29,18 @@ export const userRegistrationValidator = vine.compile(
     phone: vine.string().optional(),
     messenger: vine.string().optional(),
     validated_contact: vine.boolean(),
-    rehearsals: vine.array(vine.number()),
-    concerts: vine.array(vine.number()),
+    rehearsals: vine.array(
+      vine.object({
+        id: vine.number(),
+        comment: vine.string().optional(),
+      })
+    ),
+    concerts: vine.array(
+      vine.object({
+        id: vine.number(),
+        comment: vine.string().optional(),
+      })
+    ),
     project_id: vine.number(),
     section_id: vine.number(),
     answers: vine.array(

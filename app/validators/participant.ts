@@ -14,8 +14,18 @@ export const createParticipantValidator = vine.compile(
       id: vine.number(),
     }),
     answers: vine.array(vine.object({ formId: vine.number(), text: vine.string().nullable() })),
-    concerts: vine.array(vine.object({ id: vine.number() })),
-    rehearsals: vine.array(vine.object({ id: vine.number() })),
+    concerts: vine.array(
+      vine.object({
+        id: vine.number(),
+        pivot_comment: vine.string().optional(),
+      })
+    ),
+    rehearsals: vine.array(
+      vine.object({
+        id: vine.number(),
+        pivot_comment: vine.string().optional(),
+      })
+    ),
   })
 )
 

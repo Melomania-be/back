@@ -47,6 +47,7 @@ export default class Participant extends BaseModel {
     pivotTable: 'participates_ins',
     pivotForeignKey: 'participant_id',
     pivotRelatedForeignKey: 'rehearsal_id',
+    pivotColumns: ['comment'],
     pivotTimestamps: true,
   })
   declare rehearsals: ManyToMany<typeof Rehearsal>
@@ -55,6 +56,7 @@ export default class Participant extends BaseModel {
     pivotTable: 'participates_in_concerts',
     pivotForeignKey: 'participant_id',
     pivotRelatedForeignKey: 'concert_id',
+    pivotColumns: ['comment'],
     pivotTimestamps: true,
   })
   declare concerts: ManyToMany<typeof Concert>
@@ -72,6 +74,11 @@ export default class Participant extends BaseModel {
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
+
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  serializeExtras() {
+    return { pivot_comment: this.$extras.pivot_comment }
+  }
 }

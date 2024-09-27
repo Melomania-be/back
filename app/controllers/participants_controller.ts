@@ -13,6 +13,12 @@ export default class ParticipantsController {
     const baseQuery = Participant.query()
       .preload('contact')
       .preload('section')
+      .preload('concerts', (concertsQuery) => {
+        concertsQuery.pivotColumns(['comment'])
+      })
+      .preload('rehearsals', (rehearsalsQuery) => {
+        rehearsalsQuery.pivotColumns(['comment'])
+      })
       .where('project_id', ctx.params.id)
       .andWhere('accepted', true)
 
@@ -34,8 +40,12 @@ export default class ParticipantsController {
       .preload('contact')
       .preload('section')
       .preload('answers')
-      .preload('concerts')
-      .preload('rehearsals')
+      .preload('concerts', (concertsQuery) => {
+        concertsQuery.pivotColumns(['comment'])
+      })
+      .preload('rehearsals', (rehearsalsQuery) => {
+        rehearsalsQuery.pivotColumns(['comment'])
+      })
       .preload('project')
       .first()
   }
@@ -79,10 +89,37 @@ export default class ParticipantsController {
       }))
     )
 
-    await participant.related('concerts').detach()
-    await participant.related('rehearsals').detach()
-    await participant.related('concerts').sync(data.concerts.map((concert) => concert.id))
-    await participant.related('rehearsals').sync(data.rehearsals.map((rehearsal) => rehearsal.id))
+    if (data.concerts) {
+      let toSync = Object.assign(
+        {},
+        ...data.concerts.map((concert) => {
+          return {
+            [concert.id]: {
+              comment: concert.pivot_comment,
+            },
+          }
+        })
+      )
+
+      await participant.related('concerts').sync(toSync)
+    }
+
+    if (data.rehearsals) {
+      let toSync = Object.assign(
+        {},
+        ...data.rehearsals.map((rehearsal) => {
+          return {
+            [rehearsal.id]: {
+              comment: rehearsal.pivot_comment,
+            },
+          }
+        })
+      )
+
+      await participant.related('rehearsals').sync(toSync)
+    }
+
+    await participant.save()
 
     return response.send('Participant created')
   }
@@ -95,8 +132,12 @@ export default class ParticipantsController {
       .preload('contact')
       .preload('section')
       .preload('answers', (query) => query.preload('form'))
-      .preload('concerts')
-      .preload('rehearsals')
+      .preload('concerts', (concertsQuery) => {
+        concertsQuery.pivotColumns(['comment'])
+      })
+      .preload('rehearsals', (rehearsalsQuery) => {
+        rehearsalsQuery.pivotColumns(['comment'])
+      })
   }
 
   //validateParticipant : transforms the accepted field to true at /projects/:id/management/validation/:id

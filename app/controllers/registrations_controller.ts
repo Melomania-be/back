@@ -25,8 +25,16 @@ export default class RegistrationsController {
       .preload('content')
       .preload('project', (projectQuery) => {
         projectQuery
-          .preload('rehearsals')
-          .preload('concerts')
+          .preload('rehearsals', (rehearsalQuery) => {
+            rehearsalQuery.preload('participants', (participantQuery) => {
+              participantQuery.pivotColumns(['comment'])
+            })
+          })
+          .preload('concerts', (concertQuery) => {
+            concertQuery.preload('participants', (participantQuery) => {
+              participantQuery.pivotColumns(['comment'])
+            })
+          })
           .preload('pieces', (pieceQuery) => {
             pieceQuery.preload('composer')
           })
@@ -78,6 +86,8 @@ export default class RegistrationsController {
 
   async submit(ctx: HttpContext) {
     const data = await ctx.request.validateUsing(userRegistrationValidator)
+    console.log('Data sent : ', data)
+
     let searchContact = {
       first_name: data.first_name,
       last_name: data.last_name,
@@ -102,8 +112,26 @@ export default class RegistrationsController {
 
     //Checking if the contact is already in the participant db with this project, if not its added
     let participant = await Participant.firstOrCreate(searchParticipant, saveParticipant)
-    await participant.related('rehearsals').sync(data.rehearsals)
-    await participant.related('concerts').sync(data.concerts)
+
+    const rehearsalsWithComments = data.rehearsals.reduce(
+      (acc, rehearsal) => {
+        acc[rehearsal.id] = { comment: rehearsal.comment ?? '' }
+        return acc
+      },
+      {} as Record<number, { comment: string }>
+    )
+    console.log('Rehearsals sent : ', rehearsalsWithComments)
+    await participant.related('rehearsals').sync(rehearsalsWithComments)
+
+    const concertsWithComments = data.concerts.reduce(
+      (acc, concert) => {
+        acc[concert.id] = { comment: concert.comment ?? '' }
+        return acc
+      },
+      {} as Record<number, { comment: string }>
+    )
+    console.log('Concerts sent : ', concertsWithComments)
+    await participant.related('concerts').sync(concertsWithComments)
 
     //Puting the answer in the answer table if there is a form to fill
     if (data.answers.length === 0) {
