@@ -1,8 +1,6 @@
 import env from '#start/env'
 import { BaseMail } from '@adonisjs/mail'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
-import fs from 'node:fs'
+import MailTemplate from '#models/mail_template'
 
 //demande générale de participation au projet => mail de recrutement
 
@@ -51,12 +49,17 @@ export default class RecruitmentNotification extends BaseMail {
     this.toContact = toContact
   }
 
-  prepare() {
+  async prepare() {
     const url = env.get('URL') || ''
-    const filename = fileURLToPath(import.meta.url)
-    const dirname = path.dirname(filename)
-    const htmlFilePath = path.join(dirname, '../html_templates/recruitment_notification.html')
-    let htmlContent = fs.readFileSync(htmlFilePath, 'utf-8')
+    const template = await MailTemplate.query()
+      .where('name', 'recruitment_notification.html')
+      .first()
+
+    if (!template) {
+      throw new Error('Template callsheet_notification.html not found')
+    }
+
+    let htmlContent = template.content
     let toContactDetails = ''
 
     if (this.toContact.length <= 0) {
