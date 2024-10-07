@@ -1,10 +1,7 @@
 import Piece from '#models/piece'
-import Folder from '#models/folder'
-import Composer from '#models/composer'
-import TypeOfPiece from '#models/type_of_piece'
 import { HttpContext } from '@adonisjs/core/http'
 import { createPieceValidator } from '#validators/piece'
-import { simpleFilter, Filter, RelationFilter } from '#services/simple_filter'
+import { simpleFilter } from 'adonisjs-filters'
 
 export default class PiecesController {
   async getAll(ctx: HttpContext) {
@@ -14,29 +11,37 @@ export default class PiecesController {
       .preload('composer')
       .preload('folder')
 
-    return await simpleFilter(
+    const filter = await simpleFilter(
       ctx,
-      Piece,
       baseQuery,
-      new Filter(Piece, ['name', 'opus', 'year_of_composition', 'composer_id', 'arranger']),
-      [
-        new RelationFilter('typeOfPiece', TypeOfPiece, ['name']),
-        new RelationFilter('composer', Composer, [
-          'short_name',
-          'long_name',
-          'birth_date',
-          'death_date',
-          'country',
-          'main_style',
-        ]),
-        new RelationFilter('folder', Folder, ['name']),
-      ],
-      {
-        filtered: true,
-        paginated: true,
-        ordered: true,
-      }
+      ['name', 'opus', 'year_of_composition', 'composer_id', 'arranger'],
+      [{ relationColumns: ['long_name'], relationName: 'composer' }]
     )
+
+    return await filter
+
+    // return await simpleFilter(
+    //   ctx,
+    //   baseQuery,
+    //   new Filter(Piece, ['name', 'opus', 'year_of_composition', 'composer_id', 'arranger']),
+    //   [
+    //     new RelationFilter('typeOfPiece', TypeOfPiece, ['name']),
+    //     new RelationFilter('composer', Composer, [
+    //       'short_name',
+    //       'long_name',
+    //       'birth_date',
+    //       'death_date',
+    //       'country',
+    //       'main_style',
+    //     ]),
+    //     new RelationFilter('folder', Folder, ['name']),
+    //   ],
+    //   {
+    //     filtered: true,
+    //     paginated: true,
+    //     ordered: true,
+    //   }
+    // )
   }
 
   async createOrUpdate(ctx: HttpContext) {
