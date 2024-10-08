@@ -1,8 +1,6 @@
 // import type { HttpContext } from '@adonisjs/core/http'
 import Contact from '#models/contact'
-import Instrument from '#models/instrument'
-import { advancedFilter } from '#services/advanced_filter'
-import { simpleFilter, Filter, RelationFilter } from '#services/simple_filter'
+import { simpleFilter, advancedFilter } from 'adonisjs-filters'
 import { createContactValidator, mergeContactsValidator } from '#validators/contact'
 import { HttpContext } from '@adonisjs/core/http'
 
@@ -14,10 +12,9 @@ export default class ContactsController {
 
     return await simpleFilter(
       ctx,
-      Contact,
       baseQuery,
-      new Filter(Contact, ['first_name', 'last_name', 'email', 'comments', 'messenger', 'phone']),
-      [new RelationFilter('instruments', Instrument, ['family', 'name'])]
+      ['first_name', 'last_name', 'email', 'comments', 'messenger', 'phone'],
+      [{ relationColumns: ['family', 'name'], relationName: 'instruments' }]
     )
   }
 
@@ -46,7 +43,7 @@ export default class ContactsController {
       .preload('participants')
       .preload('projects')
 
-    const data = await advancedFilter(ctx, Contact, baseQuery)
+    const data = await advancedFilter(ctx, baseQuery)
 
     return {
       data,
@@ -198,10 +195,9 @@ export default class ContactsController {
 
     return await simpleFilter(
       ctx,
-      Contact,
       baseQuery,
-      new Filter(Contact, ['first_name', 'last_name', 'email', 'comments', 'messenger', 'phone']),
-      [new RelationFilter('instruments', Instrument, ['family', 'name'])]
+      ['first_name', 'last_name', 'email', 'comments', 'messenger', 'phone'],
+      [{ relationColumns: ['family', 'name'], relationName: 'instruments' }]
     )
   }
 

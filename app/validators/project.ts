@@ -8,7 +8,8 @@ export const createProjectValidator = vine.compile(
     concerts: vine.array(
       vine.object({
         id: vine.number().optional(),
-        date: vine.date({ formats: { utc: true } }),
+        start_date: vine.date({ formats: { utc: true } }),
+        end_date: vine.date({ formats: { utc: true } }).optional(),
         place: vine.string(),
         comment: vine.string().optional(),
       })
@@ -17,7 +18,8 @@ export const createProjectValidator = vine.compile(
     rehearsals: vine.array(
       vine.object({
         id: vine.number().optional(),
-        date: vine.date({ formats: { utc: true } }),
+        start_date: vine.date({ formats: { utc: true } }),
+        end_date: vine.date({ formats: { utc: true } }).optional(),
         place: vine.string(),
         comment: vine.string().optional(),
       })

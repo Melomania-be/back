@@ -3,7 +3,7 @@
 import Composer from '#models/composer'
 import { HttpContext } from '@adonisjs/core/http'
 import { createComposerValidator } from '#validators/composer'
-import { simpleFilter, Filter } from '#services/simple_filter'
+import { simpleFilter } from 'adonisjs-filters'
 
 export default class ComposersController {
   async getAll(ctx: HttpContext) {
@@ -11,16 +11,8 @@ export default class ComposersController {
 
     let res = await simpleFilter(
       ctx,
-      Composer,
       baseQuery,
-      new Filter(Composer, [
-        'short_name',
-        'long_name',
-        'birth_date',
-        'death_date',
-        'country',
-        'main_style',
-      ]),
+      ['short_name', 'long_name', 'birth_date', 'death_date', 'country', 'main_style'],
       [],
       {
         filtered: true,

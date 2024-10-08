@@ -1,5 +1,5 @@
 import type { HttpContext } from '@adonisjs/core/http'
-import { simpleFilter } from '#services/simple_filter'
+import { simpleFilter } from 'adonisjs-filters'
 import SectionGroups from '#models/section_group'
 import { createSectionGroupValidator } from '#validators/section_group'
 //import {createSectionValidator} from '#validators/sectionGroups'
@@ -10,7 +10,7 @@ export default class SectionGroupsController {
       subQuery.preload('instruments')
     })
 
-    return await simpleFilter(ctx, SectionGroups, baseQuery)
+    return await simpleFilter(ctx, baseQuery)
   }
 
   async getOne({ params }: HttpContext) {

@@ -2,13 +2,13 @@ import { HttpContext } from '@adonisjs/core/http'
 import Callsheet from '#models/callsheet'
 import { createCallsheetValidator, getCallsheetValidator } from '#validators/callsheet'
 import Contact from '#models/contact'
-import { simpleFilter, Filter } from '#services/simple_filter'
+import { simpleFilter } from 'adonisjs-filters'
 
 export default class CallsheetsController {
   async getAll(ctx: HttpContext) {
     let baseQuery = Callsheet.query().where('project_id', ctx.params.id)
 
-    return await simpleFilter(ctx, Callsheet, baseQuery, new Filter(Callsheet, ['version']))
+    return await simpleFilter(ctx, baseQuery, ['version'])
   }
 
   async getOne(ctx: HttpContext) {

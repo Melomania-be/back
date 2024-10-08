@@ -3,7 +3,7 @@
 import Project from '#models/project'
 import { HttpContext } from '@adonisjs/core/http'
 import { createProjectValidator } from '#validators/project'
-import { simpleFilter, Filter } from '#services/simple_filter'
+import { simpleFilter } from 'adonisjs-filters'
 import Participant from '#models/participant'
 import db from '@adonisjs/lucid/services/db'
 import SectionGroup from '#models/section_group'
@@ -23,7 +23,7 @@ export default class ProjectsController {
       .preload('sectionGroup')
       .preload('callsheets')
 
-    return await simpleFilter(ctx, Project, baseQuery, new Filter(Project, ['name']), [], {
+    return await simpleFilter(ctx, baseQuery, ['name'], [], {
       filtered: true,
       paginated: true,
       ordered: true,
@@ -163,7 +163,8 @@ export default class ProjectsController {
         if (dataConcert) {
           concert.merge({
             comment: dataConcert.comment,
-            date: DateTime.fromJSDate(dataConcert.date),
+            start_date: DateTime.fromJSDate(dataConcert.start_date),
+            end_date: dataConcert.end_date ? DateTime.fromJSDate(dataConcert.end_date) : null,
             place: dataConcert.place,
           })
           await concert.save()
@@ -174,7 +175,8 @@ export default class ProjectsController {
     for (const concert of data.concerts.filter((c) => c.id === undefined)) {
       await project.related('concerts').create({
         comment: concert.comment,
-        date: DateTime.fromJSDate(concert.date),
+        start_date: DateTime.fromJSDate(concert.start_date),
+        end_date: concert.end_date ? DateTime.fromJSDate(concert.end_date) : null,
         place: concert.place,
       })
     }
@@ -189,7 +191,8 @@ export default class ProjectsController {
         if (dataRehearsal) {
           rehearsal.merge({
             comment: dataRehearsal.comment,
-            date: DateTime.fromJSDate(dataRehearsal.date),
+            start_date: DateTime.fromJSDate(dataRehearsal.start_date),
+            end_date: dataRehearsal.end_date ? DateTime.fromJSDate(dataRehearsal.end_date) : null,
             place: dataRehearsal.place,
           })
           await rehearsal.save()
@@ -200,7 +203,8 @@ export default class ProjectsController {
     for (const rehearsal of data.rehearsals.filter((r) => r.id === undefined)) {
       await project.related('rehearsals').create({
         comment: rehearsal.comment,
-        date: DateTime.fromJSDate(rehearsal.date),
+        start_date: DateTime.fromJSDate(rehearsal.start_date),
+        end_date: rehearsal.end_date ? DateTime.fromJSDate(rehearsal.end_date) : null,
         place: rehearsal.place,
       })
     }

@@ -3,8 +3,7 @@
 import Participant from '#models/participant'
 import { HttpContext } from '@adonisjs/core/http'
 import { createParticipantValidator, validateParticipantValidator } from '#validators/participant'
-import { Filter, RelationFilter, simpleFilter } from '#services/simple_filter'
-import Contact from '#models/contact'
+import { simpleFilter } from 'adonisjs-filters'
 import Section from '#models/section'
 
 export default class ParticipantsController {
@@ -24,10 +23,9 @@ export default class ParticipantsController {
 
     return await simpleFilter(
       ctx,
-      Participant,
       baseQuery,
-      new Filter(Participant, ['contact_id']),
-      [new RelationFilter('contact', Contact, ['first_name', 'last_name'])]
+      ['contact_id'],
+      [{ relationColumns: ['first_name', 'last_name'], relationName: 'contact' }]
     )
   }
 

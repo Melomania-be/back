@@ -4,8 +4,7 @@ import { HttpContext } from '@adonisjs/core/http'
 import { createRecommendedValidator } from '#validators/recommend_someone'
 import Recommended from '#models/recommended'
 import Registration from '#models/registration'
-import { simpleFilter, Filter, RelationFilter } from '#services/simple_filter'
-import Instrument from '#models/instrument'
+import { simpleFilter } from 'adonisjs-filters'
 
 export default class RecommendSomeonesController {
   async create(ctx: HttpContext) {
@@ -18,17 +17,9 @@ export default class RecommendSomeonesController {
 
     return await simpleFilter(
       ctx,
-      Recommended,
       baseQuery,
-      new Filter(Recommended, [
-        'first_name',
-        'last_name',
-        'email',
-        'messenger',
-        'phone',
-        'project_id',
-      ]),
-      [new RelationFilter('instruments', Instrument, ['family', 'name'])]
+      ['first_name', 'last_name', 'email', 'messenger', 'phone', 'project_id'],
+      [{ relationColumns: ['family', 'name'], relationName: 'instruments' }]
     )
   }
 

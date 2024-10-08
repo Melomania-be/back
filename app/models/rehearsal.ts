@@ -12,7 +12,10 @@ export default class Rehearsal extends BaseModel {
   declare project_id: number
 
   @column()
-  declare date: DateTime
+  declare start_date: DateTime
+
+  @column()
+  declare end_date: DateTime | null
 
   @column()
   declare comment: string

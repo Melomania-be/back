@@ -9,7 +9,10 @@ export default class Concert extends BaseModel {
   declare id: number
 
   @column()
-  declare date: DateTime
+  declare start_date: DateTime
+
+  @column()
+  declare end_date: DateTime | null
 
   @column()
   declare comment: string
