@@ -7,6 +7,7 @@ export const createParticipantValidator = vine.compile(
     project: vine.object({
       id: vine.number(),
     }),
+    is_section_leader: vine.boolean(),
     section: vine.object({
       id: vine.number(),
     }),

@@ -28,6 +28,9 @@ export default class Participant extends BaseModel {
   @column()
   declare section_id: number
 
+  @column()
+  declare is_section_leader: boolean
+
   @belongsTo(() => Project, {
     foreignKey: 'project_id',
   })

@@ -236,7 +236,7 @@ export default class ProjectsController {
   }
 
   async getAttendance(ctx: HttpContext) {
-    return await Project.query()
+    const project = await Project.query()
       .where('id', ctx.params.id)
       .preload('rehearsals', (query) => {
         query.preload('participants', (participantQuery) => {
@@ -249,8 +249,55 @@ export default class ProjectsController {
         })
       })
       .preload('participants', (query) => {
-        query.where('accepted', true).preload('contact')
+        query.where('accepted', true).preload('contact').preload('section')
       })
       .firstOrFail()
+
+    const sectionOrder = [
+      'V1',
+      'V2',
+      'Alto',
+      'Violoncelle',
+      'Contrebasse',
+      'Harpe',
+      'Flute',
+      'Clarinette',
+      'Hautbois',
+      'Basson',
+      'Autres bois',
+      'Cor',
+      'Trompette',
+      'Trombone',
+      'Tuba',
+      'Autres cuivres',
+      'Percussions',
+      'Piano',
+      'Autres',
+    ]
+
+    const sortedParticipants = project.participants.sort((a, b) => {
+      const sectionA = a.section?.name || ''
+      const sectionB = b.section?.name || ''
+      const sectionIndexA = sectionOrder.indexOf(sectionA)
+      const sectionIndexB = sectionOrder.indexOf(sectionB)
+
+      if (sectionIndexA !== sectionIndexB) {
+        return sectionIndexA - sectionIndexB
+      }
+
+      if (a.is_section_leader !== b.is_section_leader) {
+        return a.is_section_leader ? -1 : 1
+      }
+
+      const nameA = `${a.contact?.first_name || ''} ${a.contact?.last_name || ''}`.toLowerCase()
+      const nameB = `${b.contact?.first_name || ''} ${b.contact?.last_name || ''}`.toLowerCase()
+
+      return nameA.localeCompare(nameB)
+    })
+
+    return {
+      ...project.serialize(),
+      participants: sortedParticipants,
+    }
   }
 }

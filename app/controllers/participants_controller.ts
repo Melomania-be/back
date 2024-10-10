@@ -69,6 +69,7 @@ export default class ParticipantsController {
           contact_id: data.contact.id,
           project_id: data.project.id,
           section_id: data.section.id,
+          is_section_leader: data.is_section_leader,
         })
     }
 
@@ -115,6 +116,11 @@ export default class ParticipantsController {
       )
 
       await participant.related('rehearsals').sync(toSync)
+    }
+
+    // Update is_section_leader
+    if (data.id) {
+      participant.merge({ is_section_leader: data.is_section_leader })
     }
 
     await participant.save()
