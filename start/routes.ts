@@ -253,18 +253,12 @@ router.group(() => {
         router.post('/sections', [SectionsController, 'createOrUpdate'])
       })
 
-      router
-        .group(() => {
-          router.get('/templates', [TemplateController, 'getTemplates'])
-          router.put('/templates/createOrUpdate', [TemplateController, 'createOrUpdateTemplate'])
-          router.delete('/templates/:id', [TemplateController, 'delete'])
-        })
-
-        .use(
-          middleware.auth({
-            guards: ['api'],
-          })
-        )
+      router.group(() => {
+        router.get('/templates', [TemplateController, 'getTemplates'])
+        router.put('/templates/createOrUpdate', [TemplateController, 'createOrUpdateTemplate'])
+        router.delete('/templates/:id', [TemplateController, 'delete'])
+      })
     })
+    .use(middleware.auth({ guards: ['api'] }))
     .use(middleware.routeLogger())
 })
