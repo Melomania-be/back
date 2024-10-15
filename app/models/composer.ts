@@ -25,7 +25,9 @@ export default class Composer extends BaseModel {
   @column()
   declare main_style: string
 
-  @hasMany(() => Piece)
+  @hasMany(() => Piece, {
+    foreignKey: 'composer_id',
+  })
   declare pieces: HasMany<typeof Piece>
 
   @column.dateTime({ autoCreate: true })

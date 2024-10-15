@@ -43,8 +43,19 @@ export default class ComposersController {
   }
 
   async delete({ params, response }: HttpContext) {
-    let composer = await Composer.find(params.id)
-    composer?.delete()
-    return response.send('composer deleted')
+    const composerId = params.id
+    const composer = await Composer.findOrFail(composerId)
+    await composer.delete()
+    return response.status(204)
+  }
+
+  async getPieces({ params, response }: HttpContext) {
+    const composer = await Composer.query().where('id', params.id).preload('pieces').first()
+
+    if (!composer) {
+      return response.status(404).send('Composer not found')
+    }
+
+    return response.json(composer.pieces)
   }
 }

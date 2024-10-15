@@ -52,6 +52,7 @@ router.group(() => {
     .group(() => {
       router.group(() => {
         router.get('/composer', [ComposersController, 'getAll'])
+        router.get('/composer/:id/pieces', [ComposersController, 'getPieces'])
         router.put('/composer', [ComposersController, 'createOrUpdate'])
         router.delete('/composer/:id', [ComposersController, 'delete'])
       })
