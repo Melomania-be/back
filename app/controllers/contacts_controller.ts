@@ -106,11 +106,20 @@ export default class ContactsController {
       false
     )
 
-    const participants = await contact1.related('participants').query()
+    const participants1 = await contact1.related('participants').query()
+    const participants2 = await contact2.related('participants').query()
 
-    for (let participant of participants) {
-      participant.contact_id = contact1.id
-      await participant.save()
+    const projectIds1 = new Set(participants1.map((p) => p.project_id))
+
+    for (let participant2 of participants2) {
+      if (projectIds1.has(participant2.project_id)) {
+        const participant1 = participants1.find((p) => p.project_id === participant2.project_id)
+        if (participant1) {
+          await participant1.delete()
+        }
+      }
+      participant2.contact_id = contact1.id
+      await participant2.save()
     }
 
     await contact1.related('instruments').sync(
