@@ -14,7 +14,12 @@ export const createProjectValidator = vine.compile(
         comment: vine.string().optional(),
       })
     ),
-    pieces_ids: vine.array(vine.number()),
+    pieces: vine.array(
+      vine.object({
+        id: vine.number(),
+        pivot_order: vine.number(),
+      })
+    ),
     rehearsals: vine.array(
       vine.object({
         id: vine.number().optional(),

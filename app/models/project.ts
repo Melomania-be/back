@@ -59,6 +59,7 @@ export default class Project extends BaseModel {
   @manyToMany(() => Piece, {
     pivotTable: 'performed_ins',
     pivotTimestamps: true,
+    pivotColumns: ['order'],
   })
   declare pieces: ManyToMany<typeof Piece>
 
@@ -77,4 +78,8 @@ export default class Project extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  serializeExtras() {
+    return { pivot_order: this.$extras.pivot_order }
+  }
 }

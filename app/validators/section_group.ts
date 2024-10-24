@@ -8,6 +8,7 @@ export const createSectionGroupValidator = vine.compile(
       vine.object({
         id: vine.number().optional(),
         name: vine.string(),
+        pivot_order: vine.number().optional(),
       })
     ),
   })

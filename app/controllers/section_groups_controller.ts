@@ -7,7 +7,7 @@ import { createSectionGroupValidator } from '#validators/section_group'
 export default class SectionGroupsController {
   async getAll(ctx: HttpContext) {
     let baseQuery = SectionGroups.query().preload('sections', (subQuery) => {
-      subQuery.preload('instruments')
+      subQuery.preload('instruments').pivotColumns(['order']).orderBy('order', 'asc')
     })
 
     return await simpleFilter(ctx, baseQuery)
@@ -47,7 +47,15 @@ export default class SectionGroupsController {
           }
         }
 
-        return sectionGroup.related('sections').sync(data.sections.map((s) => s.id!))
+        const sectionData = data.sections.reduce(
+          (acc, section) => {
+            acc[section.id!] = { order: section.pivot_order ?? 0 }
+            return acc
+          },
+          {} as Record<number, { order: number }>
+        )
+
+        return sectionGroup.related('sections').sync(sectionData)
       }
     }
   }

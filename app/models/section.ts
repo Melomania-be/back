@@ -31,6 +31,7 @@ export default class Section extends BaseModel {
     relatedKey: 'id',
     pivotRelatedForeignKey: 'section_group_id',
     pivotTimestamps: true,
+    pivotColumns: ['order'],
   })
   declare section_groups: ManyToMany<typeof SectionGroup>
 
@@ -39,4 +40,8 @@ export default class Section extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  serializeExtras() {
+    return { pivot_order: this.$extras.pivot_order }
+  }
 }

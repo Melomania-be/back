@@ -35,9 +35,13 @@ export default class ProjectsController {
       .where('id', params.id)
       .preload('concerts')
       .preload('pieces', (query) => {
-        query.preload('composer').preload('folder', (subQuery) => {
-          subQuery.preload('files')
-        })
+        query
+          .preload('composer')
+          .preload('folder', (subQuery) => {
+            subQuery.preload('files')
+          })
+          .pivotColumns(['order'])
+          .orderBy('order', 'asc')
       })
       .preload('participants')
       .preload('registration')
@@ -71,9 +75,13 @@ export default class ProjectsController {
       .preload('concerts')
       .preload('responsibles')
       .preload('pieces', (query) => {
-        query.preload('composer').preload('folder', (subQuery) => {
-          subQuery.preload('files')
-        })
+        query
+          .preload('composer')
+          .preload('folder', (subQuery) => {
+            subQuery.preload('files')
+          })
+          .pivotColumns(['order'])
+          .orderBy('order', 'asc')
       })
       .preload('sectionGroup', (query) => {
         query.preload('sections')
@@ -148,10 +156,16 @@ export default class ProjectsController {
     await project.related('responsibles').detach()
     await project.related('responsibles').attach(responsibles.map((r) => r.id))
 
-    const pieces = await Piece.query().whereIn('id', data.pieces_ids)
+    const pieces = data.pieces
+
+    // Prepare the pivot data with order
+    const pivotData = pieces.reduce((acc, piece) => {
+      acc[piece.id] = { order: piece.pivot_order }
+      return acc
+    }, {})
 
     await project.related('pieces').detach()
-    await project.related('pieces').sync(pieces.map((p) => p.id))
+    await project.related('pieces').sync(pivotData)
 
     const concerts = await project.related('concerts').query()
 
@@ -251,38 +265,27 @@ export default class ProjectsController {
       .preload('participants', (query) => {
         query.where('accepted', true).preload('contact').preload('section')
       })
+      .preload('sectionGroup', (query) => {
+        query.preload('sections', (subQuery) => {
+          subQuery.pivotColumns(['order']).orderBy('order', 'asc')
+        })
+      })
       .firstOrFail()
-
-    const sectionOrder = [
-      'V1',
-      'V2',
-      'Alto',
-      'Violoncelle',
-      'Contrebasse',
-      'Harpe',
-      'Flute',
-      'Clarinette',
-      'Hautbois',
-      'Basson',
-      'Autres bois',
-      'Cor',
-      'Trompette',
-      'Trombone',
-      'Tuba',
-      'Autres cuivres',
-      'Percussions',
-      'Piano',
-      'Autres',
-    ]
 
     const sortedParticipants = project.participants.sort((a, b) => {
       const sectionA = a.section?.name || ''
       const sectionB = b.section?.name || ''
-      const sectionIndexA = sectionOrder.indexOf(sectionA)
-      const sectionIndexB = sectionOrder.indexOf(sectionB)
+      const sectionGroup = project.sectionGroup
 
-      if (sectionIndexA !== sectionIndexB) {
-        return sectionIndexA - sectionIndexB
+      const sectionOrderA =
+        sectionGroup?.sections.find((section) => section.name === sectionA)?.$extras.pivot_order ||
+        0
+      const sectionOrderB =
+        sectionGroup?.sections.find((section) => section.name === sectionB)?.$extras.pivot_order ||
+        0
+
+      if (sectionOrderA !== sectionOrderB) {
+        return sectionOrderA - sectionOrderB
       }
 
       if (a.is_section_leader !== b.is_section_leader) {
