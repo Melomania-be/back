@@ -159,10 +159,13 @@ export default class ProjectsController {
     const pieces = data.pieces
 
     // Prepare the pivot data with order
-    const pivotData = pieces.reduce((acc, piece) => {
-      acc[piece.id] = { order: piece.pivot_order }
-      return acc
-    }, {})
+    const pivotData = pieces.reduce(
+      (acc: Record<number, { order: number }>, piece) => {
+        acc[piece.id] = { order: piece.pivot_order }
+        return acc
+      },
+      {} as Record<number, { order: number }>
+    )
 
     await project.related('pieces').detach()
     await project.related('pieces').sync(pivotData)
