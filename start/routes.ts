@@ -45,6 +45,7 @@ router.group(() => {
     router.post('/recommend_someone', [RecommendSomeonesController, 'create'])
 
     router.get('/call_sheets/:id/:visitorId', [CallsheetsController, 'getOne'])
+    router.get('/files/download/:id', [FilesController, 'download'])
   })
 
   //protected routes
@@ -143,7 +144,6 @@ router.group(() => {
         router.get('/files', [FilesController, 'getAll'])
         router.put('/files/:id', [FilesController, 'update'])
         router.delete('/files/:id', [FilesController, 'delete'])
-        router.get('/files/download/:id', [FilesController, 'download'])
       })
 
       router.group(() => {
