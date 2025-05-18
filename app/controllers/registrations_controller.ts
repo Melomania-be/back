@@ -61,12 +61,26 @@ export default class RegistrationsController {
 
     if (registration) {
       await registration.related('content').query().delete()
-      await registration.related('form').query().delete()
+      registration.related('content').createMany(data.content)
+
+      for (const form of data.form) {
+        if (form.id) {
+          await registration.related('form').query().where('id', form.id).update({
+            text: form.text,
+            type: form.type,
+          })
+        } else {
+          await registration.related('form').create({
+            text: form.text,
+            type: form.type,
+          })
+        }
+      }
     } else {
       registration = await project.related('registration').create({})
+      registration.related('content').createMany(data.content)
+      registration.related('form').createMany(data.form)
     }
-    registration.related('content').createMany(data.content)
-    registration.related('form').createMany(data.form)
 
     return registration
   }

@@ -10,6 +10,7 @@ export const createRegistrationValidator = vine.compile(
     ),
     form: vine.array(
       vine.object({
+        id: vine.number().optional(),
         text: vine.string(),
         type: vine.string(),
       })
