@@ -17,3 +17,5 @@ to setup the database
 6. >npm run dev
 
 to launch the project !
+
+Little change
