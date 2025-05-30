@@ -235,6 +235,46 @@ export default class MailingsController {
     }
   }
 
+  async sendRefusalEmailToParticipant({ request, response }: HttpContext) {
+    const { email, subject, message } = request.only(['email', 'subject', 'message'])
+
+    if (!email || !subject || !message) {
+      return response.status(400).json({
+        error: 'Missing required fields',
+        received: { email, subject, message }
+      })
+    }
+
+    try {
+      // Envoi de l'email en HTML brut
+      await mail.send((msg) => {
+        msg
+          .to(email)
+          .from('no-reply@tondomaine.com') // à personnaliser
+          .subject(subject)
+          .html(`<p>${message.replace(/\n/g, '<br/>')}</p>`) // conversion newlines → <br>
+      })
+
+      // Créer une trace de l'envoi
+      const contact = await Contact.findBy('email', email)
+      const outgoingMail = new OutgoingMail()
+      outgoingMail.type = 'refusal'
+      outgoingMail.receiver_id = contact?.id || null
+      outgoingMail.mail_template_id = null
+      outgoingMail.sent = true
+      outgoingMail.createdAt = DateTime.local()
+      outgoingMail.updatedAt = DateTime.local()
+      await OutgoingMail.create(outgoingMail)
+
+      return response.ok({ message: 'Email de refus envoyé avec succès' })
+    } catch (error) {
+      console.error("Erreur lors de l'envoi de l'email :", error)
+      return response.status(500).json({ error: "Erreur serveur lors de l'envoi de l'email" })
+    }
+  }
+
+
+
   async updateOutgoingMail(outgoingMail: OutgoingMail) {
     try {
       let updateMail = await OutgoingMail.findOrFail(outgoingMail.id)

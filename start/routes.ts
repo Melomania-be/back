@@ -178,7 +178,11 @@ router.group(() => {
 
       router.group(() => {
         router.get('projects/:id/management/mailing', [MailingsController, 'getOutgoing'])
-        router.post('/mailing', [MailingsController, 'sendUnique'])
+        router.post('/mailing/sendRefusalEmailToParticipant', [
+          MailingsController,
+          'sendRefusalEmailToParticipant',
+        ])
+
         //for unique mails to a list of contacts
 
         router.post('/mailing/sendTemplateToList', [MailingsController, 'sendTemplateToList'])
