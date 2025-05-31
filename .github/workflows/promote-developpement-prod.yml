@@ -1,0 +1,119 @@
+name: Promote Developpement to Production
+
+permissions:
+  contents: write
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      versionType:
+        type: choice
+        description: 'Version type to bump'
+        default: 'patch'
+        options:
+          - patch
+          - minor
+          - major
+        required: true
+
+jobs:
+  bump-version:
+    name: Bump Version
+    uses: ./.github/workflows/_bump_version.yml
+    with:
+      branch: dev
+      versionType: ${{ github.event.inputs.versionType || 'patch' }}
+    secrets:
+      TOKEN: ${{ secrets.TOKEN }}
+
+  create-release:
+    name: Create Release
+    uses: ./.github/workflows/_create_release.yml
+    needs: bump-version
+    with:
+      branch: dev
+      version: ${{ needs.bump-version.outputs.version }}
+    secrets:
+      TOKEN: ${{ secrets.TOKEN }}
+
+  disable-dev-protection:
+    name: Disable Branch Protection
+    uses: ./.github/workflows/_disable_protection.yml
+    needs: create-release
+    permissions:
+      contents: write
+    with:
+      branch: dev
+    secrets:
+      TOKEN: ${{ secrets.TOKEN }}
+
+  disable-prod-protection:
+    name: Disable Release-Developpement Branch Protection
+    uses: ./.github/workflows/_disable_protection.yml
+    needs: create-release
+    with:
+      branch: prod
+    secrets:
+      TOKEN: ${{ secrets.TOKEN }}
+
+  update-developpement:
+    name: Update Developpement
+    runs-on: ubuntu-latest
+    needs: [disable-dev-protection, disable-prod-protection, create-release]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Merge release -> dev
+        uses: devmasx/merge-branch@master
+        with:
+          type: now
+          from_branch: ${{ needs.create-release.outputs.branch_name }}
+          target_branch: dev
+          message: 'Merge ${{ needs.create-release.outputs.branch_name }} into dev'
+          github_token: ${{ secrets.TOKEN }}
+
+  update-production:
+    name: Update Production
+    runs-on: ubuntu-latest
+    needs: update-developpement
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@master
+          
+      - name: Move prod to tag
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions@github.com"
+          git push --delete origin prod || true
+          git fetch --tags
+          git checkout -b prod dev
+      - name: Push prod branch
+        run: |
+          git push origin prod --force
+          echo "Production branch updated to tag ${{ needs.create-release.outputs.version }}"
+
+  enable-dev-protection:
+    name: Enable Branch Protection
+    uses: ./.github/workflows/_enable_protection.yml
+    needs: update-developpement
+    with:
+      branch: dev
+      lock: false
+    secrets:
+      TOKEN: ${{ secrets.TOKEN }}
+
+  enable-prod-protection:
+    name: Enable Release-Developpement Branch Protection
+    uses: ./.github/workflows/_enable_protection.yml
+    needs: update-production
+    permissions:
+      contents: write
+    with:
+      branch: prod
+      lock: true
+    secrets:
+      TOKEN: ${{ secrets.TOKEN }}

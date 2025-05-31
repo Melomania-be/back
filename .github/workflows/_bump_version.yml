@@ -1,0 +1,47 @@
+name: bump version
+
+on:
+  workflow_call:
+    inputs:
+      versionType:
+        type: string
+        description: 'Version type to bump'
+        required: true
+      branch:
+        type: string
+        description: 'Branch to checkout'
+        required: true
+    secrets:
+      TOKEN:
+        required: true
+
+    outputs:
+      version:
+        description: 'Version number'
+        value: ${{ jobs.next_version.outputs.version }}
+
+env:
+  node-version: 22.x
+
+jobs:
+  next_version:
+    name: Get next version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # for pushing the version bump
+      pull-requests: write # for merging the version bump
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.branch }} # checkout the branch specified in the input
+
+      - name: Bump version
+        id: get_version
+        run: |
+          version=$(npm version --no-git-tag-version --force --tag-version-prefix='' --ignore-scripts ${{ inputs.versionType }})
+          echo "version=$version" >> "$GITHUB_OUTPUT"

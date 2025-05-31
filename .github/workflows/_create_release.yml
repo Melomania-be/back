@@ -1,0 +1,71 @@
+name: create release
+
+permissions:
+  contents: write
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        description: 'Version to create'
+        required: true
+      branch:
+        type: string
+        description: 'Branch to checkout'
+        required: true
+    secrets:
+      TOKEN:
+        required: true
+
+    outputs:
+      branch_name:
+        description: 'Branch name'
+        value: ${{ jobs.create_release.outputs.branch_name }}
+
+env:
+  node-version: 22.x
+
+jobs:
+  create_release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      branch_name: ${{ steps.release.outputs.branch_name }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # important for git log
+          ref: ${{ inputs.branch }} # checkout the branch specified in the input
+
+      - name: Create Release
+        run: |
+          git config --global user.name github-actions[bot]
+          git config --global user.email "github-actions@github.com"
+
+      - name: Set version
+        run: |
+          git checkout -b release-${{ inputs.version }}
+          npm version --no-git-tag-version --force --tag-version-prefix='' --ignore-scripts ${{ inputs.version }}
+          git add package.json package-lock.json
+          git commit -m "Bump version to ${{ inputs.version }}"
+
+      - name: Push Release
+        id: release
+        run: |
+          git push origin release-${{ inputs.version }}
+          git tag -a v${{ inputs.version }} -m "Release v${{ inputs.version }}"
+          git push origin v${{ inputs.version }}
+          echo "branch_name=release-${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+
+  protect_branch:
+    name: Protect Branch
+    uses: ./.github/workflows/_enable_protection.yml
+    needs: create_release
+    with:
+      branch: release-${{ inputs.version }}
+      lock: true
+    secrets:
+      TOKEN: ${{ secrets.TOKEN }}

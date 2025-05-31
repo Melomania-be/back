@@ -1,12 +1,14 @@
 {
   "name": "back",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "license": "UNLICENSED",
   "scripts": {
     "start": "node bin/server.js",
     "build": "node ace build",
+    "migrate-prod": "node build/ace migration:run",
+    "seed-prod": "node build/ace db:seed",
     "dev": "node ace serve --hmr",
     "test": "node ace test",
     "lint": "eslint . --fix",
