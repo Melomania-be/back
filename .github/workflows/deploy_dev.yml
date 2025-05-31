@@ -61,22 +61,22 @@ jobs:
           sleep 2
           rsync --timeout=60 -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa" \
           --exclude=".git" -av --delete build/ \
-          ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }}:/home/${{ secrets.CPANEL_LOGIN }}/app/front || true
+          ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }}:/home/${{ secrets.CPANEL_LOGIN }}/app/back || true
 
           sleep 2
           rsync --timeout=60 -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa" \
           --exclude=".git" -av --delete build/ \
-          ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }}:/home/${{ secrets.CPANEL_LOGIN }}/app/front
+          ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }}:/home/${{ secrets.CPANEL_LOGIN }}/app/back
 
       - name: Restarting NodeJS application via ssh
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
           ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }} \
-          '/usr/sbin/cloudlinux-selector stop --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/front && \
-          /usr/sbin/cloudlinux-selector start --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/front && \
-          /usr/sbin/cloudlinux-selector install-modules --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/front && \
-          /usr/sbin/cloudlinux-selector run-script --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/front --script-name migrate-prod && \
-          /usr/sbin/cloudlinux-selector run-script --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/front --script-name seed-prod'
+          '/usr/sbin/cloudlinux-selector stop --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
+          /usr/sbin/cloudlinux-selector start --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
+          /usr/sbin/cloudlinux-selector install-modules --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
+          /usr/sbin/cloudlinux-selector run-script --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back --script-name migrate-prod && \
+          /usr/sbin/cloudlinux-selector run-script --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back --script-name seed-prod'
 
       - name: Cleaning SSH keys
         if: always()
