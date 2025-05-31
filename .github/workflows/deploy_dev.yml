@@ -17,7 +17,7 @@ jobs:
     name: Build
     uses: ./.github/workflows/_build.yml
     with:
-      environment: deploy_dev_front
+      environment: deploy_dev_back
 
   deploy:
     runs-on: ubuntu-latest
@@ -75,6 +75,7 @@ jobs:
           '/usr/sbin/cloudlinux-selector stop --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
           /usr/sbin/cloudlinux-selector start --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
           /usr/sbin/cloudlinux-selector install-modules --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
+          source /home/sc1ciro3903/nodevenv/app/back/20/bin/activate && cd /home/sc1ciro3903/app/back/build && npm ci --omit="dev" && \
           /usr/sbin/cloudlinux-selector run-script --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back --script-name migrate-prod && \
           /usr/sbin/cloudlinux-selector run-script --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back --script-name seed-prod'
 
