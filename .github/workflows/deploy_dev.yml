@@ -76,8 +76,8 @@ jobs:
           /usr/sbin/cloudlinux-selector start --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
           /usr/sbin/cloudlinux-selector install-modules --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
           source /home/sc1ciro3903/nodevenv/app/back/20/bin/activate && cd /home/sc1ciro3903/app/back/build && npm ci --omit="dev" && \
-          cd .. && node ace migrate-prod && \
-          node ace seed-prod'
+          cd .. && npm run migrate-prod && \
+          npm run seed-prod'
 
       - name: Cleaning SSH keys
         if: always()
