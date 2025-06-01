@@ -6,6 +6,7 @@ import RecommendedNotification from '#mails/recommended_notification'
 import mail_template from '#models/mail_template'
 import TemplatePreparation from '#mails/template_preparation'
 import Callsheet from '#models/callsheet'
+import RefusalNotification from '#mails/refusal_notification'
 import List from '#models/list'
 import OutgoingMail from '#models/outgoing_mail'
 import { DateTime } from 'luxon'
@@ -14,6 +15,8 @@ import Responsibles from '#models/responsibles'
 import ParticipationValidationNotification from '#mails/participation_validation_notification'
 import RecruitmentNotification from '#mails/recruitment_notification'
 import UniquePreparation from '#mails/unique_preparation'
+import Participant from '#models/participant'
+
 
 export default class MailingsController {
   async sendUnique({ request, response }: HttpContext) {
@@ -235,41 +238,79 @@ export default class MailingsController {
     }
   }
 
+  // Fonction à remplacer dans votre MailingsController
   async sendRefusalEmailToParticipant({ request, response }: HttpContext) {
-    const { email, subject, message } = request.only(['email', 'subject', 'message'])
+    const { projectId, participantId, customMessage } = request.only(['projectId', 'participantId', 'customMessage'])
 
-    if (!email || !subject || !message) {
+    if (!projectId || !participantId) {
       return response.status(400).json({
         error: 'Missing required fields',
-        received: { email, subject, message }
+        received: { projectId, participantId, customMessage }
       })
     }
 
     try {
-      // Envoi de l'email en HTML brut
-      await mail.send((msg) => {
-        msg
-          .to(email)
-          .from('no-reply@tondomaine.com') // à personnaliser
-          .subject(subject)
-          .html(`<p>${message.replace(/\n/g, '<br/>')}</p>`) // conversion newlines → <br>
-      })
+      // Récupérer les données nécessaires
+      let project = await Project.find(projectId)
+      let participant = await Participant.query()
+        .where('id', participantId)
+        .preload('contact')
+        .preload('section')
+        .first()
+
+      if (!project || !participant) {
+        return response.status(404).json({ error: 'Project or participant not found' })
+      }
+
+      // Vérifier que le contact et la section sont bien chargés
+      if (!participant.contact || !participant.section) {
+        return response.status(404).json({ error: 'Participant contact or section not found' })
+      }
+
+      let responsibles = await Responsibles.query()
+        .where('project_id', projectId)
+        .preload('contact')
+
+      let responsibleContact = null
+      if (responsibles && responsibles.length > 0) {
+        responsibleContact = {
+          first_name: responsibles[0].contact.first_name,
+          last_name: responsibles[0].contact.last_name,
+          email: responsibles[0].contact.email,
+          phone: responsibles[0].contact.phone,
+          messenger: responsibles[0].contact.messenger,
+        }
+      }
+
+      // Créer et envoyer l'email avec le template
+      const refusalMail = new RefusalNotification(
+        participant.contact,
+        project,
+        participant.section,
+        customMessage,
+        responsibleContact
+      )
+
+      await mail.send(refusalMail)
 
       // Créer une trace de l'envoi
-      const contact = await Contact.findBy('email', email)
       const outgoingMail = new OutgoingMail()
       outgoingMail.type = 'refusal'
-      outgoingMail.receiver_id = contact?.id || null
+      outgoingMail.receiver_id = participant.contact.id
+      outgoingMail.project_id = projectId
       outgoingMail.mail_template_id = null
       outgoingMail.sent = true
       outgoingMail.createdAt = DateTime.local()
       outgoingMail.updatedAt = DateTime.local()
-      await OutgoingMail.create(outgoingMail)
+      await outgoingMail.save()
 
       return response.ok({ message: 'Email de refus envoyé avec succès' })
     } catch (error) {
       console.error("Erreur lors de l'envoi de l'email :", error)
-      return response.status(500).json({ error: "Erreur serveur lors de l'envoi de l'email" })
+      return response.status(500).json({
+        error: "Erreur serveur lors de l'envoi de l'email",
+        details: error.message || 'Erreur inconnue'
+      })
     }
   }
 
