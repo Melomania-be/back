@@ -176,4 +176,32 @@ export default class ParticipantsController {
     await participant.delete()
     return response.send('Participant deleted from the project')
   }
+
+async getParticipantsCountBySection(ctx: HttpContext) {
+  const projectId = ctx.params.id;
+
+  // On construit la requête sur Participant
+  const baseQuery = Participant.query()
+    .where('project_id', projectId)
+    .andWhere('accepted', true)
+    .select('section_id')
+    .count('id as participants_count')
+    .groupBy('section_id')
+    .preload('section', (query) => {
+      query.select('id', 'name');
+    });
+
+  const counts = await baseQuery;
+
+  // On mappe le résultat pour ne garder que l'essentiel
+  const result = counts.map((item) => ({
+    section_id: item.section_id,
+    section_name: item.section ? item.section.name : null,
+    participants_count: Number(item.$extras.participants_count) || 0,
+  }));
+
+  return result;
+}
+
+
 }

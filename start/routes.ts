@@ -32,6 +32,10 @@ const DefaultTemplatesController = () => import('#controllers/default_templates_
 
 router.group(() => {
   //open routes
+
+  router.get('/test-public-route', async () => {
+  return { ok: true }
+  })
   router.group(() => {
     router.get('/', async () => {
       return {
@@ -46,6 +50,8 @@ router.group(() => {
 
     router.get('/call_sheets/:id/:visitorId', [CallsheetsController, 'getOne'])
     router.get('/files/download/:id', [FilesController, 'download'])
+
+    router.get('/projects/:id/public/participants-count', [ParticipantsController, 'getParticipantsCountBySection'])
   })
 
   //protected routes
