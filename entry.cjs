@@ -1,5 +1,5 @@
 // entry.cjs
-async function loadApp() {
-  const { app } = await import('./build/bin/server.js')
-}
-loadApp()
+import('./build/bin/server.js').catch((err) => {
+  console.error('Failed to start server:', err)
+  process.exit(1)
+})
