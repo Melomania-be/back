@@ -40,7 +40,7 @@
     "@japa/assert": "^3.0.0",
     "@japa/plugin-adonisjs": "^3.0.1",
     "@japa/runner": "^3.1.4",
-    "@swc/core": "^1.5.3",
+    "@swc/core": "^1.11.24",
     "@types/luxon": "^3.4.2",
     "@types/node": "^20.12.10",
     "eslint": "^8.57.0",
@@ -57,11 +57,13 @@
     "@adonisjs/cors": "^2.2.1",
     "@adonisjs/lucid": "^21.2.0",
     "@adonisjs/mail": "^9.2.1",
+    "@swc/helpers": "^0.5.17",
     "@vinejs/vine": "^2.1.0",
     "adonisjs-filters": "^1.0.5",
     "luxon": "^3.5.0",
     "pg": "^8.12.0",
-    "reflect-metadata": "^0.2.2"
+    "reflect-metadata": "^0.2.2",
+    "sqlite3": "^5.1.7"
   },
   "hotHook": {
     "boundaries": [

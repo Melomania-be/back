@@ -39,6 +39,7 @@ export default class UsersController {
   }
 
   async create(ctx: HttpContext) {
+    console.log(ctx.request.body())
     if (!ctx.auth.user) {
       ctx.response.abort('You must be authenticated to create a new user', 401)
     }

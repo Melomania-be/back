@@ -23,3 +23,26 @@ const dbConfig = defineConfig({
 })
 
 export default dbConfig
+
+// import env from '#start/env'
+// import { defineConfig } from '@adonisjs/lucid'
+
+// const dbConfig = defineConfig({
+//   connection: 'sqlite',
+//   connections: {
+//     sqlite: {
+//       client: 'sqlite3',
+//       connection: {
+//         filename: env.get('DB_DATABASE', './database/db.sqlite3'),
+//       },
+//       useNullAsDefault: true,
+//       migrations: {
+//         naturalSort: true,
+//         paths: ['database/migrations'],
+//       },
+//       debug: false,
+//     },
+//   },
+// })
+
+// export default dbConfig
