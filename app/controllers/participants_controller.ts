@@ -173,14 +173,10 @@ export default class ParticipantsController {
       return response.send("Can't find this participant in this project")
     }
 
-    // 💥 Supprimer les relations many-to-many si elles existent
+
     await participant.related('concerts').detach()
     await participant.related('rehearsals').detach()
 
-    // 💥 Ajoute ceci SI tu as une autre relation many-to-many utilisant participates_ins
-    // await participant.related('inscriptions').detach()  ← exemple, à adapter selon ton modèle
-
-    // ✅ Supprimer ensuite le participant
     await participant.delete()
 
     return response.send('Participant deleted from the project')
