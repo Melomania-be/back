@@ -46,7 +46,7 @@ jobs:
   activate-protection:
     name: Activate Branch Protection
     permissions:
-      contents: read
+      contents: write
     uses: ./.github/workflows/_enable_protection.yml
     needs: merge
     with:
