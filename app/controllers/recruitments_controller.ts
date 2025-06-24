@@ -348,36 +348,43 @@ export default class RecruitmentController {
 
   async checkAndUpdateStatuses({ request, response }: HttpContext) {
     try {
-      const { checkDateTime } = await request.validateUsing(checkStatusValidator)
-
-      if (typeof checkDateTime === 'string') {
-        throw new Error('Invalid date format after validation')
-      }
-
-      const now = DateTime.now().toUTC()
-
-      if (now < checkDateTime) {
-        return response.badRequest({
-          message: `Cannot perform status check: Specified time (${checkDateTime.toISO()}) is in the future.`,
-        })
-      }
-
-      const updatedCount = await db.transaction(async (trx) => {
-        return await Recruitment.query({ client: trx })
-          .where('status', 'awaiting response')
-          .update({
-            status: 'to be contacted',
-            statusUpdatedAt: now.toJSDate(),
+      // ✅ Validate daysThreshold from frontend
+      const { daysThreshold } = await vine
+        .compile(
+          vine.object({
+            daysThreshold: vine.number().min(1).max(365),
           })
-      })
+        )
+        .validate(request.all())
+
+      const now = DateTime.now().startOf('day')
+
+      // ✅ Fetch all "awaiting response" recruitments
+      const recruitments = await Recruitment.query().where('status', 'awaiting response')
+
+      let updatedCount = 0
+
+      for (const recruitment of recruitments) {
+        if (!recruitment.contactDate) continue
+
+        const contactDate = recruitment.contactDate.startOf('day')
+        const daysSinceContact = now.diff(contactDate, 'days').days
+
+        if (daysSinceContact > daysThreshold) {
+          recruitment.status = 'to be contacted'
+          recruitment.statusUpdatedAt = DateTime.now()
+          await recruitment.save()
+          updatedCount++
+        }
+      }
 
       return response.ok({
-        message: `Status check completed. ${updatedCount} recruitment(s) updated to 'to be contacted'.`,
+        message: `Updated ${updatedCount} recruitment(s) to "to be contacted" based on ${daysThreshold}-day threshold.`,
         updatedCount,
       })
     } catch (error) {
       return response.badRequest({
-        message: 'Failed to process status check.',
+        message: 'Failed to process status update by threshold.',
         error: error.message,
       })
     }
