@@ -85,7 +85,7 @@ export default class RecommendedNotification extends BaseMail {
 
     this.message
       .to(this.recommended.email)
-      .from(env.get('SMTP_USERNAME'))
+      .from(`MELOMANIA <${env.get('SMTP_USERNAME')}>`)
       .subject('We heard you might be interested...')
       .html(htmlContent)
   }

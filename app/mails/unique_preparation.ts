@@ -58,7 +58,7 @@ export default class UniquePreparation extends BaseMail {
 
     this.message
       .to(this.contact.email)
-      .from(env.get('SMTP_USERNAME'))
+      .from(`MELOMANIA <${env.get('SMTP_USERNAME')}>`)
       .subject(this.subject)
       .html(htmlContent)
   }

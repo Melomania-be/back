@@ -95,7 +95,7 @@ export default class CallsheetNotification extends BaseMail {
 
     this.message
       .to(this.contact.email)
-      .from(env.get('SMTP_USERNAME'))
+      .from(`MELOMANIA <${env.get('SMTP_USERNAME')}>`)
       .subject('News about the project ' + this.project.name)
       .html(htmlContent)
   }
