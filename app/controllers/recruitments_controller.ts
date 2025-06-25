@@ -346,21 +346,64 @@ export default class RecruitmentController {
    * Endpoint to perform the status update based on a provided datetime.
    */
 
+  // async checkAndUpdateStatuses({ request, response }: HttpContext) {
+  //   try {
+  //     // ✅ Validate daysThreshold from frontend
+  //     const { daysThreshold } = await vine
+  //       .compile(
+  //         vine.object({
+  //           daysThreshold: vine.number().min(1).max(365),
+  //         })
+  //       )
+  //       .validate(request.all())
+
+  //     const now = DateTime.now().startOf('day')
+
+  //     // ✅ Fetch all "awaiting response" recruitments
+  //     const recruitments = await Recruitment.query().where('status', 'awaiting response')
+
+  //     let updatedCount = 0
+
+  //     for (const recruitment of recruitments) {
+  //       if (!recruitment.contactDate) continue
+
+  //       const contactDate = recruitment.contactDate.startOf('day')
+  //       const daysSinceContact = now.diff(contactDate, 'days').days
+
+  //       if (daysSinceContact > daysThreshold) {
+  //         recruitment.status = 'to be contacted'
+  //         recruitment.statusUpdatedAt = DateTime.now()
+  //         await recruitment.save()
+  //         updatedCount++
+  //       }
+  //     }
+
+  //     return response.ok({
+  //       message: `Updated ${updatedCount} recruitment(s) to "to be contacted" based on ${daysThreshold}-day threshold.`,
+  //       updatedCount,
+  //     })
+  //   } catch (error) {
+  //     return response.badRequest({
+  //       message: 'Failed to process status update by threshold.',
+  //       error: error.message,
+  //     })
+  //   }
+  // }
+
   async checkAndUpdateStatuses({ request, response }: HttpContext) {
     try {
-      // ✅ Validate daysThreshold from frontend
+      // Validate the number of days (X) from frontend
       const { daysThreshold } = await vine
-        .compile(
-          vine.object({
-            daysThreshold: vine.number().min(1).max(365),
-          })
-        )
+        .compile(vine.object({ daysThreshold: vine.number().min(1).max(365) }))
         .validate(request.all())
 
       const now = DateTime.now().startOf('day')
 
-      // ✅ Fetch all "awaiting response" recruitments
-      const recruitments = await Recruitment.query().where('status', 'awaiting response')
+      // Fetch only recruitments with status 'awaiting response' or 'to be contacted'
+      const recruitments = await Recruitment.query().whereIn('status', [
+        'awaiting response',
+        'to be contacted',
+      ])
 
       let updatedCount = 0
 
@@ -368,10 +411,17 @@ export default class RecruitmentController {
         if (!recruitment.contactDate) continue
 
         const contactDate = recruitment.contactDate.startOf('day')
-        const daysSinceContact = now.diff(contactDate, 'days').days
+        const diffInDays = now.diff(contactDate, 'days').days
 
-        if (daysSinceContact > daysThreshold) {
+        if (diffInDays > daysThreshold && recruitment.status === 'awaiting response') {
           recruitment.status = 'to be contacted'
+          recruitment.statusUpdatedAt = DateTime.now()
+          await recruitment.save()
+          updatedCount++
+        }
+
+        if (diffInDays <= daysThreshold && recruitment.status === 'to be contacted') {
+          recruitment.status = 'awaiting response'
           recruitment.statusUpdatedAt = DateTime.now()
           await recruitment.save()
           updatedCount++
@@ -379,12 +429,12 @@ export default class RecruitmentController {
       }
 
       return response.ok({
-        message: `Updated ${updatedCount} recruitment(s) to "to be contacted" based on ${daysThreshold}-day threshold.`,
+        message: `Statuses recalculated using threshold of ${daysThreshold} day(s).`,
         updatedCount,
       })
     } catch (error) {
       return response.badRequest({
-        message: 'Failed to process status update by threshold.',
+        message: 'Failed to update statuses.',
         error: error.message,
       })
     }
