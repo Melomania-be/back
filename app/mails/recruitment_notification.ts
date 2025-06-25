@@ -84,7 +84,7 @@ export default class RecruitmentNotification extends BaseMail {
 
     this.message
       .to(this.contact.email)
-      .from(`MELOMANIA <${env.get('SMTP_USERNAME')}>`)
+      .from(`Melomania <${env.get('SMTP_USERNAME')}>`)
       .subject('New Project by Melomania : ' + this.project.name)
       .html(htmlContent)
   }
