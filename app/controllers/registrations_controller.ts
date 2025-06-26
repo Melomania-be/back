@@ -55,13 +55,24 @@ export default class RegistrationsController {
   async createOrUpdate(ctx: HttpContext) {
     const data = await ctx.request.validateUsing(createRegistrationValidator)
 
-    let project = await Project.findOrFail(data.params.id)
-
+    const project = await Project.findOrFail(data.params.id)
     let registration = await project.related('registration').query().first()
 
     if (registration) {
       await registration.related('content').query().delete()
-      registration.related('content').createMany(data.content)
+      await registration.related('content').createMany(data.content)
+
+      const incomingFormIds = data.form
+        .filter(f => f.id !== undefined && f.id !== null)
+        .map(f => String(f.id))
+
+      if (incomingFormIds.length > 0) {
+        await registration.related('form').query()
+          .whereNotIn('id', incomingFormIds)
+          .delete()
+      } else {
+        await registration.related('form').query().delete()
+      }
 
       for (const form of data.form) {
         if (form.id) {
@@ -78,8 +89,8 @@ export default class RegistrationsController {
       }
     } else {
       registration = await project.related('registration').create({})
-      registration.related('content').createMany(data.content)
-      registration.related('form').createMany(data.form)
+      await registration.related('content').createMany(data.content)
+      await registration.related('form').createMany(data.form)
     }
 
     return registration
