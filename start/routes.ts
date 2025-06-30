@@ -41,7 +41,7 @@ router.group(() => {
     })
     router.get('/registration/:id', [RegistrationsController, 'getOne'])
     router.put('/registration/submit', [RegistrationsController, 'submit'])
-
+    router.get('/recruitments', [RecruitmentsController, 'getAll'])
     router.post('/sign_in', [UsersController, 'signIn'])
     router.post('/recommend_someone', [RecommendSomeonesController, 'create'])
 
@@ -54,7 +54,7 @@ router.group(() => {
     .group(() => {
       router.group(() => {
         // GET all recruitments with simple filtering
-        router.get('/recruitments', [RecruitmentsController, 'getAll'])
+        // router.get('/recruitments', [RecruitmentsController, 'getAll'])
 
         // GET a single recruitment by ID
         router.get('/recruitments/:id', [RecruitmentsController, 'getOne'])

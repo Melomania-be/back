@@ -158,21 +158,79 @@ export default class RecruitmentController {
   }
 
   // Get all recruitments with basic filtering
+  // async getAll(ctx: HttpContext) {
+  //   const baseQuery = Recruitment.query()
+  //     .preload('sectionGroup', (query) => {
+  //       query.select('id', 'name') // Only select id and name from section_groups
+  //     })
+  //     .preload('user', (query) => {
+  //       query.select('id', 'fullName') // Only select id and fullName from users
+  //     })
+
+  //   const results = await simpleFilter(
+  //     ctx,
+  //     baseQuery,
+  //     ['firstName', 'lastName', 'comment', 'status'],
+  //     []
+  //   )
+  //   return results
+  // }
+
   async getAll(ctx: HttpContext) {
     const baseQuery = Recruitment.query()
       .preload('sectionGroup', (query) => {
-        query.select('id', 'name') // Only select id and name from section_groups
+        query.select('id', 'name')
       })
       .preload('user', (query) => {
-        query.select('id', 'fullName') // Only select id and fullName from users
+        query.select('id', 'fullName')
       })
 
-    const results = await simpleFilter(
+    const results = await this.simpleFilter(
       ctx,
       baseQuery,
-      ['firstName', 'lastName', 'comment', 'status'],
-      []
+      // Add 'sectionGroupId' and 'contactedBy' to the list of columns that can be filtered
+      ['firstName', 'lastName', 'comment', 'status', 'sectionGroupId', 'contactedBy'],
+      [] // Keep relation filtering empty unless you have specific nested filter needs
     )
+    return results
+  }
+
+  // private async simpleFilter(ctx: HttpContext, query: any, columns: string[], relations: string[]) {
+  //   const { request } = ctx
+  //   const filters = request.qs()
+
+  //   columns.forEach((col) => {
+  //     if (filters[col] !== undefined) {
+  //       query.where(col, filters[col])
+  //     }
+  //   })
+
+  //   return query
+  // }
+
+  private async simpleFilter(ctx: HttpContext, query: any, columns: string[], relations: string[]) {
+    const { request } = ctx
+    const filters = request.qs()
+    console.log('Backend query params:', filters) // Debug log
+
+    columns.forEach((col) => {
+      if (filters[col] !== undefined) {
+        // Cast to number for numeric columns
+        const value = ['sectionGroupId', 'contactedBy'].includes(col)
+          ? Number(filters[col])
+          : filters[col]
+
+        if (value !== null && value !== undefined && !isNaN(value)) {
+          console.log(`Applying filter: ${col} = ${value}`) // Debug log
+          query.where(col, value)
+        } else {
+          console.log(`Skipping invalid filter: ${col} = ${filters[col]}`) // Debug log
+        }
+      }
+    })
+
+    const results = await query
+    console.log('Filtered results:', results) // Debug log
     return results
   }
 
