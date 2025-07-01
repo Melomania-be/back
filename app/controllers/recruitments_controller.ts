@@ -120,7 +120,7 @@
 // }
 
 import { HttpContext } from '@adonisjs/core/http'
-import Recruitment from '#models/recruitment'
+import Recruitment, { RecruitmentStatus } from '#models/recruitment'
 import { simpleFilter, advancedFilter } from 'adonisjs-filters'
 import { createRecruitmentValidator, mergeRecruitmentsValidator } from '#validators/recruitment'
 import { DateTime } from 'luxon'
@@ -157,25 +157,6 @@ export default class RecruitmentController {
     })
   }
 
-  // Get all recruitments with basic filtering
-  // async getAll(ctx: HttpContext) {
-  //   const baseQuery = Recruitment.query()
-  //     .preload('sectionGroup', (query) => {
-  //       query.select('id', 'name') // Only select id and name from section_groups
-  //     })
-  //     .preload('user', (query) => {
-  //       query.select('id', 'fullName') // Only select id and fullName from users
-  //     })
-
-  //   const results = await simpleFilter(
-  //     ctx,
-  //     baseQuery,
-  //     ['firstName', 'lastName', 'comment', 'status'],
-  //     []
-  //   )
-  //   return results
-  // }
-
   async getAll(ctx: HttpContext) {
     const baseQuery = Recruitment.query()
       .preload('sectionGroup', (query) => {
@@ -194,19 +175,6 @@ export default class RecruitmentController {
     )
     return results
   }
-
-  // private async simpleFilter(ctx: HttpContext, query: any, columns: string[], relations: string[]) {
-  //   const { request } = ctx
-  //   const filters = request.qs()
-
-  //   columns.forEach((col) => {
-  //     if (filters[col] !== undefined) {
-  //       query.where(col, filters[col])
-  //     }
-  //   })
-
-  //   return query
-  // }
 
   private async simpleFilter(ctx: HttpContext, query: any, columns: string[], relations: string[]) {
     const { request } = ctx
@@ -263,6 +231,12 @@ export default class RecruitmentController {
   // Advanced search with more complex filtering
   async advancedSearch(ctx: HttpContext) {
     const baseQuery = Recruitment.query()
+      .preload('sectionGroup', (query) => {
+        query.select('id', 'name')
+      })
+      .preload('user', (query) => {
+        query.select('id', 'fullName')
+      })
     const data = await advancedFilter(ctx, baseQuery)
 
     return {
@@ -277,6 +251,8 @@ export default class RecruitmentController {
           'status',
           'statusUpdatedAt',
           'comment',
+          'sectionGroup.name',
+          'user.fullName',
         ],
       },
     }
@@ -293,8 +269,30 @@ export default class RecruitmentController {
     }
 
     // Use transaction for atomicity when performing multiple database operations
+    //   const mergedRecruitment = await db.transaction(async (trx) => {
+    //     // <--- CHANGE HERE
+    //     const rec1 = await Recruitment.query()
+    //       .useTransaction(trx)
+    //       .where('id', recruitmentId1)
+    //       .firstOrFail()
+    //     const rec2 = await Recruitment.query()
+    //       .useTransaction(trx)
+    //       .where('id', recruitmentId2)
+    //       .firstOrFail()
+
+    //     // Apply updates to rec1 from validated fields, respecting `undefined` for optional fields
+    //     rec1.merge(fieldsToUpdate)
+
+    //     await rec1.save()
+    //     await rec2.delete() // Delete the merged-into record
+
+    //     return rec1
+    //   })
+
+    //   return ctx.response.ok({ message: 'Recruitments merged successfully', data: mergedRecruitment })
+    // }
+
     const mergedRecruitment = await db.transaction(async (trx) => {
-      // <--- CHANGE HERE
       const rec1 = await Recruitment.query()
         .useTransaction(trx)
         .where('id', recruitmentId1)
@@ -304,11 +302,50 @@ export default class RecruitmentController {
         .where('id', recruitmentId2)
         .firstOrFail()
 
-      // Apply updates to rec1 from validated fields, respecting `undefined` for optional fields
-      rec1.merge(fieldsToUpdate)
+      let newContactDateForMerge: DateTime | null | undefined = rec1.contactDate
+      let newContactedByForMerge: number | null | undefined = rec1.contactedBy
+
+      const incomingStatus: RecruitmentStatus | undefined = fieldsToUpdate.status
+      const oldStatus: RecruitmentStatus = rec1.status
+
+      if (incomingStatus !== undefined) {
+        if (oldStatus === 'not yet contacted' && incomingStatus !== 'not yet contacted') {
+          newContactDateForMerge = DateTime.now().toUTC()
+          newContactedByForMerge = fieldsToUpdate.contactedBy ?? null
+        } else if (incomingStatus === 'not yet contacted') {
+          newContactDateForMerge = null
+          newContactedByForMerge = null
+        } else {
+          newContactDateForMerge = fieldsToUpdate.contactDate ?? rec1.contactDate
+          newContactedByForMerge = fieldsToUpdate.contactedBy ?? rec1.contactedBy
+        }
+      } else {
+        newContactDateForMerge = fieldsToUpdate.contactDate ?? rec1.contactDate
+        newContactedByForMerge = fieldsToUpdate.contactedBy ?? rec1.contactedBy
+      }
+
+      const finalPayloadForMerge = { ...fieldsToUpdate }
+
+      if (newContactDateForMerge === null) {
+        finalPayloadForMerge.contactDate = undefined
+      } else if (newContactDateForMerge instanceof DateTime) {
+        finalPayloadForMerge.contactDate = newContactDateForMerge
+      } else {
+        delete finalPayloadForMerge.contactDate
+      }
+
+      if (newContactedByForMerge === null) {
+        finalPayloadForMerge.contactedBy = undefined
+      } else if (newContactedByForMerge !== undefined) {
+        finalPayloadForMerge.contactedBy = newContactedByForMerge
+      } else {
+        delete finalPayloadForMerge.contactedBy
+      }
+
+      rec1.merge(finalPayloadForMerge)
 
       await rec1.save()
-      await rec2.delete() // Delete the merged-into record
+      await rec2.delete()
 
       return rec1
     })
@@ -321,24 +358,69 @@ export default class RecruitmentController {
    * This method now assumes NO ID is passed and always creates a new record.
    * If you need an `upsert` functionality, you'd create a separate method for it.
    */
+  // async store(ctx: HttpContext) {
+  //   const payload = await ctx.request.validateUsing(createRecruitmentValidator)
+
+  //   // Check for existing recruitment based on first and last name BEFORE creation
+  //   // This is a business logic decision. Adjust if uniqueness rules differ.
+  //   const existing = await Recruitment.query()
+  //     .where('firstName', payload.firstName)
+  //     .andWhere('lastName', payload.lastName)
+  //     .first()
+
+  //   if (existing) {
+  //     // You might return 409 Conflict if you don't want duplicates
+  //     return ctx.response.conflict({
+  //       message: 'Recruitment with this first and last name already exists.',
+  //     })
+  //   }
+
+  //   const recruitment = await Recruitment.create(payload)
+
+  //   return ctx.response.created({ message: 'Recruitment created successfully', data: recruitment })
+  // }
+
   async store(ctx: HttpContext) {
     const payload = await ctx.request.validateUsing(createRecruitmentValidator)
 
-    // Check for existing recruitment based on first and last name BEFORE creation
-    // This is a business logic decision. Adjust if uniqueness rules differ.
     const existing = await Recruitment.query()
       .where('firstName', payload.firstName)
       .andWhere('lastName', payload.lastName)
       .first()
 
     if (existing) {
-      // You might return 409 Conflict if you don't want duplicates
       return ctx.response.conflict({
         message: 'Recruitment with this first and last name already exists.',
       })
     }
 
-    const recruitment = await Recruitment.create(payload)
+    const finalStatus: RecruitmentStatus = payload.status || 'not yet contacted'
+
+    // The validator now correctly allows contactDate and contactedBy to be null or undefined
+    // when status is 'not yet contacted'. We can directly use payload values.
+    let contactDateForCreate: DateTime | null | undefined = payload.contactDate
+    let contactedByForCreate: number | null | undefined = payload.contactedBy
+
+    if (finalStatus === 'not yet contacted') {
+      // For 'not yet contacted', ensure contactDate and contactedBy are null (or undefined for DB)
+      contactDateForCreate = null // Will store as NULL in DB
+      contactedByForCreate = null // Will store as NULL in DB
+    } else {
+      // If status is not 'not yet contacted', ensure contactDate is present.
+      // If not provided in payload, default to now.
+      contactDateForCreate = payload.contactDate ?? DateTime.now().toUTC()
+      contactedByForCreate = payload.contactedBy ?? null // If not provided, allow null.
+    }
+
+    const recruitment = await Recruitment.create({
+      firstName: payload.firstName,
+      lastName: payload.lastName,
+      sectionGroupId: payload.sectionGroupId,
+      comment: payload.comment,
+      status: finalStatus,
+      contactDate: contactDateForCreate,
+      contactedBy: contactedByForCreate,
+    })
 
     return ctx.response.created({ message: 'Recruitment created successfully', data: recruitment })
   }
@@ -347,6 +429,48 @@ export default class RecruitmentController {
    * Updates an existing recruitment record.
    * This should be a separate method from creation and accept an ID in params.
    */
+  // async update({ params, request, response }: HttpContext) {
+  //   const recruitment = await Recruitment.find(params.id)
+
+  //   if (!recruitment) {
+  //     return response.notFound({ message: 'Recruitment not found' })
+  //   }
+
+  //   const updatePayload = await request.validateUsing(
+  //     vine.compile(
+  //       vine.object({
+  //         firstName: vine.string().trim().optional(),
+  //         lastName: vine.string().trim().optional(),
+  //         sectionGroupId: vine.number().optional(),
+  //         contactDate: vine
+  //           .string()
+  //           .transform((val) => DateTime.fromISO(val))
+  //           .optional(),
+  //         contactedBy: vine.number().optional(),
+  //         status: vine
+  //           .enum([
+  //             'awaiting response',
+  //             'interested',
+  //             'participating',
+  //             'registered',
+  //             'not available',
+  //             'to be contacted',
+  //             'cancelled',
+  //             'other',
+  //             'withdrawn',
+  //           ])
+  //           .optional(),
+  //         comment: vine.string().trim().optional().nullable(),
+  //       })
+  //     )
+  //   )
+
+  //   recruitment.merge(updatePayload)
+  //   await recruitment.save()
+
+  //   return response.ok({ message: 'Recruitment updated successfully', data: recruitment })
+  // }
+
   async update({ params, request, response }: HttpContext) {
     const recruitment = await Recruitment.find(params.id)
 
@@ -354,36 +478,35 @@ export default class RecruitmentController {
       return response.notFound({ message: 'Recruitment not found' })
     }
 
-    const updatePayload = await request.validateUsing(
-      vine.compile(
-        vine.object({
-          firstName: vine.string().trim().optional(),
-          lastName: vine.string().trim().optional(),
-          sectionGroupId: vine.number().optional(),
-          contactDate: vine
-            .string()
-            .transform((val) => DateTime.fromISO(val))
-            .optional(),
-          contactedBy: vine.number().optional(),
-          status: vine
-            .enum([
-              'awaiting response',
-              'interested',
-              'participating',
-              'registered',
-              'not available',
-              'to be contacted',
-              'cancelled',
-              'other',
-              'withdrawn',
-            ])
-            .optional(),
-          comment: vine.string().trim().optional().nullable(),
-        })
-      )
-    )
+    const updatePayload = await request.validateUsing(mergeRecruitmentsValidator)
 
-    recruitment.merge(updatePayload)
+    let newContactDateValue: DateTime | null | undefined = recruitment.contactDate
+    let newContactedByValue: number | null | undefined = recruitment.contactedBy
+
+    const incomingStatus: RecruitmentStatus | undefined = updatePayload.status
+    const oldStatus: RecruitmentStatus = recruitment.status
+
+    if (incomingStatus !== undefined) {
+      if (oldStatus === 'not yet contacted' && incomingStatus !== 'not yet contacted') {
+        newContactDateValue = DateTime.now().toUTC()
+        newContactedByValue = updatePayload.contactedBy ?? recruitment.contactedBy
+      } else if (incomingStatus === 'not yet contacted') {
+        newContactDateValue = null
+        newContactedByValue = null
+      } else {
+        newContactDateValue = updatePayload.contactDate ?? recruitment.contactDate
+        newContactedByValue = updatePayload.contactedBy ?? recruitment.contactedBy
+      }
+    } else {
+      newContactDateValue = updatePayload.contactDate ?? recruitment.contactDate
+      newContactedByValue = updatePayload.contactedBy ?? recruitment.contactedBy
+    }
+
+    recruitment.merge({
+      ...updatePayload,
+      contactDate: newContactDateValue,
+      contactedBy: newContactedByValue,
+    })
     await recruitment.save()
 
     return response.ok({ message: 'Recruitment updated successfully', data: recruitment })
@@ -399,54 +522,6 @@ export default class RecruitmentController {
     await recruitment.delete()
     return response.noContent()
   }
-
-  /**
-   * Endpoint to perform the status update based on a provided datetime.
-   */
-
-  // async checkAndUpdateStatuses({ request, response }: HttpContext) {
-  //   try {
-  //     // ✅ Validate daysThreshold from frontend
-  //     const { daysThreshold } = await vine
-  //       .compile(
-  //         vine.object({
-  //           daysThreshold: vine.number().min(1).max(365),
-  //         })
-  //       )
-  //       .validate(request.all())
-
-  //     const now = DateTime.now().startOf('day')
-
-  //     // ✅ Fetch all "awaiting response" recruitments
-  //     const recruitments = await Recruitment.query().where('status', 'awaiting response')
-
-  //     let updatedCount = 0
-
-  //     for (const recruitment of recruitments) {
-  //       if (!recruitment.contactDate) continue
-
-  //       const contactDate = recruitment.contactDate.startOf('day')
-  //       const daysSinceContact = now.diff(contactDate, 'days').days
-
-  //       if (daysSinceContact > daysThreshold) {
-  //         recruitment.status = 'to be contacted'
-  //         recruitment.statusUpdatedAt = DateTime.now()
-  //         await recruitment.save()
-  //         updatedCount++
-  //       }
-  //     }
-
-  //     return response.ok({
-  //       message: `Updated ${updatedCount} recruitment(s) to "to be contacted" based on ${daysThreshold}-day threshold.`,
-  //       updatedCount,
-  //     })
-  //   } catch (error) {
-  //     return response.badRequest({
-  //       message: 'Failed to process status update by threshold.',
-  //       error: error.message,
-  //     })
-  //   }
-  // }
 
   async checkAndUpdateStatuses({ request, response }: HttpContext) {
     try {
@@ -472,13 +547,13 @@ export default class RecruitmentController {
         const diffInDays = now.diff(contactDate, 'days').days
 
         if (diffInDays > daysThreshold && recruitment.status === 'awaiting response') {
-          recruitment.status = 'to be contacted'
+          recruitment.status = 'to follow up'
           recruitment.statusUpdatedAt = DateTime.now()
           await recruitment.save()
           updatedCount++
         }
 
-        if (diffInDays <= daysThreshold && recruitment.status === 'to be contacted') {
+        if (diffInDays <= daysThreshold && recruitment.status === 'to follow up') {
           recruitment.status = 'awaiting response'
           recruitment.statusUpdatedAt = DateTime.now()
           await recruitment.save()

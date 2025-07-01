@@ -59,7 +59,7 @@ export default class extends BaseSchema {
         .onDelete('RESTRICT')
 
       table.date('contact_date').nullable() // updated
-      table.integer('calculate_status').defaultTo(14).notNullable()
+
       table
         .integer('contacted_by')
         .unsigned()
@@ -81,10 +81,11 @@ export default class extends BaseSchema {
           'other',
         ])
         .notNullable()
+        .defaultTo('not yet contacted')
 
       table.timestamp('status_updated_at', { useTz: true }).defaultTo(this.now()).notNullable()
 
-      table.text('comment').notNullable()
+      table.text('comment').nullable()
       table.timestamp('created_at', { useTz: true }).notNullable()
       table.timestamp('updated_at', { useTz: true }).notNullable()
     })

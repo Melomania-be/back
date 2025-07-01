@@ -94,20 +94,22 @@ export const createRecruitmentValidator = vine.compile(
     lastName: vine.string().trim(),
     sectionGroupId: vine.number(), // Corrected: Remove .notNullable()
     contactDate: vine
-      .string() // Expecting an ISO string date
-      .transform((val) => DateTime.fromISO(val)), // Corrected: Remove .notNullable()
-    contactedBy: vine.number(), // Corrected: Remove .notNullable()
+      .string() // Expecting an ISO string date for provided values
+      .transform((val) => (val ? DateTime.fromISO(val) : null)) // Transform to DateTime or null
+      .optional() // Field can be omitted
+      .nullable(),
+
+    contactedBy: vine.number().optional().nullable(), // Corrected: Remove .notNullable()
     status: vine.enum([
-      // Enforce specific status values
+      'not yet contacted', // ADDED
       'awaiting response',
       'interested',
       'participating',
       'registered',
       'not available',
-      'to be contacted',
+      'to follow up', // CHANGED from 'to be contacted'
       'cancelled',
       'other',
-      'withdrawn',
     ]), // Corrected: Remove .notNullable()
     comment: vine.string().trim().optional().nullable(), // .nullable() if null is acceptable AND optional() if the field itself can be missing
   })
@@ -121,21 +123,21 @@ export const mergeRecruitmentsValidator = vine.compile(
     lastName: vine.string().trim().optional(),
     contactDate: vine
       .string()
-      .transform((val) => DateTime.fromISO(val))
-      .optional(),
-    contactedBy: vine.number().optional(),
+      .transform((val) => (val ? DateTime.fromISO(val) : null))
+      .optional()
+      .nullable(),
+    contactedBy: vine.number().optional().nullable(),
     status: vine
       .enum([
-        // Enforce specific status values even if optional
+        'not yet contacted', // ADDED
         'awaiting response',
         'interested',
         'participating',
         'registered',
         'not available',
-        'to be contacted',
+        'to follow up', // CHANGED from 'to be contacted'
         'cancelled',
         'other',
-        'withdrawn',
       ])
       .optional(),
     statusUpdatedAt: vine
