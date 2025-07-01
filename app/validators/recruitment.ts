@@ -115,6 +115,38 @@ export const createRecruitmentValidator = vine.compile(
   })
 )
 
+export const updateRecruitmentValidator = vine.compile(
+  vine.object({
+    firstName: vine.string().trim().optional(),
+    lastName: vine.string().trim().optional(),
+    sectionGroupId: vine.number().optional(),
+
+    contactDate: vine
+      .string()
+      .transform((val) => (val ? DateTime.fromISO(val) : null))
+      .optional()
+      .nullable(),
+
+    contactedBy: vine.number().optional().nullable(),
+
+    status: vine
+      .enum([
+        'not yet contacted',
+        'awaiting response',
+        'interested',
+        'participating',
+        'registered',
+        'not available',
+        'to follow up',
+        'cancelled',
+        'other',
+      ])
+      .optional(), // Status itself is optional for update
+
+    comment: vine.string().trim().optional().nullable(),
+  })
+)
+
 export const mergeRecruitmentsValidator = vine.compile(
   vine.object({
     recruitmentId1: vine.number(), // Corrected: Remove .notNullable() - implicit for required fields
