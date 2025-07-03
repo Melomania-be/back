@@ -8,10 +8,26 @@ import Contact from '#models/contact'
 import Rehearsal from '#models/rehearsal'
 import Callsheet from './callsheet.js'
 import Concert from './concert.js'
+import Audition from './audition.js'  // ← Import manquant ajouté
 
 export default class Participant extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
+
+  // Colonnes pour les auditions
+  @column()
+  declare audition_status: 'none' | 'pending' | 'completed'
+
+  @column.dateTime()
+  declare audition_requested_at: DateTime | null
+
+  @column.dateTime()
+  declare audition_deadline: DateTime | null
+
+  @hasMany(() => Audition, {
+    foreignKey: 'participant_id',
+  })
+  declare auditions: HasMany<typeof Audition>
 
   @column()
   declare last_activity: Date

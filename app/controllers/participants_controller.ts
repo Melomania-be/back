@@ -129,6 +129,7 @@ export default class ParticipantsController {
   }
 
   //getApplications : gets list of all contacts that want to be participants at /projects/:id/management/validation
+  // Modifier la méthode getApplications pour inclure les auditions :
   async getApplications({ params }: HttpContext) {
     return await Participant.query()
       .where('project_id', params.id)
@@ -142,6 +143,36 @@ export default class ParticipantsController {
       .preload('rehearsals', (rehearsalsQuery) => {
         rehearsalsQuery.pivotColumns(['comment'])
       })
+      .preload('auditions', (auditionQuery) => {
+        auditionQuery.preload('files', (fileQuery) => {
+          fileQuery.preload('file')
+        })
+      })
+  }
+  // Ajouter cette nouvelle méthode pour gérer l'affichage des auditions dans la validation :
+  async getParticipantWithAuditions({ params }: HttpContext) {
+    const { id, participantId } = params
+    return await Participant.query()
+      .where('id', participantId)
+      .andWhere('project_id', id)
+      .preload('contact')
+      .preload('section')
+      .preload('answers')
+      .preload('concerts', (concertsQuery) => {
+        concertsQuery.pivotColumns(['comment'])
+      })
+      .preload('rehearsals', (rehearsalsQuery) => {
+        rehearsalsQuery.pivotColumns(['comment'])
+      })
+      .preload('project')
+      .preload('auditions', (auditionQuery) => {
+        auditionQuery
+          .preload('files', (fileQuery) => {
+            fileQuery.preload('file')
+          })
+          .orderBy('created_at', 'desc')
+      })
+      .first()
   }
 
   //validateParticipant : transforms the accepted field to true at /projects/:id/management/validation/:id
@@ -161,9 +192,9 @@ export default class ParticipantsController {
     return response.send('Participant validated')
   }
 
-  //delete : deletes a participant from the given project at /projects/:id/management/participants/:id
   async delete({ params, response }: HttpContext) {
     const { id, participantId } = params
+
     const participant = await Participant.query()
       .where('id', participantId)
       .andWhere('project_id', id)
@@ -173,35 +204,11 @@ export default class ParticipantsController {
       return response.send("Can't find this participant in this project")
     }
 
+    await participant.related('concerts').detach()
+    await participant.related('rehearsals').detach()
+
     await participant.delete()
+
     return response.send('Participant deleted from the project')
   }
-
-async getParticipantsCountBySection(ctx: HttpContext) {
-  const projectId = ctx.params.id;
-
-  // On construit la requête sur Participant
-  const baseQuery = Participant.query()
-    .where('project_id', projectId)
-    .andWhere('accepted', true)
-    .select('section_id')
-    .count('id as participants_count')
-    .groupBy('section_id')
-    .preload('section', (query) => {
-      query.select('id', 'name');
-    });
-
-  const counts = await baseQuery;
-
-  // On mappe le résultat pour ne garder que l'essentiel
-  const result = counts.map((item) => ({
-    section_id: item.section_id,
-    section_name: item.section ? item.section.name : null,
-    participants_count: Number(item.$extras.participants_count) || 0,
-  }));
-
-  return result;
-}
-
-
 }

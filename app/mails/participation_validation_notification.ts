@@ -88,7 +88,7 @@ export default class ParticipationValidationNotification extends BaseMail {
 
     this.message
       .to(this.contact.email)
-      .from(`Melomania <${env.get('SMTP_USERNAME')}>`)
+      .from(env.get('SMTP_USERNAME'))
       .subject('Your participation to ' + this.project.name)
       .html(htmlContent)
   }
