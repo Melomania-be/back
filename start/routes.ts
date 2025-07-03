@@ -29,12 +29,13 @@ const FormsController = () => import('#controllers/forms_controller')
 const SectionsController = () => import('#controllers/sections_controller')
 const TemplateController = () => import('#controllers/template_controller')
 const DefaultTemplatesController = () => import('#controllers/default_templates_controller')
+const RecruitmentsController = () => import('#controllers/recruitments_controller')
 
 router.group(() => {
   //open routes
 
   router.get('/test-public-route', async () => {
-  return { ok: true }
+    return { ok: true }
   })
   router.group(() => {
     router.get('/', async () => {
@@ -51,16 +52,50 @@ router.group(() => {
     router.get('/call_sheets/:id/:visitorId', [CallsheetsController, 'getOne'])
     router.get('/files/download/:id', [FilesController, 'download'])
 
-    router.get('/projects/:id/public/participants-count', [ParticipantsController, 'getParticipantsCountBySection'])
+    router.get('/projects/:id/public/participants-count', [
+      ParticipantsController,
+      'getParticipantsCountBySection',
+    ])
   })
 
   //protected routes
   router
     .group(() => {
       router.group(() => {
+        // GET all recruitments with simple filtering
+        // router.get('/recruitments', [RecruitmentsController, 'getAll'])
+
+        // GET a single recruitment by ID
+        router.get('/recruitments/:id', [RecruitmentsController, 'getOne'])
+
+        // POST for creating a new recruitment
+        router.post('/recruitments', [RecruitmentsController, 'store'])
+
+        // PUT for updating an existing recruitment (use :id in URL)
+        router.put('/recruitments/:id', [RecruitmentsController, 'update'])
+
+        // DELETE a recruitment by ID
+        router.delete('/recruitments/:id', [RecruitmentsController, 'destroy'])
+
+        // POST for advanced search (often uses POST because filters can be complex in body)
+        router.post('/recruitments/search/advanced', [RecruitmentsController, 'advancedSearch'])
+
+        // POST for merging recruitments
+        router.post('/recruitments/merge', [RecruitmentsController, 'mergeRecruitments'])
+        router.post('/recruitments/check-status', [
+          RecruitmentsController,
+          'checkAndUpdateStatuses',
+        ])
+        // New Lookup Endpoints for dropdowns
+        // router.get('/users', [RecruitmentsController, 'getUsers'])
+        router.get('/section-groups', [RecruitmentsController, 'getSectionGroups'])
+      })
+
+      router.group(() => {
         router.get('/composer', [ComposersController, 'getAll'])
         router.get('/composer/:id/pieces', [ComposersController, 'getPieces'])
         router.put('/composer', [ComposersController, 'createOrUpdate'])
+        router.get('/recruitments', [RecruitmentsController, 'getAll'])
         router.delete('/composer/:id', [ComposersController, 'delete'])
       })
 
