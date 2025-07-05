@@ -1,4 +1,4 @@
-// app/controllers/auditions_controller.ts - Version complète avec pièces jointes PDF
+// app/controllers/auditions_controller.ts - Version complète avec pièces jointes PDF et corrections
 
 import { HttpContext } from '@adonisjs/core/http'
 import Audition from '#models/audition'
@@ -334,6 +334,7 @@ export default class AuditionsController {
                 name: af.file.name || 'Nom de fichier non disponible',
                 type: af.file.type || 'Type inconnu',
                 path: af.file.path || '',
+                size: af.file.size || 0, // ✅ Ajout de la taille si disponible
               },
             })),
 
@@ -351,6 +352,7 @@ export default class AuditionsController {
                 name: apf.file.name || 'Nom de fichier non disponible',
                 type: apf.file.type || 'application/pdf',
                 path: apf.file.path || '',
+                size: apf.file.size || 0, // ✅ Ajout de la taille si disponible
               },
             })),
           }
@@ -456,7 +458,8 @@ export default class AuditionsController {
         name: file.clientName,
         type: file.type || 'application/pdf',
         content: '',
-        path: file.filePath
+        path: file.filePath,
+
       })
 
       console.log('✅ PDF file saved in database:', savedFile.id)
@@ -641,7 +644,8 @@ export default class AuditionsController {
             id: sectionPdf.file.id,
             name: sectionPdf.file.name,
             type: sectionPdf.file.type,
-            path: sectionPdf.file.path
+            path: sectionPdf.file.path,
+            size: sectionPdf.file.size || 0
           },
           usage_count: parseInt(usageCount[0].$extras.total || '0')
         })
@@ -949,6 +953,7 @@ export default class AuditionsController {
           name: file.name,
           type: file.type,
           path: file.path,
+          size: file.size || 0,
           created_at: file.createdAt
         })),
         section_pdfs: sectionPdfs.map(sp => ({
@@ -1073,7 +1078,8 @@ export default class AuditionsController {
           file: {
             id: af.file.id,
             name: af.file.name,
-            type: af.file.type
+            type: af.file.type,
+            size: af.file.size || 0
           }
         })),
         // ✅ CORRECTION : Utiliser apf.section.name au lieu de audition.participant.section.name
@@ -1086,7 +1092,8 @@ export default class AuditionsController {
           file: {
             id: apf.file.id,
             name: apf.file.name,
-            type: apf.file.type
+            type: apf.file.type,
+            size: apf.file.size || 0
           }
         }))
       })
@@ -1150,7 +1157,8 @@ export default class AuditionsController {
         name: file.clientName,
         type: file.type || 'application/octet-stream',
         content: '',
-        path: file.filePath
+        path: file.filePath,
+
       })
 
       // Créer l'association audition-fichier
@@ -1173,7 +1181,8 @@ export default class AuditionsController {
           file: {
             id: savedFile.id,
             name: savedFile.name,
-            type: savedFile.type
+            type: savedFile.type,
+            size: savedFile.size || 0
           }
         }
       })
@@ -1362,7 +1371,8 @@ export default class AuditionsController {
           file: {
             id: apf.file.id,
             name: apf.file.name,
-            type: apf.file.type
+            type: apf.file.type,
+            size: apf.file.size || 0
           }
         }))
       )
@@ -1410,7 +1420,6 @@ export default class AuditionsController {
 
       // ✅ CORRECTION : Vérifier que le fichier existe physiquement
       const fs = await import('node:fs/promises')
-      const path = await import('node:path')
 
       try {
         await fs.access(file.path)
@@ -1478,7 +1487,8 @@ export default class AuditionsController {
         name: file.clientName,
         type: file.type || 'application/pdf',
         content: '',
-        path: file.filePath
+        path: file.filePath,
+        size: file.size || 0
       })
 
       // Créer l'association dans section_pdfs
@@ -1501,7 +1511,8 @@ export default class AuditionsController {
           file: {
             id: savedFile.id,
             name: savedFile.name,
-            type: savedFile.type
+            type: savedFile.type,
+            size: savedFile.size || 0
           }
         }
       })

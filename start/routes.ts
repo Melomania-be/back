@@ -46,8 +46,10 @@ router.group(() => {
   // Authentication
   router.post('/sign_in', [UsersController, 'signIn'])
 
-  // Public file download
+  // ✅ ROUTES FICHIERS PUBLIQUES ÉTENDUES
   router.get('/files/download/:id', [FilesController, 'download'])
+  router.get('/files/stream/:id', [FilesController, 'stream'])     // ← NOUVELLE ROUTE STREAMING
+  router.get('/files/info/:id', [FilesController, 'info'])         // ← NOUVELLE ROUTE INFO (debug)
 
   // Recommend someone (public)
   router.post('/recommend_someone', [RecommendSomeonesController, 'create'])
@@ -152,6 +154,9 @@ router.group(() => {
               // Obtenir tous les PDFs groupés par section
               router.get('/pdfs', [AuditionsController, 'getProjectPdfs'])
 
+              // ✅ NOUVELLE ROUTE : Statistiques PDF par section
+              router.get('/section-pdfs', [AuditionsController, 'getProjectPdfs'])
+
               // Envoyer des PDFs en masse à une section
               router.post('/bulk-send-pdfs', [AuditionsController, 'bulkSendPdfsToSection'])
 
@@ -164,6 +169,7 @@ router.group(() => {
                 'removePdfFromSection',
               ])
 
+              // ✅ ROUTE DE DEBUG (à supprimer en production)
               router.get('/debug-files', [AuditionsController, 'debugFiles'])
             })
             .prefix('/:id/management/auditions')
@@ -246,7 +252,7 @@ router.group(() => {
         .prefix('/type_of_pieces')
 
       // =============================================================================
-      // GESTION DES FICHIERS
+      // GESTION DES FICHIERS (PROTÉGÉE)
       // =============================================================================
       router
         .group(() => {
@@ -254,6 +260,9 @@ router.group(() => {
           router.get('/', [FilesController, 'getAll'])
           router.put('/:id', [FilesController, 'update'])
           router.delete('/:id', [FilesController, 'delete'])
+
+          // ✅ ROUTES ADDITIONNELLES POUR ADMIN
+          router.get('/:id/info', [FilesController, 'info'])     // Info détaillée sur un fichier
         })
         .prefix('/files')
 
