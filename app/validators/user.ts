@@ -6,6 +6,7 @@ import vine from '@vinejs/vine'
 
 export const userLoginValidator = vine.compile(
   vine.object({
+   
     email: vine.string().email(),
     password: vine.string(),
   })
@@ -16,6 +17,7 @@ export const userLoginValidator = vine.compile(
  */
 export const userCreationValidator = vine.compile(
   vine.object({
+     full_name: vine.string(),
     email: vine.string().email(),
     password: vine.string().confirmed(),
   })

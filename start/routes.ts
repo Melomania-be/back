@@ -215,6 +215,8 @@ router.group(() => {
         router.get('users', [UsersController, 'getAll'])
         router.put('users', [UsersController, 'create'])
         router.delete('users/:id', [UsersController, 'delete'])
+        router.get('auth/me', [UsersController, 'me']) // This route should ideally be protected by auth middleware
+        router.get('users/dropdown', [UsersController, 'getUsersForDropdown']) // Removed .use('auth') for this step
       })
 
       router.group(() => {

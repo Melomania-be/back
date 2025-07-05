@@ -25,6 +25,41 @@ export default class UsersController {
     return reworkedUsers
   }
 
+
+async me({ auth, response }: HttpContext) {
+    try {
+      // Authenticate the user using the 'api' guard (e.g., token-based auth)
+      const user = await auth.use('api').authenticate()
+
+      // Return a sanitized version of the user (e.g., without password hash)
+      const userResponse = user.serialize()
+      userResponse.password = 'hidden' // Ensure password hash is not sent to frontend
+
+      return response.ok({ message: 'User details fetched successfully.', data: userResponse })
+    } catch (error) {
+      console.error('Error fetching current user details:', error)
+      // If authentication fails (e.g., no token, invalid token), AdonisJS's global
+      // exception handler will typically return a 401 Unauthorized.
+      // For other unexpected errors, return a generic 500.
+      if (error.code === 'E_UNAUTHORIZED_ACCESS') { // Specific AdonisJS auth error code
+        return response.unauthorized({ message: 'Authentication required to access user details.' });
+      }
+      return response.internalServerError({ message: 'Failed to fetch user details.' })
+    }
+  }
+
+
+  async getUsersForDropdown({ response }: HttpContext) {
+    try {
+      const users = await User.query().select('id', 'fullName').orderBy('fullName', 'asc')
+      return response.ok(users)
+    } catch (error) {
+      console.error('Error fetching users for dropdown:', error)
+      return response.internalServerError({ message: 'Failed to retrieve user list.' })
+    }
+  }
+  
+
   async signIn(ctx: HttpContext) {
     const credentials = await ctx.request.validateUsing(userLoginValidator)
     const user = await User.verifyCredentials(credentials.email, credentials.password)
