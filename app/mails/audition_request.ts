@@ -1,4 +1,4 @@
-// app/mails/audition_request.ts - Version avec variables standardisées
+// app/mails/audition_request.ts - Version avec détection automatique d'environnement
 
 import env from '#start/env'
 import { BaseMail } from '@adonisjs/mail'
@@ -28,8 +28,62 @@ export default class AuditionRequest extends BaseMail {
     super()
   }
 
+  /**
+   * 🎯 DÉTECTION AUTOMATIQUE D'ENVIRONNEMENT
+   * Détermine l'URL frontend correcte selon l'environnement de déploiement
+   */
+  private getFrontendUrl(): string {
+    const envUrl = env.get('FRONTEND_URL')
+    const nodeEnv = env.get('NODE_ENV', 'development')
+    const host = env.get('HOST', 'localhost')
+    const port = env.get('PORT', '3333')
+
+    console.log('🔍 Environment detection:', {
+      FRONTEND_URL: envUrl,
+      NODE_ENV: nodeEnv,
+      HOST: host,
+      PORT: port
+    })
+
+    // Si FRONTEND_URL est définie explicitement et n'est pas localhost, l'utiliser
+    if (envUrl && !envUrl.includes('localhost')) {
+      console.log(`🌐 Using explicit FRONTEND_URL: ${envUrl}`)
+      return envUrl
+    }
+
+    // Détection automatique basée sur HOST et NODE_ENV
+    if (host !== 'localhost' && host !== '127.0.0.1') {
+      // On est sur un serveur distant
+
+      if (nodeEnv === 'development' || host.includes('universe.wf')) {
+        // Serveur de test (détection par domaine universe.wf)
+        const frontendUrl = 'http://tool.sc1ciro3903.universe.wf'
+        console.log(`🧪 Auto-detected TEST environment: ${frontendUrl}`)
+        return frontendUrl
+      }
+
+      if (nodeEnv === 'production' || host.includes('melomania.be')) {
+        // Serveur de production (détection par domaine melomania.be)
+        const frontendUrl = 'https://tool.melomania.be'
+        console.log(`🚀 Auto-detected PRODUCTION environment: ${frontendUrl}`)
+        return frontendUrl
+      }
+
+      // Fallback pour serveur distant non reconnu
+      const protocol = nodeEnv === 'production' ? 'https' : 'http'
+      const frontendUrl = `${protocol}://${host}`
+      console.log(`⚡ Auto-detected REMOTE server: ${frontendUrl}`)
+      return frontendUrl
+    }
+
+    // Développement local
+    const frontendUrl = envUrl || 'http://localhost:5173'
+    console.log(`🔧 Using LOCAL development: ${frontendUrl}`)
+    return frontendUrl
+  }
+
   async prepare() {
-    const frontendUrl = env.get('FRONTEND_URL') || 'http://localhost:5173'
+    const frontendUrl = this.getFrontendUrl()
     const logoPath = path.join(
       currentDirname,
       '..',
@@ -47,6 +101,10 @@ export default class AuditionRequest extends BaseMail {
       .orderBy('title', 'asc')
 
     console.log(`📧 Preparing audition email for ${this.contact.email} with ${pdfFiles.length} PDF attachments`)
+
+    // 🎯 GÉNÉRATION DU LIEN D'AUDITION
+    const auditionUploadUrl = `${frontendUrl}/audition/${this.audition.secure_token}`
+    console.log(`🎭 Generated audition link: ${auditionUploadUrl}`)
 
     let htmlContent = ''
     let template = await MailTemplate.query().where('name', 'audition_request.html').first()
@@ -289,7 +347,7 @@ export default class AuditionRequest extends BaseMail {
     }
 
     // Préparer les informations de contact formatées
-    const toContactDetails = this.responsible ? 
+    const toContactDetails = this.responsible ?
       `${this.responsible.first_name || ''} ${this.responsible.last_name || ''}
        Email: ${this.responsible.email || 'No email provided'}
        Phone: ${this.responsible.phone || 'No phone provided'}
@@ -297,21 +355,21 @@ export default class AuditionRequest extends BaseMail {
       'No contact details available'
 
     const auditionInstructions = this.audition.instructions || 'Please prepare your best musical performance.'
-    
+
     const deadlineBlock = this.audition.deadline
       ? `<div class="deadline">
           ⏰ <strong>Deadline:</strong> ${this.audition.deadline.toFormat('dd/MM/yyyy at HH:mm')}
          </div>`
       : ''
 
-    const attachmentsSection = pdfFiles.length > 0 
+    const attachmentsSection = pdfFiles.length > 0
       ? `<div class="attachments-section">
           <h3 style="margin-top: 0; color: #0369a1; display: flex; align-items: center;">
             <span style="margin-right: 10px;">📎</span>
             Sheet Music Attached (${pdfFiles.length} file${pdfFiles.length > 1 ? 's' : ''})
           </h3>
           <p style="margin-bottom: 15px; color: #0c4a6e;">The following PDF files are attached to this email:</p>
-          
+
           ${pdfFiles.map(pdf => `
           <div class="attachment-item">
             <div style="display: flex; align-items: center;">
@@ -323,7 +381,7 @@ export default class AuditionRequest extends BaseMail {
             </div>
             <span class="attachment-badge">PDF</span>
           </div>`).join('')}
-          
+
           <p style="font-size: 14px; color: #475569; margin-top: 15px; font-style: italic;">
             💡 <strong>Tip:</strong> If you don't see the attachments, they can also be downloaded from the audition portal.
           </p>
@@ -335,8 +393,6 @@ export default class AuditionRequest extends BaseMail {
           </h3>
           <p style="color: #0c4a6e;">Sheet music will be provided via the audition portal.</p>
         </div>`
-
-    const auditionUploadUrl = `${frontendUrl}/audition/${this.audition.secure_token}`
 
     // Remplacer toutes les variables standardisées dans le template
     htmlContent = htmlContent
