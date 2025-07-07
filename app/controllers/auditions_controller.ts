@@ -140,10 +140,10 @@ export default class AuditionsController {
       const associatedPdfsCount = await this.associateSectionPdfsToAudition(audition.id, participant.section_id, params.id)
       console.log(`📎 Associated ${associatedPdfsCount} PDFs to the audition`)
 
-      // ✅ CORRECTION DATETIME : Mettre à jour le statut du participant avec DateTime (pas de conversion)
+      // ✅ CORRECTION : Mettre à jour le statut du participant avec DateTime (pas de conversion en Date)
       participant.audition_status = 'pending' as 'pending' // ✅ Cast explicite pour éviter l'erreur de type
       participant.audition_requested_at = DateTime.now() // ✅ Garder DateTime
-      participant.audition_deadline = deadline // ✅ Garder DateTime (peut être null)
+      participant.audition_deadline = deadline // ✅ Garder l'objet DateTime (peut être null)
       await participant.save()
 
       console.log(`✅ Participant status updated to 'pending'`)
