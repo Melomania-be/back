@@ -15,7 +15,7 @@ const currentFilename = fileURLToPath(import.meta.url)
 const currentDirname = path.dirname(currentFilename)
 
 export default class AuditionRequest extends BaseMail {
-  from = env.get('SMTP_USERNAME') || 'benskotlemogo@gmail.com'
+  from: string
   subject = "Audition Request with Sheet Music"
 
   constructor(
@@ -26,6 +26,7 @@ export default class AuditionRequest extends BaseMail {
     private responsible: any = null
   ) {
     super()
+    this.from = env.get('SMTP_USERNAME')
   }
 
   /**
@@ -408,7 +409,7 @@ export default class AuditionRequest extends BaseMail {
     // Configuration du message de base
     this.message
       .to(this.contact.email)
-      .from(this.from)
+      .from(`Melomania <${env.get('SMTP_USERNAME')}>`)
       .subject(`${this.subject}${pdfFiles.length > 0 ? ` - ${pdfFiles.length} sheet music file(s) attached` : ''}`)
       .html(htmlContent)
       .attach(logoPath, { cid: 'logoMelomania.png' } as any)

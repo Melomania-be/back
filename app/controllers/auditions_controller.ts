@@ -122,14 +122,14 @@ export default class AuditionsController {
         }
       }
 
-      // Créer l'audition avec initialisation explicite
+      // ✅ CORRECTION : Créer l'audition avec DateTime (pas de conversion)
       const audition = await Audition.create({
         participant_id: participant.id,
         project_id: params.id,
         secure_token: secureToken,
         instructions: data.instructions || '',
         required_files: data.required_files || [],
-        deadline: deadline,
+        deadline: deadline, // ✅ Garder l'objet DateTime
         is_submitted: false,
         candidate_notes: '',
       })
@@ -140,10 +140,10 @@ export default class AuditionsController {
       const associatedPdfsCount = await this.associateSectionPdfsToAudition(audition.id, participant.section_id, params.id)
       console.log(`📎 Associated ${associatedPdfsCount} PDFs to the audition`)
 
-      // Mettre à jour le statut du participant
-      participant.audition_status = 'pending'
+      // ✅ CORRECTION : Mettre à jour le statut du participant avec type correct
+      participant.audition_status = 'pending' as 'pending' // ✅ Cast explicite pour éviter l'erreur de type
       participant.audition_requested_at = DateTime.now()
-      participant.audition_deadline = audition.deadline
+      participant.audition_deadline = deadline // ✅ Garder l'objet DateTime
       await participant.save()
 
       console.log(`✅ Participant status updated to 'pending'`)
@@ -264,9 +264,9 @@ export default class AuditionsController {
         .where('audition_id', audition.id)
         .delete()
 
-      // Réinitialiser le statut du participant
+      // ✅ CORRECTION : Réinitialiser le statut du participant avec gestion de null
       const participant = audition.participant
-      participant.audition_status = null
+      participant.audition_status = 'none' as 'none' // ✅ Utiliser 'none' au lieu de null
       participant.audition_requested_at = null
       participant.audition_deadline = null
       await participant.save()
@@ -334,7 +334,7 @@ export default class AuditionsController {
                 name: af.file.name || 'Nom de fichier non disponible',
                 type: af.file.type || 'Type inconnu',
                 path: af.file.path || '',
-                size: af.file.size || 0, // ✅ Ajout de la taille si disponible
+                size: af.file.size || 0, // ✅ Accès direct à la propriété size du modèle File
               },
             })),
 
@@ -352,7 +352,7 @@ export default class AuditionsController {
                 name: apf.file.name || 'Nom de fichier non disponible',
                 type: apf.file.type || 'application/pdf',
                 path: apf.file.path || '',
-                size: apf.file.size || 0, // ✅ Ajout de la taille si disponible
+                size: apf.file.size || 0, // ✅ Accès direct à la propriété size du modèle File
               },
             })),
           }
@@ -427,8 +427,8 @@ export default class AuditionsController {
         size: file.size
       })
 
-      // Vérifier que le projet et la section existent
-      const project = await Project.findOrFail(params.id)
+      // ✅ CORRECTION : Supprimer la variable project non utilisée
+      await Project.findOrFail(params.id) // Vérifier que le projet existe
       const section = await Section.findOrFail(section_id)
 
       // Générer un nom unique pour le fichier PDF
@@ -577,8 +577,13 @@ export default class AuditionsController {
 
       console.log('📄 Found section PDFs:', sectionPdfs.length)
 
-      // Grouper par section
-      const pdfsBySection = {}
+      // ✅ CORRECTION : Grouper par section avec typage correct
+      const pdfsBySection: Record<number, {
+        section_id: number
+        section_name: string
+        pdfs: any[]
+        auditions_count: number
+      }> = {}
 
       // Initialiser avec toutes les sections du projet
       if (project.sectionGroup && project.sectionGroup.sections) {
@@ -603,11 +608,11 @@ export default class AuditionsController {
 
       console.log('📊 Auditions per section:', auditionsPerSection)
 
-      // Ajouter le compte d'auditions
+      // ✅ CORRECTION : Ajouter le compte d'auditions avec typage correct
       for (const sectionCount of auditionsPerSection) {
-        const sectionId = sectionCount.$extras.section_id
+        const sectionId = Number(sectionCount.$extras.section_id)
         if (pdfsBySection[sectionId]) {
-          pdfsBySection[sectionId].auditions_count = parseInt(sectionCount.$extras.total)
+          pdfsBySection[sectionId].auditions_count = parseInt(String(sectionCount.$extras.total))
         }
       }
 
@@ -647,7 +652,7 @@ export default class AuditionsController {
             path: sectionPdf.file.path,
             size: sectionPdf.file.size || 0
           },
-          usage_count: parseInt(usageCount[0].$extras.total || '0')
+          usage_count: parseInt(String(usageCount[0].$extras.total || '0'))
         })
       }
 
@@ -699,7 +704,7 @@ export default class AuditionsController {
       console.log(`📤 Bulk sending ${pdf_files.length} PDFs to section ${section_id} in project ${params.id}`)
 
       // Vérifier que le projet et la section existent
-      const project = await Project.findOrFail(params.id)
+      await Project.findOrFail(params.id)
       const section = await Section.findOrFail(section_id)
 
       // Récupérer toutes les auditions actives pour cette section
@@ -725,7 +730,7 @@ export default class AuditionsController {
         try {
           for (const pdfData of pdf_files) {
             // Vérifier que le fichier existe
-            const file = await File.findOrFail(pdfData.file_id)
+            await File.findOrFail(pdfData.file_id)
 
             // Créer l'association (éviter les doublons)
             const existingAssociation = await AuditionPdfFile.query()
@@ -1323,7 +1328,7 @@ export default class AuditionsController {
 
       // Mettre à jour le statut du participant
       const participant = audition.participant
-      participant.audition_status = 'completed'
+      participant.audition_status = 'completed' as 'completed' // ✅ Cast explicite
       await participant.save()
 
       return response.ok({
@@ -1462,7 +1467,7 @@ export default class AuditionsController {
       const { file, title, description, section_id, order } = data
 
       // Vérifier que le projet et la section existent
-      const project = await Project.findOrFail(params.id)
+      await Project.findOrFail(params.id)
       const section = await Section.findOrFail(section_id)
 
       // Générer un nom unique pour le fichier PDF
