@@ -1,6 +1,6 @@
 import { HttpContext } from '@adonisjs/core/http'
 import Recruitment, { RecruitmentStatus } from '#models/recruitment'
-import { simpleFilter, advancedFilter } from 'adonisjs-filters'
+import { advancedFilter } from 'adonisjs-filters'
 import {
   createRecruitmentValidator,
   mergeRecruitmentsValidator,
@@ -61,31 +61,50 @@ export default class RecruitmentController {
     })
   }
 
-  async getAll(ctx: HttpContext) {
-    try {
-      const baseQuery = Recruitment.query()
-        .preload('sectionGroup', (query) => {
-          query.select('id', 'name')
-        })
-        .preload('user', (query) => {
-          query.select('id', 'fullName')
-        })
+  // async getAll(ctx: HttpContext) {
+  //   try {
+  //     const baseQuery = Recruitment.query()
+  //       .preload('sectionGroup', (query) => {
+  //         query.select('id', 'name')
+  //       })
+  //       .preload('user', (query) => {
+  //         query.select('id', 'fullName')
+  //       })
 
-      const results = await this.simpleFilter(
-        ctx,
-        baseQuery,
-        // Add 'sectionGroupId' and 'contactedBy' to the list of columns that can be filtered
-        ['firstName', 'lastName', 'comment', 'status', 'sectionGroupId', 'contactedBy'],
-        [] // Keep relation filtering empty unless you have specific nested filter needs
-      )
-      return results
-    } catch (error) {
-      console.error('Error in getAll:', error)
-      return ctx.response.internalServerError({
-        message: 'Failed to fetch recruitments.',
-        error: error.message,
+  //     const results = await this.simpleFilter(
+  //       ctx,
+  //       baseQuery,
+  //       // Add 'sectionGroupId' and 'contactedBy' to the list of columns that can be filtered
+  //       ['firstName', 'lastName', 'comment', 'status', 'sectionGroupId', 'contactedBy'],
+  //       [] // Keep relation filtering empty unless you have specific nested filter needs
+  //     )
+  //     return results
+  //   } catch (error) {
+  //     console.error('Error in getAll:', error)
+  //     return ctx.response.internalServerError({
+  //       message: 'Failed to fetch recruitments.',
+  //       error: error.message,
+  //     })
+  //   }
+  // }
+
+  async getAll(ctx: HttpContext) {
+    const baseQuery = Recruitment.query()
+      .preload('sectionGroup', (query) => {
+        query.select('id', 'name')
       })
-    }
+      .preload('user', (query) => {
+        query.select('id', 'fullName')
+      })
+
+    // --- MODIFIED: Call our new private filter method ---
+    const results = await this._applySimpleFilters(
+      ctx,
+      baseQuery,
+      ['firstName', 'lastName', 'comment', 'status', 'sectionGroupId', 'contactedBy', 'contactDate'] // Include contactDate here
+    )
+    // --- END MODIFIED ---
+    return results
   }
 
   private async simpleFilter(ctx: HttpContext, query: any, columns: string[], relations: string[]) {
@@ -108,6 +127,60 @@ export default class RecruitmentController {
         }
       }
     })
+
+    const results = await query
+    console.log('Filtered results:', results) // Debug log
+    return results
+  }
+
+  // --- NEW PRIVATE METHOD: _applySimpleFilters ---
+  private async _applySimpleFilters(
+    ctx: HttpContext,
+    query: any, // Use `any` for the query builder for flexibility
+    filterableColumns: string[]
+  ) {
+    const { request } = ctx
+    const filters = request.qs() // Get all query string parameters
+
+    for (const col of filterableColumns) {
+      const filterValue = filters[col]
+
+      // Only apply filter if the value is provided (not undefined, null, or empty string after trim)
+      if (filterValue !== undefined && filterValue !== null && String(filterValue).trim() !== '') {
+        console.log(`Applying filter: ${col} = ${filterValue}`) // Debug log
+
+        switch (col) {
+          case 'sectionGroupId':
+          case 'contactedBy':
+            // Cast to number for integer columns
+            const numericValue = Number(filterValue)
+            if (!isNaN(numericValue)) {
+              query.where(col, numericValue)
+            }
+            break
+          case 'contactDate':
+            // For date columns, ensure it's a valid date string (YYYY-MM-DD)
+            // The frontend sends YYYY-MM-DD, which matches database 'date' type
+            query.where(col, filterValue)
+            break
+          case 'firstName':
+          case 'lastName':
+          case 'comment':
+            // For string fields, use 'like' for partial matching (case-insensitive)
+            // If exact match is required, change to query.where(col, filterValue);
+            query.where(col, 'ILIKE', `%${filterValue}%`) // ILIKE for case-insensitive LIKE in PostgreSQL
+            break
+          case 'status':
+            // For enum status, exact match
+            query.where(col, filterValue)
+            break
+          default:
+            // For any other column, apply exact match
+            query.where(col, filterValue)
+            break
+        }
+      }
+    }
 
     const results = await query
     console.log('Filtered results:', results) // Debug log
@@ -463,52 +536,6 @@ export default class RecruitmentController {
     }
   }
 
-  /**
-   * Updates an existing recruitment record.
-   * This should be a separate method from creation and accept an ID in params.
-   */
-  // async update({ params, request, response }: HttpContext) {
-  //   const recruitment = await Recruitment.find(params.id)
-
-  //   if (!recruitment) {
-  //     return response.notFound({ message: 'Recruitment not found' })
-  //   }
-
-  //   const updatePayload = await request.validateUsing(
-  //     vine.compile(
-  //       vine.object({
-  //         firstName: vine.string().trim().optional(),
-  //         lastName: vine.string().trim().optional(),
-  //         sectionGroupId: vine.number().optional(),
-  //         contactDate: vine
-  //           .string()
-  //           .transform((val) => DateTime.fromISO(val))
-  //           .optional(),
-  //         contactedBy: vine.number().optional(),
-  //         status: vine
-  //           .enum([
-  //             'awaiting response',
-  //             'interested',
-  //             'participating',
-  //             'registered',
-  //             'not available',
-  //             'to be contacted',
-  //             'cancelled',
-  //             'other',
-  //             'withdrawn',
-  //           ])
-  //           .optional(),
-  //         comment: vine.string().trim().optional().nullable(),
-  //       })
-  //     )
-  //   )
-
-  //   recruitment.merge(updatePayload)
-  //   await recruitment.save()
-
-  //   return response.ok({ message: 'Recruitment updated successfully', data: recruitment })
-  // }
-
   async update({ params, request, response }: HttpContext) {
     try {
       const recruitment = await Recruitment.find(params.id)
@@ -647,100 +674,4 @@ export default class RecruitmentController {
       })
     }
   }
-
-  // async checkAndUpdateStatuses({ request, response }: HttpContext) {
-  //   try {
-  //     const { daysThreshold } = await vine
-  //       .compile(vine.object({ daysThreshold: vine.number().min(1).max(365) }))
-  //       .validate(request.all())
-
-  //     const now = DateTime.now().startOf('day')
-  //     const thresholdDate = now.minus({ days: daysThreshold }).startOf('day') // This is the date boundary
-
-  //     let updatedCount = 0 // For 'awaiting response' -> 'to follow up'
-  //     let revertedCount = 0 // For 'to follow up' -> 'awaiting response'
-  //     let failedCount = 0 // For any individual save failures
-
-  //     // --- CRITICAL FIX: Wrap the entire process in a single transaction ---
-  //     await db.transaction(async (trx) => {
-  //       // Fetch all relevant recruitments that *might* need a status change.
-  //       // We need to fetch both 'awaiting response' and 'to follow up' statuses.
-  //       const recruitmentsToProcess = await Recruitment.query()
-  //         .useTransaction(trx) // Associate query with the transaction
-  //         .whereIn('status', [
-  //           'awaiting response',
-  //           'to follow up', // FIX: Use 'to follow up' as per your current enum
-  //         ])
-  //         .andWhereNotNull('contactDate') // Only process records that have been contacted
-  //         .andWhere('contactDate', '<=', now.toISODate()) // Only consider contact dates up to today
-  //         .forUpdate() // Acquire row-level locks for safety during updates
-
-  //       // Execute the query to get the candidates
-  //       const candidates = await recruitmentsToProcess
-
-  //       if (candidates.length === 0) {
-  //         return response.ok({
-  //           message: 'No recruitments found requiring status re-evaluation.',
-  //           updatedCount: 0,
-  //           revertedCount: 0,
-  //           failedCount: 0,
-  //         })
-  //       }
-
-  //       // Iterate and update each candidate based on the current threshold
-  //       for (const recruitment of candidates) {
-  //         // Defensive check, though andWhereNotNull should prevent this
-  //         if (!recruitment.contactDate) {
-  //           continue
-  //         }
-
-  //         const contactDate = recruitment.contactDate.startOf('day')
-  //         const diffInDays = now.diff(contactDate, 'days').days
-
-  //         try {
-  //           if (diffInDays > daysThreshold && recruitment.status === 'awaiting response') {
-  //             // Rule 1: Change from 'awaiting response' to 'to follow up' if older than threshold
-  //             recruitment.status = 'to follow up'
-  //             recruitment.statusUpdatedAt = DateTime.now()
-  //             await recruitment.save() // Save within the transaction
-  //             updatedCount++
-  //           } else if (diffInDays <= daysThreshold && recruitment.status === 'to follow up') {
-  //             // Rule 2: Change from 'to follow up' back to 'awaiting response' if within threshold
-  //             recruitment.status = 'awaiting response'
-  //             recruitment.statusUpdatedAt = DateTime.now()
-  //             await recruitment.save() // Save within the transaction
-  //             revertedCount++
-  //           }
-  //           // If neither condition is met, the status remains as is.
-  //         } catch (updateError) {
-  //           failedCount++
-  //           console.error(
-  //             `Failed to update recruitment ID: ${recruitment.id}. Error: ${updateError.message}`
-  //           )
-  //         }
-  //       }
-  //     }) // Transaction commits here if successful, or rolls back if an error occurs
-
-  //     return response.ok({
-  //       message: `Statuses re-evaluated using threshold of ${daysThreshold} day(s). Updated: ${updatedCount}, Reverted: ${revertedCount}, Failed: ${failedCount}.`,
-  //       updatedCount,
-  //       revertedCount,
-  //       failedCount,
-  //     })
-  //   } catch (error) {
-  //     // Improved error handling for this specific method
-  //     if (error.messages) {
-  //       // VineJS validation errors
-  //       return response.badRequest({
-  //         message: 'Validation failed for status re-evaluation.',
-  //         errors: error.messages,
-  //       })
-  //     }
-  //     console.error('Error in checkAndUpdateStatuses:', error) // Log the actual error
-  //     return response.internalServerError({
-  //       message: 'An unexpected error occurred during status re-evaluation.',
-  //       error: error.message, // Include error message in dev, hide in prod via handler
-  //     })
-  //   }
-  // }
 }
