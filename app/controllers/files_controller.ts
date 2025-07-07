@@ -1,4 +1,4 @@
-// app/controllers/files_controller.ts - Version complète avec streaming amélioré
+// app/controllers/files_controller.ts - Version complète avec streaming amélioré et size
 import { filesUploadValidator, filesUpdateValidator } from '#validators/file'
 import { cuid } from '@adonisjs/core/helpers'
 import { HttpContext } from '@adonisjs/core/http'
@@ -23,6 +23,7 @@ export default class FilesController {
           type: fileElement.type,
           content: '',
           path: fileElement.filePath,
+          size: fileElement.size || 0, // ✅ Ajouter la taille
         })
       }
     }
@@ -37,6 +38,7 @@ export default class FilesController {
         type: file.type,
         content: '',
         path: file.filePath,
+        size: file.size || 0, // ✅ Ajouter la taille
       })
     }
 
@@ -320,6 +322,7 @@ export default class FilesController {
           name: file.name,
           type: file.type,
           path: file.path,
+          size: file.size ?? 0, // ✅ Inclure la taille du modèle
           created_at: file.createdAt,
           updated_at: file.updatedAt
         },
@@ -342,6 +345,4 @@ export default class FilesController {
       })
     }
   }
-
-
 }
