@@ -118,7 +118,7 @@ export default class TemplatePreparation extends BaseMail {
 
     this.message
       .to(this.contact.email)
-      .from(`Melomania <${env.get('SMTP_USERNAME')}>`)
+      .from(env.get('SMTP_USERNAME'))
       .subject('Notification')
       .html(htmlContent)
   }

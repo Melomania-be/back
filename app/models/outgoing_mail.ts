@@ -9,7 +9,7 @@ export default class OutgoingMail extends BaseModel {
   declare type: string
 
   @column()
-  declare receiver_id: number
+  declare receiver_id: number | null
 
   @column()
   declare project_id: number | null | undefined
