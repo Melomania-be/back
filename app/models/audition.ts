@@ -1,4 +1,5 @@
-// app/models/audition.ts
+// app/models/audition.ts - Version corrigée complète
+
 import { DateTime } from 'luxon'
 import { BaseModel, belongsTo, column, hasMany } from '@adonisjs/lucid/orm'
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
@@ -49,12 +50,12 @@ export default class Audition extends BaseModel {
   @column.dateTime()
   declare deadline: DateTime | null
 
-  // ✅ CORRECTION : Ajouter valeur par défaut et sérialisation explicite
+  // ✅ CORRECTION LIGNE 57 : Ajouter valeur par défaut et sérialisation explicite sans initializer
   @column({
     serialize: (value: any) => Boolean(value),
     prepare: (value: any) => Boolean(value),
   })
-  declare is_submitted: boolean = false
+  declare is_submitted: boolean
 
   @column.dateTime()
   declare submitted_at: DateTime | null
