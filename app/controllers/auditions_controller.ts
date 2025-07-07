@@ -1,4 +1,4 @@
-// app/controllers/auditions_controller.ts - Version complète avec pièces jointes PDF et corrections
+// app/controllers/auditions_controller.ts - Version complète avec pièces jointes PDF et corrections DateTime
 
 import { HttpContext } from '@adonisjs/core/http'
 import Audition from '#models/audition'
@@ -140,10 +140,10 @@ export default class AuditionsController {
       const associatedPdfsCount = await this.associateSectionPdfsToAudition(audition.id, participant.section_id, params.id)
       console.log(`📎 Associated ${associatedPdfsCount} PDFs to the audition`)
 
-      // ✅ CORRECTION : Mettre à jour le statut du participant avec type correct
+      // ✅ CORRECTION DATETIME : Mettre à jour le statut du participant avec DateTime (pas de conversion)
       participant.audition_status = 'pending' as 'pending' // ✅ Cast explicite pour éviter l'erreur de type
-      participant.audition_requested_at = DateTime.now()
-      participant.audition_deadline = deadline // ✅ Garder l'objet DateTime
+      participant.audition_requested_at = DateTime.now() // ✅ Garder DateTime
+      participant.audition_deadline = deadline // ✅ Garder DateTime (peut être null)
       await participant.save()
 
       console.log(`✅ Participant status updated to 'pending'`)
@@ -334,7 +334,7 @@ export default class AuditionsController {
                 name: af.file.name || 'Nom de fichier non disponible',
                 type: af.file.type || 'Type inconnu',
                 path: af.file.path || '',
-                size: af.file.size || 0, // ✅ Accès direct à la propriété size du modèle File
+                size: af.file.size ?? 0, // ✅ Correction size
               },
             })),
 
@@ -352,7 +352,7 @@ export default class AuditionsController {
                 name: apf.file.name || 'Nom de fichier non disponible',
                 type: apf.file.type || 'application/pdf',
                 path: apf.file.path || '',
-                size: apf.file.size || 0, // ✅ Accès direct à la propriété size du modèle File
+                size: apf.file.size ?? 0, // ✅ Correction size
               },
             })),
           }
@@ -459,7 +459,7 @@ export default class AuditionsController {
         type: file.type || 'application/pdf',
         content: '',
         path: file.filePath,
-
+        size: file.size || 0, // ✅ Ajouter la taille
       })
 
       console.log('✅ PDF file saved in database:', savedFile.id)
@@ -529,7 +529,8 @@ export default class AuditionsController {
           section_id: section_id,
           section_name: section.name,
           order: order || 0,
-          project_id: params.id
+          project_id: params.id,
+          size: savedFile.size ?? 0 // ✅ Correction size
         },
         section_pdf: {
           id: sectionPdf.id,
@@ -650,7 +651,7 @@ export default class AuditionsController {
             name: sectionPdf.file.name,
             type: sectionPdf.file.type,
             path: sectionPdf.file.path,
-            size: sectionPdf.file.size || 0
+            size: sectionPdf.file.size ?? 0 // ✅ Correction size
           },
           usage_count: parseInt(String(usageCount[0].$extras.total || '0'))
         })
@@ -958,7 +959,7 @@ export default class AuditionsController {
           name: file.name,
           type: file.type,
           path: file.path,
-          size: file.size || 0,
+          size: file.size ?? 0, // ✅ Correction size
           created_at: file.createdAt
         })),
         section_pdfs: sectionPdfs.map(sp => ({
@@ -1027,7 +1028,7 @@ export default class AuditionsController {
 
       // Vérifier que l'audition n'est pas expirée
       const now = DateTime.now()
-      if (audition.deadline && DateTime.fromJSDate(audition.deadline) < now) {
+      if (audition.deadline && audition.deadline < now) {
         console.log(`⏰ Audition expired: deadline was ${audition.deadline}`)
         return response.status(410).json({
           error: 'Audition deadline has passed',
@@ -1084,7 +1085,7 @@ export default class AuditionsController {
             id: af.file.id,
             name: af.file.name,
             type: af.file.type,
-            size: af.file.size || 0
+            size: af.file.size ?? 0 // ✅ Correction size
           }
         })),
         // ✅ CORRECTION : Utiliser apf.section.name au lieu de audition.participant.section.name
@@ -1098,7 +1099,7 @@ export default class AuditionsController {
             id: apf.file.id,
             name: apf.file.name,
             type: apf.file.type,
-            size: apf.file.size || 0
+            size: apf.file.size ?? 0 // ✅ Correction size
           }
         }))
       })
@@ -1131,7 +1132,7 @@ export default class AuditionsController {
 
       // Vérifier que la deadline n'est pas dépassée
       const now = DateTime.now()
-      if (audition.deadline && DateTime.fromJSDate(audition.deadline) < now) {
+      if (audition.deadline && audition.deadline < now) {
         return response.status(403).json({
           error: 'Audition deadline has passed'
         })
@@ -1163,7 +1164,7 @@ export default class AuditionsController {
         type: file.type || 'application/octet-stream',
         content: '',
         path: file.filePath,
-
+        size: file.size || 0, // ✅ Ajouter la taille
       })
 
       // Créer l'association audition-fichier
@@ -1187,7 +1188,7 @@ export default class AuditionsController {
             id: savedFile.id,
             name: savedFile.name,
             type: savedFile.type,
-            size: savedFile.size || 0
+            size: savedFile.size ?? 0 // ✅ Correction size
           }
         }
       })
@@ -1312,9 +1313,9 @@ export default class AuditionsController {
         })
       }
 
-      // Vérifier que la deadline n'est pas dépassée
+      // ✅ CORRECTION DATETIME : Vérifier que la deadline n'est pas dépassée
       const now = DateTime.now()
-      if (audition.deadline && DateTime.fromJSDate(audition.deadline) < now) {
+      if (audition.deadline && audition.deadline < now) {
         return response.status(403).json({
           error: 'Audition deadline has passed'
         })
@@ -1377,7 +1378,7 @@ export default class AuditionsController {
             id: apf.file.id,
             name: apf.file.name,
             type: apf.file.type,
-            size: apf.file.size || 0
+            size: apf.file.size ?? 0 // ✅ Correction size
           }
         }))
       )
@@ -1493,7 +1494,7 @@ export default class AuditionsController {
         type: file.type || 'application/pdf',
         content: '',
         path: file.filePath,
-        size: file.size || 0
+        size: file.size || 0 // ✅ Ajouter la taille
       })
 
       // Créer l'association dans section_pdfs
@@ -1517,7 +1518,7 @@ export default class AuditionsController {
             id: savedFile.id,
             name: savedFile.name,
             type: savedFile.type,
-            size: savedFile.size || 0
+            size: savedFile.size ?? 0 // ✅ Correction size
           }
         }
       })
