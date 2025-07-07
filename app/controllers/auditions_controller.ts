@@ -101,13 +101,41 @@ export default class AuditionsController {
         if (project.rehearsals && project.rehearsals.length > 0) {
           // Trouver la première répétition future (après maintenant)
           const now = DateTime.now()
+
+          // ✅ CORRECTION : Gérer les répétitions qui peuvent être DateTime ou Date
           const futureRehearsals = project.rehearsals
-            .filter(rehearsal => DateTime.fromJSDate(rehearsal.start_date) > now)
-            .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
+            .filter(rehearsal => {
+              // Si start_date est déjà un DateTime
+              if (rehearsal.start_date && typeof (rehearsal.start_date as any).toJSDate === 'function') {
+                return (rehearsal.start_date as any) > now
+              }
+              // Si start_date est une Date JavaScript
+              return DateTime.fromJSDate(rehearsal.start_date as unknown as Date) > now
+            })
+            .sort((a, b) => {
+              // ✅ CORRECTION : Conversion appropriée pour le tri
+              const dateA = (a.start_date && typeof (a.start_date as any).toJSDate === 'function')
+                ? (a.start_date as any).toJSDate()
+                : (a.start_date as unknown as Date)
+              const dateB = (b.start_date && typeof (b.start_date as any).toJSDate === 'function')
+                ? (b.start_date as any).toJSDate()
+                : (b.start_date as unknown as Date)
+              return dateA.getTime() - dateB.getTime()
+            })
 
           if (futureRehearsals.length > 0) {
-            // Définir la deadline à 24h avant la première répétition
-            const firstRehearsal = DateTime.fromJSDate(futureRehearsals[0].start_date)
+            // ✅ CORRECTION : Définir la deadline à 24h avant la première répétition
+            const firstRehearsalStartDate = futureRehearsals[0].start_date
+            let firstRehearsal: DateTime
+
+            if (firstRehearsalStartDate && typeof (firstRehearsalStartDate as any).toJSDate === 'function') {
+              // Si c'est déjà un DateTime
+              firstRehearsal = firstRehearsalStartDate as any
+            } else {
+              // Si c'est une Date JavaScript
+              firstRehearsal = DateTime.fromJSDate(firstRehearsalStartDate as unknown as Date)
+            }
+
             deadline = firstRehearsal.minus({ days: 1 })
             console.log(`⏰ Auto-set audition deadline to ${deadline.toISO()} (1 day before first rehearsal)`)
           } else {
@@ -1445,8 +1473,8 @@ export default class AuditionsController {
       response.header('Content-Disposition', `attachment; filename="${fileName}"`)
       response.header('Cache-Control', 'no-cache')
 
-      // Retourner le fichier pour téléchargement
-      return response.download(file.path, fileName)
+      // ✅ CORRECTION : Retourner le fichier pour téléchargement (sans le paramètre fileName)
+      return response.download(file.path)
 
     } catch (error) {
       console.error('❌ Error downloading audition PDF:', error)
