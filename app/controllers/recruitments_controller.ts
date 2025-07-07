@@ -31,6 +31,27 @@ export const checkStatusValidator = vine.compile(
   })
 )
 
+// export const checkStatusValidator = vine.compile(
+//   vine.object({
+//     checkDateTime: vine
+//       .string()
+//       .trim()
+//       .transform((value, field) => {
+//         const dateTime = DateTime.fromISO(value, { zone: 'utc' })
+//         if (!dateTime.isValid) {
+//           field.report(
+//             'The {{ field }} must be a valid ISO datetime string.',
+//             'invalid_datetime',
+//             field
+//           )
+//         }
+//         return dateTime
+//       })
+//       .optional()
+//       .nullable(),
+//   })
+// )
+
 export default class RecruitmentController {
   // Simple test route
   public async test({ response }: HttpContext) {
@@ -576,10 +597,10 @@ export default class RecruitmentController {
 
       const now = DateTime.now().startOf('day')
 
-      // Fetch only recruitments with status 'awaiting response' or 'to be contacted'
+      // Fetch only recruitments with status 'awaiting response' or 'to follow up'
       const recruitments = await Recruitment.query().whereIn('status', [
         'awaiting response',
-        'to be contacted',
+        'to follow up',
       ])
 
       let updatedCount = 0
@@ -626,4 +647,100 @@ export default class RecruitmentController {
       })
     }
   }
+
+  // async checkAndUpdateStatuses({ request, response }: HttpContext) {
+  //   try {
+  //     const { daysThreshold } = await vine
+  //       .compile(vine.object({ daysThreshold: vine.number().min(1).max(365) }))
+  //       .validate(request.all())
+
+  //     const now = DateTime.now().startOf('day')
+  //     const thresholdDate = now.minus({ days: daysThreshold }).startOf('day') // This is the date boundary
+
+  //     let updatedCount = 0 // For 'awaiting response' -> 'to follow up'
+  //     let revertedCount = 0 // For 'to follow up' -> 'awaiting response'
+  //     let failedCount = 0 // For any individual save failures
+
+  //     // --- CRITICAL FIX: Wrap the entire process in a single transaction ---
+  //     await db.transaction(async (trx) => {
+  //       // Fetch all relevant recruitments that *might* need a status change.
+  //       // We need to fetch both 'awaiting response' and 'to follow up' statuses.
+  //       const recruitmentsToProcess = await Recruitment.query()
+  //         .useTransaction(trx) // Associate query with the transaction
+  //         .whereIn('status', [
+  //           'awaiting response',
+  //           'to follow up', // FIX: Use 'to follow up' as per your current enum
+  //         ])
+  //         .andWhereNotNull('contactDate') // Only process records that have been contacted
+  //         .andWhere('contactDate', '<=', now.toISODate()) // Only consider contact dates up to today
+  //         .forUpdate() // Acquire row-level locks for safety during updates
+
+  //       // Execute the query to get the candidates
+  //       const candidates = await recruitmentsToProcess
+
+  //       if (candidates.length === 0) {
+  //         return response.ok({
+  //           message: 'No recruitments found requiring status re-evaluation.',
+  //           updatedCount: 0,
+  //           revertedCount: 0,
+  //           failedCount: 0,
+  //         })
+  //       }
+
+  //       // Iterate and update each candidate based on the current threshold
+  //       for (const recruitment of candidates) {
+  //         // Defensive check, though andWhereNotNull should prevent this
+  //         if (!recruitment.contactDate) {
+  //           continue
+  //         }
+
+  //         const contactDate = recruitment.contactDate.startOf('day')
+  //         const diffInDays = now.diff(contactDate, 'days').days
+
+  //         try {
+  //           if (diffInDays > daysThreshold && recruitment.status === 'awaiting response') {
+  //             // Rule 1: Change from 'awaiting response' to 'to follow up' if older than threshold
+  //             recruitment.status = 'to follow up'
+  //             recruitment.statusUpdatedAt = DateTime.now()
+  //             await recruitment.save() // Save within the transaction
+  //             updatedCount++
+  //           } else if (diffInDays <= daysThreshold && recruitment.status === 'to follow up') {
+  //             // Rule 2: Change from 'to follow up' back to 'awaiting response' if within threshold
+  //             recruitment.status = 'awaiting response'
+  //             recruitment.statusUpdatedAt = DateTime.now()
+  //             await recruitment.save() // Save within the transaction
+  //             revertedCount++
+  //           }
+  //           // If neither condition is met, the status remains as is.
+  //         } catch (updateError) {
+  //           failedCount++
+  //           console.error(
+  //             `Failed to update recruitment ID: ${recruitment.id}. Error: ${updateError.message}`
+  //           )
+  //         }
+  //       }
+  //     }) // Transaction commits here if successful, or rolls back if an error occurs
+
+  //     return response.ok({
+  //       message: `Statuses re-evaluated using threshold of ${daysThreshold} day(s). Updated: ${updatedCount}, Reverted: ${revertedCount}, Failed: ${failedCount}.`,
+  //       updatedCount,
+  //       revertedCount,
+  //       failedCount,
+  //     })
+  //   } catch (error) {
+  //     // Improved error handling for this specific method
+  //     if (error.messages) {
+  //       // VineJS validation errors
+  //       return response.badRequest({
+  //         message: 'Validation failed for status re-evaluation.',
+  //         errors: error.messages,
+  //       })
+  //     }
+  //     console.error('Error in checkAndUpdateStatuses:', error) // Log the actual error
+  //     return response.internalServerError({
+  //       message: 'An unexpected error occurred during status re-evaluation.',
+  //       error: error.message, // Include error message in dev, hide in prod via handler
+  //     })
+  //   }
+  // }
 }
