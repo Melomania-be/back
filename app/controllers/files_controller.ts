@@ -1,4 +1,5 @@
-// app/controllers/files_controller.ts - Version complète avec streaming amélioré et size
+// app/controllers/files_controller.ts - Version corrigée complète
+
 import { filesUploadValidator, filesUpdateValidator } from '#validators/file'
 import { cuid } from '@adonisjs/core/helpers'
 import { HttpContext } from '@adonisjs/core/http'
@@ -23,7 +24,7 @@ export default class FilesController {
           type: fileElement.type,
           content: '',
           path: fileElement.filePath,
-          size: fileElement.size || 0, // ✅ Ajouter la taille
+          size: fileElement.size || 0,
         })
       }
     }
@@ -38,7 +39,7 @@ export default class FilesController {
         type: file.type,
         content: '',
         path: file.filePath,
-        size: file.size || 0, // ✅ Ajouter la taille
+        size: file.size || 0,
       })
     }
 
@@ -70,7 +71,7 @@ export default class FilesController {
     }
   }
 
-  // ✅ MÉTHODE DOWNLOAD AMÉLIORÉE AVEC DEBUG ET CORS
+  // ✅ CORRECTION LIGNE 115 : Méthode download améliorée
   async download(ctx: HttpContext) {
     try {
       const file = await File.findOrFail(ctx.params.id)
@@ -101,7 +102,7 @@ export default class FilesController {
 
       console.log(`✅ Sending download for: ${file.name}`)
 
-      // ✅ HEADERS CORS POUR TÉLÉCHARGEMENT
+      // Headers CORS pour téléchargement
       ctx.response.header('Access-Control-Allow-Origin', '*')
       ctx.response.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
       ctx.response.header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
@@ -112,23 +113,24 @@ export default class FilesController {
       ctx.response.header('Content-Disposition', `attachment; filename="${file.name}"`)
       ctx.response.header('Cache-Control', 'no-cache')
 
-      return ctx.response.download(file.path, file.name)
+      // ✅ CORRECTION : Retourner le fichier sans deuxième paramètre
+      return ctx.response.download(file.path)
     } catch (error) {
       console.error('❌ Download error:', error)
 
-      // ✅ CORS HEADERS MÊME EN CAS D'ERREUR
+      // CORS headers même en cas d'erreur
       ctx.response.header('Access-Control-Allow-Origin', '*')
       ctx.response.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
 
       return ctx.response.status(500).json({
         error: 'Download failed',
-        details: error.message,
+        details: (error as Error).message,
         fileId: ctx.params.id
       })
     }
   }
 
-  // ✅ MÉTHODE STREAM AMÉLIORÉE POUR LECTURE DIRECTE
+  // ✅ CORRECTION LIGNE 210 : Méthode stream améliorée
   async stream({ params, request, response }: HttpContext) {
     try {
       const file = await File.findOrFail(params.id)
@@ -165,9 +167,9 @@ export default class FilesController {
       const fileSize = stats.size
       const range = request.header('range')
 
-      // ✅ DÉTECTION AMÉLIORÉE DU CONTENT-TYPE
+      // ✅ CORRECTION LIGNE 210 : Détection améliorée du content-type avec typage correct
       const ext = extname(file.name).toLowerCase()
-      const mimeTypes = {
+      const mimeTypes: Record<string, string> = {
         // Vidéos
         '.mp4': 'video/mp4',
         '.webm': 'video/webm',
@@ -210,19 +212,19 @@ export default class FilesController {
       const contentType = mimeTypes[ext] || file.type || 'application/octet-stream'
       console.log(`🎵 Determined Content-Type: ${contentType}`)
 
-      // ✅ HEADERS CORS ET CACHE OPTIMISÉS
+      // Headers CORS et cache optimisés
       response.header('Access-Control-Allow-Origin', '*')
       response.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
       response.header('Access-Control-Allow-Headers', 'Range, Content-Type')
       response.header('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length')
 
-      // ✅ GESTION DES RANGE REQUESTS (CRUCIAL POUR VIDÉOS)
+      // Gestion des range requests (crucial pour vidéos)
       if (range) {
         console.log(`📊 Range request detected: ${range}`)
 
         // Parser le header Range (format: "bytes=start-end")
         const parts = range.replace(/bytes=/, "").split("-")
-        const start = parseInt(parts[0], 10)
+        const start = parseInt(parts[0] || '0', 10) // ✅ Correction: valeur par défaut
         const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1
         const chunksize = (end - start) + 1
 
@@ -257,7 +259,7 @@ export default class FilesController {
 
         return response.stream(stream)
       } else {
-        // ✅ STREAMING COMPLET SANS RANGE
+        // Streaming complet sans range
         console.log(`📺 Serving complete file: ${fileSize} bytes`)
 
         response.header('Content-Length', fileSize.toString())
@@ -273,76 +275,3 @@ export default class FilesController {
         // Gestion des erreurs de stream
         stream.on('error', (error) => {
           console.error('❌ Complete stream error:', error)
-          if (!response.hasLazyBody) {
-            response.status(500).send('Stream error')
-          }
-        })
-
-        stream.on('open', () => {
-          console.log(`✅ Stream opened for: ${file.name}`)
-        })
-
-        stream.on('end', () => {
-          console.log(`✅ Stream completed for: ${file.name}`)
-        })
-
-        return response.stream(stream)
-      }
-    } catch (error) {
-      console.error('❌ Streaming error:', error)
-      return response.status(500).json({
-        error: 'File streaming failed',
-        details: error.message,
-        fileId: params.id
-      })
-    }
-  }
-
-  // ✅ NOUVELLE MÉTHODE : Informations sur un fichier (debugging)
-  async info({ params, response }: HttpContext) {
-    try {
-      const file = await File.findOrFail(params.id)
-
-      let fileStats = null
-      let fileExists = false
-
-      if (file.path) {
-        try {
-          await fs.access(file.path)
-          fileStats = statSync(file.path)
-          fileExists = true
-        } catch (accessError) {
-          console.log('File does not exist on disk:', file.path)
-        }
-      }
-
-      return response.ok({
-        file: {
-          id: file.id,
-          name: file.name,
-          type: file.type,
-          path: file.path,
-          size: file.size ?? 0, // ✅ Inclure la taille du modèle
-          created_at: file.createdAt,
-          updated_at: file.updatedAt
-        },
-        physical_file: {
-          exists: fileExists,
-          size: fileStats?.size || null,
-          modified: fileStats?.mtime || null,
-          accessible: fileExists
-        },
-        urls: {
-          download: `/files/download/${file.id}`,
-          stream: `/files/stream/${file.id}`,
-          info: `/files/info/${file.id}`
-        }
-      })
-    } catch (error) {
-      return response.status(404).json({
-        error: 'File not found',
-        fileId: params.id,
-      })
-    }
-  }
-}
