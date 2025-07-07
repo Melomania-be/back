@@ -28,6 +28,17 @@ export default class SectionPdf extends BaseModel {
   @column()
   declare order: number
 
+  // ✅ COLONNES ADDITIONNELLES - Configuration d'audition
+  @column()
+  declare is_required: boolean
+
+  @column()
+  declare is_active: boolean
+
+  // ✅ COLONNES ADDITIONNELLES - Statistiques d'usage
+  @column()
+  declare auditions_count: number
+
   @belongsTo(() => Project, {
     foreignKey: 'project_id',
   })

@@ -19,6 +19,10 @@ export default class File extends BaseModel {
   @column()
   declare path: string
 
+  // ✅ AJOUT DE LA PROPRIÉTÉ SIZE
+  @column()
+  declare size: number | null
+
   @manyToMany(() => Folder, {
     pivotTable: 'contains',
     pivotForeignKey: 'file_id',
