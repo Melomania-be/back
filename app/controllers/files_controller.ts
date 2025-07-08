@@ -83,7 +83,7 @@ export default class FilesController {
         return ctx.response.status(404).json({
           error: 'File path not found',
           fileId: file.id,
-          fileName: file.name
+          fileName: file.name,
         })
       }
 
@@ -96,7 +96,7 @@ export default class FilesController {
         return ctx.response.status(404).json({
           error: 'Physical file not found',
           path: file.path,
-          fileName: file.name
+          fileName: file.name,
         })
       }
 
@@ -106,7 +106,10 @@ export default class FilesController {
       ctx.response.header('Access-Control-Allow-Origin', '*')
       ctx.response.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
       ctx.response.header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-      ctx.response.header('Access-Control-Expose-Headers', 'Content-Disposition, Content-Length, Content-Type')
+      ctx.response.header(
+        'Access-Control-Expose-Headers',
+        'Content-Disposition, Content-Length, Content-Type'
+      )
 
       // Headers pour forcer le téléchargement
       ctx.response.header('Content-Type', file.type || 'application/octet-stream')
@@ -125,7 +128,7 @@ export default class FilesController {
       return ctx.response.status(500).json({
         error: 'Download failed',
         details: (error as Error).message,
-        fileId: ctx.params.id
+        fileId: ctx.params.id,
       })
     }
   }
@@ -145,7 +148,7 @@ export default class FilesController {
         return response.status(404).json({
           error: 'File path not found',
           fileId: file.id,
-          fileName: file.name
+          fileName: file.name,
         })
       }
 
@@ -160,7 +163,7 @@ export default class FilesController {
         return response.status(404).json({
           error: 'Physical file not found',
           path: filePath,
-          fileName: file.name
+          fileName: file.name,
         })
       }
 
@@ -206,7 +209,7 @@ export default class FilesController {
         '.txt': 'text/plain',
         '.html': 'text/html',
         '.css': 'text/css',
-        '.js': 'application/javascript'
+        '.js': 'application/javascript',
       }
 
       const contentType = mimeTypes[ext] || file.type || 'application/octet-stream'
@@ -216,17 +219,20 @@ export default class FilesController {
       response.header('Access-Control-Allow-Origin', '*')
       response.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
       response.header('Access-Control-Allow-Headers', 'Range, Content-Type')
-      response.header('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length')
+      response.header(
+        'Access-Control-Expose-Headers',
+        'Content-Range, Accept-Ranges, Content-Length'
+      )
 
       // Gestion des range requests (crucial pour vidéos)
       if (range) {
         console.log(`📊 Range request detected: ${range}`)
 
         // Parser le header Range (format: "bytes=start-end")
-        const parts = range.replace(/bytes=/, "").split("-")
-        const start = parseInt(parts[0] || '0', 10) // ✅ Correction: valeur par défaut
-        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1
-        const chunksize = (end - start) + 1
+        const parts = range.replace(/bytes=/, '').split('-')
+        const start = Number.parseInt(parts[0] || '0', 10) // ✅ Correction: valeur par défaut
+        const end = parts[1] ? Number.parseInt(parts[1], 10) : fileSize - 1
+        const chunksize = end - start + 1
 
         // Validation des ranges
         if (start >= fileSize || end >= fileSize || start > end) {
@@ -295,7 +301,7 @@ export default class FilesController {
       return response.status(500).json({
         error: 'File streaming failed',
         details: (error as Error).message,
-        fileId: params.id
+        fileId: params.id,
       })
     }
   }
@@ -326,19 +332,19 @@ export default class FilesController {
           path: file.path,
           size: file.size ?? 0,
           created_at: file.createdAt,
-          updated_at: file.updatedAt
+          updated_at: file.updatedAt,
         },
         physical_file: {
           exists: fileExists,
           size: fileStats?.size || null,
           modified: fileStats?.mtime || null,
-          accessible: fileExists
+          accessible: fileExists,
         },
         urls: {
           download: `/files/download/${file.id}`,
           stream: `/files/stream/${file.id}`,
-          info: `/files/info/${file.id}`
-        }
+          info: `/files/info/${file.id}`,
+        },
       })
     } catch (error) {
       return response.status(404).json({
