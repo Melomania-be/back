@@ -1,4 +1,4 @@
-// app/mails/audition_request.ts - Version avec détection automatique d'environnement CORRIGÉE
+// app/mails/audition_request.ts - FIXED VERSION
 
 import env from '#start/env'
 import { BaseMail } from '@adonisjs/mail'
@@ -16,12 +16,12 @@ const currentDirname = path.dirname(currentFilename)
 
 export default class AuditionRequest extends BaseMail {
   override from: string
-  override subject = "Audition Request with Sheet Music"
+  override subject = 'Audition Request with Sheet Music'
 
   constructor(
     private contact: Contact,
     private project: Project,
-    private _section: Section, // ✅ Préfixe avec underscore
+    private _section: Section,
     private audition: Audition,
     private responsible: any = null
   ) {
@@ -30,7 +30,6 @@ export default class AuditionRequest extends BaseMail {
   }
 
   /**
-   * 🎯 DÉTECTION AUTOMATIQUE D'ENVIRONNEMENT
    * Détermine l'URL frontend correcte selon l'environnement de déploiement
    */
   private getFrontendUrl(): string {
@@ -43,7 +42,7 @@ export default class AuditionRequest extends BaseMail {
       FRONTEND_URL: envUrl,
       NODE_ENV: nodeEnv,
       HOST: host,
-      PORT: port
+      PORT: port,
     })
 
     // Si FRONTEND_URL est définie explicitement et n'est pas localhost, l'utiliser
@@ -55,16 +54,13 @@ export default class AuditionRequest extends BaseMail {
     // Détection automatique basée sur HOST et NODE_ENV
     if (host !== 'localhost' && host !== '127.0.0.1') {
       // On est sur un serveur distant
-
       if (nodeEnv === 'development' || host.includes('universe.wf')) {
-        // Serveur de test (détection par domaine universe.wf)
         const frontendUrl = 'http://tool.sc1ciro3903.universe.wf'
         console.log(`🧪 Auto-detected TEST environment: ${frontendUrl}`)
         return frontendUrl
       }
 
       if (nodeEnv === 'production' || host.includes('melomania.be')) {
-        // Serveur de production (détection par domaine melomania.be)
         const frontendUrl = 'https://tool.melomania.be'
         console.log(`🚀 Auto-detected PRODUCTION environment: ${frontendUrl}`)
         return frontendUrl
@@ -84,40 +80,47 @@ export default class AuditionRequest extends BaseMail {
     return frontendUrl
   }
 
-  async prepare() {
-    const frontendUrl = this.getFrontendUrl()
-    const logoPath = path.join(
-      currentDirname,
-      '..',
-      '..',
-      'resources',
-      'mail_assets',
-      'logoMelomania.png'
-    )
+  /**
+   * ✅ FONCTION CORRIGÉE : Remplacement sécurisé des variables de template
+   */
+  private replaceTemplateVariables(htmlContent: string, variables: Record<string, string>): string {
+    let result = htmlContent
 
-    // Charger les PDFs associés à cette audition
-    const pdfFiles = await AuditionPdfFile.query()
-      .where('audition_id', this.audition.id)
-      .preload('file')
-      .orderBy('order', 'asc')
-      .orderBy('title', 'asc')
+    // Pour chaque variable, remplacer toutes les variations possibles
+    Object.entries(variables).forEach(([key, value]) => {
+      // Échapper la valeur pour éviter les problèmes avec les caractères spéciaux
+      const safeValue = (value || '').replace(/\$/g, '$$') // Escape $ for replacement
 
-    console.log(`📧 Preparing audition email for ${this.contact.email} with ${pdfFiles.length} PDF attachments`)
+      // ✅ CORRECTION : Patterns pour accolades simples {KEY}
+      const patterns = [
+        new RegExp(`\\{${key}\\}`, 'g'), // {KEY} - pattern principal
+        new RegExp(`\\\\\\$\\{${key}\\}`, 'g'), // \${KEY} - fallback
+        new RegExp(`\\$\\{${key}\\}`, 'g'), // ${KEY} - fallback
+      ]
 
-    // 🎯 GÉNÉRATION DU LIEN D'AUDITION
-    const auditionUploadUrl = `${frontendUrl}/audition/${this.audition.secure_token}`
-    console.log(`🎭 Generated audition link: ${auditionUploadUrl}`)
+      let replacementCount = 0
+      patterns.forEach((pattern) => {
+        const matches = result.match(pattern)
+        if (matches) {
+          replacementCount += matches.length
+          result = result.replace(pattern, safeValue)
+        }
+      })
 
-    let htmlContent = ''
-    let template = await MailTemplate.query().where('name', 'audition_request.html').first()
+      console.log(`🔧 Replaced ${key}: ${replacementCount} occurrences found and replaced`)
+      if (replacementCount === 0) {
+        console.warn(`⚠️  Variable ${key} not found in template`)
+      }
+    })
 
-    if (template) {
-      htmlContent = template.content
-      console.log('📧 Using template from database')
-    } else {
-      console.log('📧 Using default template')
-      // ✅ CORRECTION : Template par défaut avec variables NON ÉCHAPPÉES
-      htmlContent = `<!DOCTYPE html>
+    return result
+  }
+
+  /**
+   * ✅ TEMPLATE HTML CORRIGÉ sans variables échappées
+   */
+  private getDefaultTemplate(): string {
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -241,7 +244,6 @@ export default class AuditionRequest extends BaseMail {
       font-weight: bold;
     }
 
-    /* Step-by-step instruction styles */
     .step-by-step {
       background-color: #ecfdf5;
       border: 2px solid #10b981;
@@ -300,20 +302,20 @@ export default class AuditionRequest extends BaseMail {
     <div class="content-padding" style="padding: 0 10px;">
       <h2 style="color: #28a745; text-align: center; margin-bottom: 20px;">🎵 Audition Request with Sheet Music 🎵</h2>
 
-      <p style="margin-bottom: 15px; line-height: 1.5;">Dear <strong>\${NAME}</strong>,</p>
+      <p style="margin-bottom: 15px; line-height: 1.5;">Dear <strong>{NAME}</strong>,</p>
 
-      <p style="margin-bottom: 15px; line-height: 1.5;">Congratulations! Your application for the <strong>\${PROJECT}</strong> project has caught our attention.</p>
+      <p style="margin-bottom: 15px; line-height: 1.5;">Congratulations! Your application for the <strong>{PROJECT}</strong> project has caught our attention.</p>
 
       <p style="margin-bottom: 20px; line-height: 1.5;">We would like to invite you to take an audition to more precisely evaluate your musical skills.</p>
 
       <!-- Audition instructions -->
       <div class="requirements">
         <h3 style="margin-top: 0; color: #28a745;">📋 Specific Instructions:</h3>
-        <div style="margin: 10px 0;">\${AUDITION_INSTRUCTIONS}</div>
+        <div style="margin: 10px 0;">{AUDITION_INSTRUCTIONS}</div>
       </div>
 
       <!-- Attachments section -->
-      \${ATTACHMENTS_SECTION}
+      {ATTACHMENTS_SECTION}
 
       <!-- Step-by-step instructions -->
       <div class="step-by-step">
@@ -356,11 +358,11 @@ export default class AuditionRequest extends BaseMail {
       </div>
 
       <!-- Deadline -->
-      \${DEADLINE_BLOCK}
+      {DEADLINE_BLOCK}
 
       <!-- Access button -->
       <div style="text-align: center; margin: 30px 0;">
-        <a href="\${REGISTRATION}" class="upload-button" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; margin: 20px 0;">
+        <a href="{REGISTRATION}" class="upload-button" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; margin: 20px 0;">
           🎬 Access audition portal
         </a>
       </div>
@@ -372,12 +374,12 @@ export default class AuditionRequest extends BaseMail {
       <p style="margin-bottom: 15px; line-height: 1.5;">Good luck with your audition!</p>
 
       <p style="margin-bottom: 20px; line-height: 1.5;">Best regards,<br />
-      <strong>The \${PROJECT} project team</strong></p>
+      <strong>The {PROJECT} project team</strong></p>
 
       <!-- Contact information -->
       <div class="contact-info">
         <h4 style="margin-top: 0; color: #495057;">📞 Contact Information:</h4>
-        <div style="white-space: pre-line; color: #6c757d; font-size: 14px;">\${TO_CONTACT}</div>
+        <div style="white-space: pre-line; color: #6c757d; font-size: 14px;">{TO_CONTACT}</div>
       </div>
     </div>
 
@@ -394,33 +396,68 @@ export default class AuditionRequest extends BaseMail {
   </div>
 </body>
 </html>`
-    }
+  }
+
+  async prepare() {
+    const frontendUrl = this.getFrontendUrl()
+    const logoPath = path.join(
+      currentDirname,
+      '..',
+      '..',
+      'resources',
+      'mail_assets',
+      'logoMelomania.png'
+    )
+
+    // Charger les PDFs associés à cette audition
+    const pdfFiles = await AuditionPdfFile.query()
+      .where('audition_id', this.audition.id)
+      .preload('file')
+      .orderBy('order', 'asc')
+      .orderBy('title', 'asc')
+
+    console.log(
+      `📧 Preparing audition email for ${this.contact.email} with ${pdfFiles.length} PDF attachments`
+    )
+
+    // Génération du lien d'audition
+    const auditionUploadUrl = `${frontendUrl}/audition/${this.audition.secure_token}`
+    console.log(`🎭 Generated audition link: ${auditionUploadUrl}`)
+
+    // Préparer les données pour le template
+    const contactName = `${this.contact.first_name || ''} ${this.contact.last_name || ''}`.trim()
+    const projectName = this.project.name || ''
+    const auditionInstructions =
+      this.audition.instructions || 'Please prepare your best musical performance.'
 
     // Préparer les informations de contact formatées
-    const toContactDetails = this.responsible ?
-      `${this.responsible.first_name || ''} ${this.responsible.last_name || ''}
-       Email: ${this.responsible.email || 'No email provided'}
-       Phone: ${this.responsible.phone || 'No phone provided'}
-       Messenger: ${this.responsible.messenger || 'No messenger provided'}` :
-      'No contact details available'
+    const toContactDetails = this.responsible
+      ? `${this.responsible.first_name || ''} ${this.responsible.last_name || ''}
+Email: ${this.responsible.email || 'No email provided'}
+Phone: ${this.responsible.phone || 'No phone provided'}
+Messenger: ${this.responsible.messenger || 'No messenger provided'}`
+      : 'No contact details available'
 
-    const auditionInstructions = this.audition.instructions || 'Please prepare your best musical performance.'
-
+    // Préparer le bloc deadline
     const deadlineBlock = this.audition.deadline
       ? `<div class="deadline">
           ⏰ <strong>Deadline:</strong> ${this.audition.deadline.toFormat('dd/MM/yyyy at HH:mm')}
          </div>`
       : ''
 
-    const attachmentsSection = pdfFiles.length > 0
-      ? `<div class="attachments-section">
+    // Préparer la section des attachements
+    const attachmentsSection =
+      pdfFiles.length > 0
+        ? `<div class="attachments-section">
           <h3 style="margin-top: 0; color: #0369a1; display: flex; align-items: center;">
             <span style="margin-right: 10px;">📎</span>
             Sheet Music Attached (${pdfFiles.length} file${pdfFiles.length > 1 ? 's' : ''})
           </h3>
           <p style="margin-bottom: 15px; color: #0c4a6e;">The following PDF files are attached to this email:</p>
 
-          ${pdfFiles.map(pdf => `
+          ${pdfFiles
+            .map(
+              (pdf) => `
           <div class="attachment-item">
             <div style="display: flex; align-items: center;">
               <span class="attachment-icon">📄</span>
@@ -430,13 +467,15 @@ export default class AuditionRequest extends BaseMail {
               </div>
             </div>
             <span class="attachment-badge">PDF</span>
-          </div>`).join('')}
+          </div>`
+            )
+            .join('')}
 
           <p style="font-size: 14px; color: #475569; margin-top: 15px; font-style: italic;">
             💡 <strong>Tip:</strong> If you don't see the attachments, they can also be downloaded from the audition portal.
           </p>
         </div>`
-      : `<div class="attachments-section">
+        : `<div class="attachments-section">
           <h3 style="margin-top: 0; color: #0369a1; display: flex; align-items: center;">
             <span style="margin-right: 10px;">📎</span>
             Sheet Music Information
@@ -444,40 +483,63 @@ export default class AuditionRequest extends BaseMail {
           <p style="color: #0c4a6e;">Sheet music will be provided via the audition portal.</p>
         </div>`
 
-    // ✅ SOLUTION SIMPLE : Remplacer d'abord les variables échappées, puis les variables normales
+    // Charger le template
+    let htmlContent = ''
+    const template = await MailTemplate.query().where('name', 'audition_request.html').first()
+
+    if (template) {
+      htmlContent = template.content
+      console.log('📧 Using template from database')
+    } else {
+      console.log('📧 Using default template')
+      htmlContent = this.getDefaultTemplate()
+    }
+
+    // ✅ UTILISER LA NOUVELLE FONCTION DE REMPLACEMENT
+    const templateVariables = {
+      URL: frontendUrl,
+      NAME: contactName,
+      PROJECT: projectName,
+      REGISTRATION: auditionUploadUrl,
+      TO_CONTACT: toContactDetails,
+      AUDITION_INSTRUCTIONS: auditionInstructions,
+      ATTACHMENTS_SECTION: attachmentsSection,
+      DEADLINE_BLOCK: deadlineBlock,
+    }
+
     console.log('🔧 Starting template variable replacement...')
+    console.log('📝 Variables to replace:', Object.keys(templateVariables))
+    console.log('📝 Sample values:', {
+      NAME: contactName,
+      PROJECT: projectName,
+      REGISTRATION: auditionUploadUrl.substring(0, 50) + '...',
+    })
 
-    // Étape 1 : Remplacer les variables échappées (\${VARIABLE})
-    htmlContent = htmlContent
-      .replace(/\\\$\{URL\}/g, frontendUrl)
-      .replace(/\\\$\{NAME\}/g, `${this.contact.first_name || ''} ${this.contact.last_name || ''}`.trim())
-      .replace(/\\\$\{PROJECT\}/g, this.project.name || '')
-      .replace(/\\\$\{REGISTRATION\}/g, auditionUploadUrl)
-      .replace(/\\\$\{TO_CONTACT\}/g, toContactDetails)
-      .replace(/\\\$\{AUDITION_INSTRUCTIONS\}/g, auditionInstructions)
-      .replace(/\\\$\{ATTACHMENTS_SECTION\}/g, attachmentsSection)
-      .replace(/\\\$\{DEADLINE_BLOCK\}/g, deadlineBlock)
+    // ✅ DÉBOGAGE : Vérifier si les variables existent dans le template
+    console.log('🔍 Template variables check:')
+    Object.keys(templateVariables).forEach((key) => {
+      const found = htmlContent.includes(`{${key}}`)
+      console.log(`  {${key}}: ${found ? '✅ FOUND' : '❌ NOT FOUND'}`)
+    })
 
-    // Étape 2 : Remplacer aussi les variables non échappées (au cas où)
-    htmlContent = htmlContent
-      .replace(/\$\{URL\}/g, frontendUrl)
-      .replace(/\$\{NAME\}/g, `${this.contact.first_name || ''} ${this.contact.last_name || ''}`.trim())
-      .replace(/\$\{PROJECT\}/g, this.project.name || '')
-      .replace(/\$\{REGISTRATION\}/g, auditionUploadUrl)
-      .replace(/\$\{TO_CONTACT\}/g, toContactDetails)
-      .replace(/\$\{AUDITION_INSTRUCTIONS\}/g, auditionInstructions)
-      .replace(/\$\{ATTACHMENTS_SECTION\}/g, attachmentsSection)
-      .replace(/\$\{DEADLINE_BLOCK\}/g, deadlineBlock)
+    htmlContent = this.replaceTemplateVariables(htmlContent, templateVariables)
 
     console.log('✅ Template variables replaced')
-    console.log('📝 Sample content check:', htmlContent.includes(this.contact.first_name || 'NO_NAME') ? 'Variables replaced successfully' : 'Variables NOT replaced')
+    console.log(
+      '📝 Post-replacement check:',
+      htmlContent.includes(contactName)
+        ? 'Variables replaced successfully'
+        : 'Variables NOT replaced'
+    )
     console.log('📧 Final HTML content length:', htmlContent.length)
 
     // Configuration du message de base
     this.message
       .to(this.contact.email)
       .from(`Melomania <${env.get('SMTP_USERNAME')}>`)
-      .subject(`${this.subject}${pdfFiles.length > 0 ? ` - ${pdfFiles.length} sheet music file(s) attached` : ''}`)
+      .subject(
+        `${this.subject}${pdfFiles.length > 0 ? ` - ${pdfFiles.length} sheet music file(s) attached` : ''}`
+      )
       .html(htmlContent)
       .attach(logoPath, { cid: 'logoMelomania.png' } as any)
 
@@ -510,21 +572,24 @@ export default class AuditionRequest extends BaseMail {
         this.message.attach(filePath, {
           filename: cleanFileName,
           contentType: 'application/pdf',
-          contentDisposition: 'attachment'
+          contentDisposition: 'attachment',
         } as any)
 
         attachedCount++
         console.log(`📎 Attached PDF: "${pdfFile.title}" as "${cleanFileName}"`)
-
       } catch (error) {
-        attachmentErrors.push(`PDF "${pdfFile.title}": attachment error (${(error as Error).message})`)
+        attachmentErrors.push(
+          `PDF "${pdfFile.title}": attachment error (${(error as Error).message})`
+        )
         console.error(`❌ Error attaching PDF "${pdfFile.title}":`, error)
       }
     }
 
     // Log du résultat des attachements
     if (attachedCount > 0) {
-      console.log(`✅ Successfully attached ${attachedCount}/${pdfFiles.length} PDFs to audition email`)
+      console.log(
+        `✅ Successfully attached ${attachedCount}/${pdfFiles.length} PDFs to audition email`
+      )
     }
 
     if (attachmentErrors.length > 0) {
@@ -536,6 +601,6 @@ export default class AuditionRequest extends BaseMail {
       console.error(`❌ Failed to attach any PDFs for audition ${this.audition.id}`)
     }
 
-    console.log(`📧 Email preparation completed`)
+    console.log(`📧 Email preparation completed for ${this.contact.email}`)
   }
 }

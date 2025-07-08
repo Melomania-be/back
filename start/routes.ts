@@ -48,8 +48,8 @@ router.group(() => {
 
   // ✅ ROUTES FICHIERS PUBLIQUES ÉTENDUES
   router.get('/files/download/:id', [FilesController, 'download'])
-  router.get('/files/stream/:id', [FilesController, 'stream'])     // ← NOUVELLE ROUTE STREAMING
-  router.get('/files/info/:id', [FilesController, 'info'])         // ← NOUVELLE ROUTE INFO (debug)
+  router.get('/files/stream/:id', [FilesController, 'stream']) // ← NOUVELLE ROUTE STREAMING
+  router.get('/files/info/:id', [FilesController, 'info']) // ← NOUVELLE ROUTE INFO (debug)
 
   // Recommend someone (public)
   router.post('/recommend_someone', [RecommendSomeonesController, 'create'])
@@ -70,26 +70,28 @@ router.group(() => {
   // =============================================================================
   // ROUTES PUBLIQUES POUR AUDITIONS (CANDIDATS) - CORRIGÉ
   // =============================================================================
-  router.group(() => {
-    // Page d'audition sécurisée pour les candidats
-    router.get('/:token', [AuditionsController, 'getAuditionPage'])
+  router
+    .group(() => {
+      // Page d'audition sécurisée pour les candidats
+      router.get('/:token', [AuditionsController, 'getAuditionPage'])
 
-    // Upload de fichier d'audition
-    router.post('/:token/upload', [AuditionsController, 'uploadAuditionFile'])
+      // Upload de fichier d'audition
+      router.post('/:token/upload', [AuditionsController, 'uploadAuditionFile'])
 
-    // Sauvegarder les notes temporaires
-    router.post('/:token/save-notes', [AuditionsController, 'saveTemporaryNotes'])
+      // Sauvegarder les notes temporaires
+      router.post('/:token/save-notes', [AuditionsController, 'saveTemporaryNotes'])
 
-    // Soumettre l'audition complète
-    router.post('/:token/submit', [AuditionsController, 'submitAudition'])
+      // Soumettre l'audition complète
+      router.post('/:token/submit', [AuditionsController, 'submitAudition'])
 
-    // Supprimer un fichier d'audition
-    router.delete('/:token/files/:fileId', [AuditionsController, 'deleteAuditionFile'])
+      // Supprimer un fichier d'audition
+      router.delete('/:token/files/:fileId', [AuditionsController, 'deleteAuditionFile'])
 
-    // Gestion des PDFs d'audition (côté participant)
-    router.get('/:token/pdfs', [AuditionsController, 'getAuditionPdfs'])
-    router.get('/:token/pdf/:pdfFileId/download', [AuditionsController, 'downloadAuditionPdf'])
-  }).prefix('/audition')
+      // Gestion des PDFs d'audition (côté participant)
+      router.get('/:token/pdfs', [AuditionsController, 'getAuditionPdfs'])
+      router.get('/:token/pdf/:pdfFileId/download', [AuditionsController, 'downloadAuditionPdf'])
+    })
+    .prefix('/audition')
 
   // =============================================================================
   // ROUTES PROTÉGÉES (AVEC AUTHENTIFICATION)
@@ -262,7 +264,7 @@ router.group(() => {
           router.delete('/:id', [FilesController, 'delete'])
 
           // ✅ ROUTES ADDITIONNELLES POUR ADMIN
-          router.get('/:id/info', [FilesController, 'info'])     // Info détaillée sur un fichier
+          router.get('/:id/info', [FilesController, 'info']) // Info détaillée sur un fichier
         })
         .prefix('/files')
 
@@ -336,6 +338,8 @@ router.group(() => {
             MailingsController,
             'sendRefusalEmailToParticipant',
           ])
+
+          router.post('/sendAuditionRequest', [MailingsController, 'sendAuditionRequest'])
 
           // Mailing pour des listes de contacts
           router.post('/sendTemplateToList', [MailingsController, 'sendTemplateToList'])
