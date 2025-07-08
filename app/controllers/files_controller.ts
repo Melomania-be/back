@@ -275,3 +275,76 @@ export default class FilesController {
         // Gestion des erreurs de stream
         stream.on('error', (error) => {
           console.error('❌ Complete stream error:', error)
+          if (!response.hasLazyBody) {
+            response.status(500).send('Stream error')
+          }
+        })
+
+        stream.on('open', () => {
+          console.log(`✅ Stream opened for: ${file.name}`)
+        })
+
+        stream.on('end', () => {
+          console.log(`✅ Stream completed for: ${file.name}`)
+        })
+
+        return response.stream(stream)
+      }
+    } catch (error) {
+      console.error('❌ Streaming error:', error)
+      return response.status(500).json({
+        error: 'File streaming failed',
+        details: (error as Error).message,
+        fileId: params.id
+      })
+    }
+  }
+
+  // Informations sur un fichier (debugging)
+  async info({ params, response }: HttpContext) {
+    try {
+      const file = await File.findOrFail(params.id)
+
+      let fileStats = null
+      let fileExists = false
+
+      if (file.path) {
+        try {
+          await fs.access(file.path)
+          fileStats = statSync(file.path)
+          fileExists = true
+        } catch (accessError) {
+          console.log('File does not exist on disk:', file.path)
+        }
+      }
+
+      return response.ok({
+        file: {
+          id: file.id,
+          name: file.name,
+          type: file.type,
+          path: file.path,
+          size: file.size ?? 0,
+          created_at: file.createdAt,
+          updated_at: file.updatedAt
+        },
+        physical_file: {
+          exists: fileExists,
+          size: fileStats?.size || null,
+          modified: fileStats?.mtime || null,
+          accessible: fileExists
+        },
+        urls: {
+          download: `/files/download/${file.id}`,
+          stream: `/files/stream/${file.id}`,
+          info: `/files/info/${file.id}`
+        }
+      })
+    } catch (error) {
+      return response.status(404).json({
+        error: 'File not found',
+        fileId: params.id,
+      })
+    }
+  }
+}
