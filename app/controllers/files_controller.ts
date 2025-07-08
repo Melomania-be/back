@@ -1,4 +1,5 @@
-// app/controllers/files_controller.ts - Version complète avec streaming amélioré et size
+// app/controllers/files_controller.ts - Version corrigée complète
+
 import { filesUploadValidator, filesUpdateValidator } from '#validators/file'
 import { cuid } from '@adonisjs/core/helpers'
 import { HttpContext } from '@adonisjs/core/http'
@@ -23,7 +24,7 @@ export default class FilesController {
           type: fileElement.type,
           content: '',
           path: fileElement.filePath,
-          size: fileElement.size || 0, // ✅ Ajouter la taille
+          size: fileElement.size || 0,
         })
       }
     }
@@ -38,7 +39,7 @@ export default class FilesController {
         type: file.type,
         content: '',
         path: file.filePath,
-        size: file.size || 0, // ✅ Ajouter la taille
+        size: file.size || 0,
       })
     }
 
@@ -70,7 +71,7 @@ export default class FilesController {
     }
   }
 
-  // ✅ MÉTHODE DOWNLOAD AMÉLIORÉE AVEC DEBUG ET CORS
+  // ✅ CORRECTION LIGNE 115 : Méthode download améliorée
   async download(ctx: HttpContext) {
     try {
       const file = await File.findOrFail(ctx.params.id)
@@ -82,7 +83,7 @@ export default class FilesController {
         return ctx.response.status(404).json({
           error: 'File path not found',
           fileId: file.id,
-          fileName: file.name
+          fileName: file.name,
         })
       }
 
@@ -95,40 +96,44 @@ export default class FilesController {
         return ctx.response.status(404).json({
           error: 'Physical file not found',
           path: file.path,
-          fileName: file.name
+          fileName: file.name,
         })
       }
 
       console.log(`✅ Sending download for: ${file.name}`)
 
-      // ✅ HEADERS CORS POUR TÉLÉCHARGEMENT
+      // Headers CORS pour téléchargement
       ctx.response.header('Access-Control-Allow-Origin', '*')
       ctx.response.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
       ctx.response.header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-      ctx.response.header('Access-Control-Expose-Headers', 'Content-Disposition, Content-Length, Content-Type')
+      ctx.response.header(
+        'Access-Control-Expose-Headers',
+        'Content-Disposition, Content-Length, Content-Type'
+      )
 
       // Headers pour forcer le téléchargement
       ctx.response.header('Content-Type', file.type || 'application/octet-stream')
       ctx.response.header('Content-Disposition', `attachment; filename="${file.name}"`)
       ctx.response.header('Cache-Control', 'no-cache')
 
-      return ctx.response.download(file.path, file.name)
+      // ✅ CORRECTION : Retourner le fichier sans deuxième paramètre
+      return ctx.response.download(file.path)
     } catch (error) {
       console.error('❌ Download error:', error)
 
-      // ✅ CORS HEADERS MÊME EN CAS D'ERREUR
+      // CORS headers même en cas d'erreur
       ctx.response.header('Access-Control-Allow-Origin', '*')
       ctx.response.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
 
       return ctx.response.status(500).json({
         error: 'Download failed',
-        details: error.message,
-        fileId: ctx.params.id
+        details: (error as Error).message,
+        fileId: ctx.params.id,
       })
     }
   }
 
-  // ✅ MÉTHODE STREAM AMÉLIORÉE POUR LECTURE DIRECTE
+  // ✅ CORRECTION LIGNE 210 : Méthode stream améliorée
   async stream({ params, request, response }: HttpContext) {
     try {
       const file = await File.findOrFail(params.id)
@@ -143,7 +148,7 @@ export default class FilesController {
         return response.status(404).json({
           error: 'File path not found',
           fileId: file.id,
-          fileName: file.name
+          fileName: file.name,
         })
       }
 
@@ -158,16 +163,16 @@ export default class FilesController {
         return response.status(404).json({
           error: 'Physical file not found',
           path: filePath,
-          fileName: file.name
+          fileName: file.name,
         })
       }
 
       const fileSize = stats.size
       const range = request.header('range')
 
-      // ✅ DÉTECTION AMÉLIORÉE DU CONTENT-TYPE
+      // ✅ CORRECTION LIGNE 210 : Détection améliorée du content-type avec typage correct
       const ext = extname(file.name).toLowerCase()
-      const mimeTypes = {
+      const mimeTypes: Record<string, string> = {
         // Vidéos
         '.mp4': 'video/mp4',
         '.webm': 'video/webm',
@@ -204,27 +209,30 @@ export default class FilesController {
         '.txt': 'text/plain',
         '.html': 'text/html',
         '.css': 'text/css',
-        '.js': 'application/javascript'
+        '.js': 'application/javascript',
       }
 
       const contentType = mimeTypes[ext] || file.type || 'application/octet-stream'
       console.log(`🎵 Determined Content-Type: ${contentType}`)
 
-      // ✅ HEADERS CORS ET CACHE OPTIMISÉS
+      // Headers CORS et cache optimisés
       response.header('Access-Control-Allow-Origin', '*')
       response.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
       response.header('Access-Control-Allow-Headers', 'Range, Content-Type')
-      response.header('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length')
+      response.header(
+        'Access-Control-Expose-Headers',
+        'Content-Range, Accept-Ranges, Content-Length'
+      )
 
-      // ✅ GESTION DES RANGE REQUESTS (CRUCIAL POUR VIDÉOS)
+      // Gestion des range requests (crucial pour vidéos)
       if (range) {
         console.log(`📊 Range request detected: ${range}`)
 
         // Parser le header Range (format: "bytes=start-end")
-        const parts = range.replace(/bytes=/, "").split("-")
-        const start = parseInt(parts[0], 10)
-        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1
-        const chunksize = (end - start) + 1
+        const parts = range.replace(/bytes=/, '').split('-')
+        const start = Number.parseInt(parts[0] || '0', 10) // ✅ Correction: valeur par défaut
+        const end = parts[1] ? Number.parseInt(parts[1], 10) : fileSize - 1
+        const chunksize = end - start + 1
 
         // Validation des ranges
         if (start >= fileSize || end >= fileSize || start > end) {
@@ -257,7 +265,7 @@ export default class FilesController {
 
         return response.stream(stream)
       } else {
-        // ✅ STREAMING COMPLET SANS RANGE
+        // Streaming complet sans range
         console.log(`📺 Serving complete file: ${fileSize} bytes`)
 
         response.header('Content-Length', fileSize.toString())
@@ -292,13 +300,13 @@ export default class FilesController {
       console.error('❌ Streaming error:', error)
       return response.status(500).json({
         error: 'File streaming failed',
-        details: error.message,
-        fileId: params.id
+        details: (error as Error).message,
+        fileId: params.id,
       })
     }
   }
 
-  // ✅ NOUVELLE MÉTHODE : Informations sur un fichier (debugging)
+  // Informations sur un fichier (debugging)
   async info({ params, response }: HttpContext) {
     try {
       const file = await File.findOrFail(params.id)
@@ -322,21 +330,21 @@ export default class FilesController {
           name: file.name,
           type: file.type,
           path: file.path,
-          size: file.size ?? 0, // ✅ Inclure la taille du modèle
+          size: file.size ?? 0,
           created_at: file.createdAt,
-          updated_at: file.updatedAt
+          updated_at: file.updatedAt,
         },
         physical_file: {
           exists: fileExists,
           size: fileStats?.size || null,
           modified: fileStats?.mtime || null,
-          accessible: fileExists
+          accessible: fileExists,
         },
         urls: {
           download: `/files/download/${file.id}`,
           stream: `/files/stream/${file.id}`,
-          info: `/files/info/${file.id}`
-        }
+          info: `/files/info/${file.id}`,
+        },
       })
     } catch (error) {
       return response.status(404).json({

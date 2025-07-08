@@ -13,7 +13,14 @@
     "test": "node ace test",
     "lint": "eslint . --fix",
     "format": "prettier --write .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+
+    "typecheck:strict": "tsc --noEmit --strict",
+    "typecheck:watch": "tsc --noEmit --watch",
+    "build:check": "tsc --noEmit && node ace build",
+    "lint:strict": "eslint . --max-warnings 0",
+    "validate": "npm run typecheck:strict && npm run lint:strict",
+    "pre-deploy": "npm run validate && npm run build:check"
   },
   "imports": {
     "#controllers/*": "./app/controllers/*.js",
