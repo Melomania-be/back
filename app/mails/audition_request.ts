@@ -1,4 +1,4 @@
-// app/mails/audition_request.ts - FIXED VERSION
+// app/mails/audition_request.ts - VERSION CORRIGÉE AVEC GESTION ROBUSTE DU LOGO
 
 import env from '#start/env'
 import { BaseMail } from '@adonisjs/mail'
@@ -10,6 +10,7 @@ import MailTemplate from '#models/mail_template'
 import AuditionPdfFile from '#models/audition_pdf_file'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import fs from 'node:fs'
 
 const currentFilename = fileURLToPath(import.meta.url)
 const currentDirname = path.dirname(currentFilename)
@@ -27,6 +28,41 @@ export default class AuditionRequest extends BaseMail {
   ) {
     super()
     this.from = env.get('SMTP_USERNAME')
+  }
+
+  /**
+   * ✅ SOLUTION : Trouver le chemin du logo de manière robuste
+   */
+  private findLogoPath(): string | null {
+    const possibleLogoPaths = [
+      // Chemin original (développement)
+      path.join(currentDirname, '..', '..', 'resources', 'mail_assets', 'logoMelomania.png'),
+      // Chemin après build
+      path.join(currentDirname, '..', '..', '..', 'resources', 'mail_assets', 'logoMelomania.png'),
+      // Chemin depuis la racine du projet
+      path.join(process.cwd(), 'resources', 'mail_assets', 'logoMelomania.png'),
+      // Chemin depuis la racine du build
+      path.join(process.cwd(), 'build', 'resources', 'mail_assets', 'logoMelomania.png'),
+      // Chemin absolu si défini dans l'environnement
+      env.get('LOGO_PATH') || '',
+    ].filter(Boolean)
+
+    // Trouver le premier chemin qui existe
+    for (const testPath of possibleLogoPaths) {
+      try {
+        if (fs.existsSync(testPath)) {
+          console.log(`✅ Logo trouvé pour audition à : ${testPath}`)
+          return testPath
+        } else {
+          console.log(`❌ Logo non trouvé pour audition à : ${testPath}`)
+        }
+      } catch (error) {
+        console.log(`❌ Erreur lors de la vérification du chemin d'audition ${testPath}:`, error)
+      }
+    }
+
+    console.warn('⚠️ Aucun logo trouvé pour l\'email d\'audition, envoi sans logo')
+    return null
   }
 
   /**
@@ -117,7 +153,7 @@ export default class AuditionRequest extends BaseMail {
   }
 
   /**
-   * ✅ TEMPLATE HTML CORRIGÉ sans variables échappées
+   * ✅ TEMPLATE HTML CORRIGÉ avec gestion conditionnelle du logo
    */
   private getDefaultTemplate(): string {
     return `<!DOCTYPE html>
@@ -290,8 +326,7 @@ export default class AuditionRequest extends BaseMail {
 
     <!-- Header with logo and name -->
     <div class="header-flex" style="display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 30px; text-align: center;">
-      <img src="cid:logoMelomania.png" alt="Melomania Logo" class="logo"
-           style="max-width: 125px; width: 100%; height: auto; border-radius: 6px; display: block; margin: 0 auto;">
+      {LOGO_BLOCK}
       <div style="flex: 1; min-width: 200px;">
         <h1 class="title" style="margin: 0; font-size: 40px; color: #333; line-height: 1.2;">Melomania</h1>
         <p class="subtitle" style="font-size: 18px; margin-top: 8px; color: #666; line-height: 1.3;">The collaborative musicians platform</p>
@@ -400,14 +435,9 @@ export default class AuditionRequest extends BaseMail {
 
   async prepare() {
     const frontendUrl = this.getFrontendUrl()
-    const logoPath = path.join(
-      currentDirname,
-      '..',
-      '..',
-      'resources',
-      'mail_assets',
-      'logoMelomania.png'
-    )
+    
+    // ✅ SOLUTION : Utiliser la fonction robuste pour trouver le logo
+    const logoPath = this.findLogoPath()
 
     // Charger les PDFs associés à cette audition
     const pdfFiles = await AuditionPdfFile.query()
@@ -483,6 +513,12 @@ Messenger: ${this.responsible.messenger || 'No messenger provided'}`
           <p style="color: #0c4a6e;">Sheet music will be provided via the audition portal.</p>
         </div>`
 
+    // ✅ SOLUTION : Gérer le logo de manière conditionnelle
+    const logoBlock = logoPath 
+      ? `<img src="cid:logoMelomania.png" alt="Melomania Logo" class="logo"
+           style="max-width: 125px; width: 100%; height: auto; border-radius: 6px; display: block; margin: 0 auto;">`
+      : `<!-- Logo non disponible sur ce serveur -->`
+
     // Charger le template
     let htmlContent = ''
     const template = await MailTemplate.query().where('name', 'audition_request.html').first()
@@ -505,6 +541,7 @@ Messenger: ${this.responsible.messenger || 'No messenger provided'}`
       AUDITION_INSTRUCTIONS: auditionInstructions,
       ATTACHMENTS_SECTION: attachmentsSection,
       DEADLINE_BLOCK: deadlineBlock,
+      LOGO_BLOCK: logoBlock, // ✅ NOUVEAU : Variable pour le logo
     }
 
     console.log('🔧 Starting template variable replacement...')
@@ -541,7 +578,19 @@ Messenger: ${this.responsible.messenger || 'No messenger provided'}`
         `${this.subject}${pdfFiles.length > 0 ? ` - ${pdfFiles.length} sheet music file(s) attached` : ''}`
       )
       .html(htmlContent)
-      .attach(logoPath, { cid: 'logoMelomania.png' } as any)
+
+    // ✅ SOLUTION : N'attacher le logo que s'il existe
+    if (logoPath) {
+      try {
+        this.message.attach(logoPath, { cid: 'logoMelomania.png' } as any)
+        console.log(`✅ Logo attaché avec succès pour audition depuis : ${logoPath}`)
+      } catch (error) {
+        console.error(`❌ Erreur lors de l'attachement du logo d'audition depuis ${logoPath}:`, error)
+        // On continue sans le logo plutôt que de faire échouer l'email
+      }
+    } else {
+      console.warn('⚠️ Aucun logo trouvé pour l\'email d\'audition, envoi sans logo')
+    }
 
     // Attacher tous les PDFs en pièces jointes
     let attachedCount = 0
