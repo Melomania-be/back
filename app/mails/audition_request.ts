@@ -5,11 +5,10 @@ import type Project from '#models/project'
 import type Section from '#models/section'
 import type Audition from '#models/audition'
 import MailTemplate from '#models/mail_template'
-import AuditionPdfFile from '#models/audition_pdf_file'
 
 export default class AuditionRequest extends BaseMail {
   override from: string
-  override subject = 'Audition Request with Sheet Music'
+  override subject = 'Audition Request - Musical Project'
 
   // URL du logo hébergé
   private logoUrl = 'https://static.wixstatic.com/media/90f349_9af8027280c347c29fdab0e895368255~mv2.png/v1/crop/x_20,y_0,w_351,h_638/fill/w_82,h_149,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/melomania_favicon_392x638.png'
@@ -113,7 +112,7 @@ export default class AuditionRequest extends BaseMail {
   }
 
   /**
-   * Template HTML optimisé pour tous les clients email
+   * Template HTML professionnel et épuré
    */
   private getDefaultTemplate(): string {
     return `<!DOCTYPE html>
@@ -122,7 +121,7 @@ export default class AuditionRequest extends BaseMail {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>Audition Request with Sheet Music</title>
+  <title>Audition Request</title>
   <!--[if mso]>
   <noscript>
     <xml>
@@ -143,10 +142,11 @@ export default class AuditionRequest extends BaseMail {
     body {
       margin: 0 !important;
       padding: 0 !important;
-      background-color: #f9f9f9 !important;
-      font-family: Arial, Helvetica, sans-serif !important;
+      background-color: #f8f9fa !important;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
       -webkit-text-size-adjust: 100% !important;
       -ms-text-size-adjust: 100% !important;
+      line-height: 1.6 !important;
     }
 
     table {
@@ -206,7 +206,7 @@ export default class AuditionRequest extends BaseMail {
         height: auto !important;
       }
 
-      .upload-button {
+      .access-button {
         width: 100% !important;
         padding: 15px !important;
         font-size: 16px !important;
@@ -247,7 +247,7 @@ export default class AuditionRequest extends BaseMail {
     }
   </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f9f9f9; font-family: Arial, Helvetica, sans-serif;">
+<body style="margin: 0; padding: 0; background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
   <!--[if mso]>
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
     <tr>
@@ -257,25 +257,25 @@ export default class AuditionRequest extends BaseMail {
   <!-- Container principal -->
   <table class="container" role="presentation" cellspacing="0" cellpadding="0" border="0"
          style="max-width: 600px; width: 100%; margin: 20px auto; background-color: #ffffff;
-                border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.05);">
+                border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
 
     <!-- En-tête avec logo et titre -->
     <tr>
-      <td style="padding: 30px 20px;">
+      <td style="padding: 40px 30px 30px 30px;">
         <table class="header-table" role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
           <tr>
             <!-- Logo -->
-            <td class="logo-cell" style="width: 150px; text-align: center; vertical-align: middle; padding-right: 20px;">
+            <td class="logo-cell" style="width: 120px; text-align: center; vertical-align: middle; padding-right: 20px;">
               {LOGO_BLOCK}
             </td>
 
             <!-- Titre -->
-            <td class="title-cell" style="text-align: center; vertical-align: middle;">
-              <h1 class="title" style="margin: 0; font-size: 40px; color: #333333; line-height: 44px; font-weight: bold;">
+            <td class="title-cell" style="text-align: left; vertical-align: middle;">
+              <h1 class="title" style="margin: 0; font-size: 32px; color: #2c3e50; line-height: 38px; font-weight: 600;">
                 Melomania
               </h1>
-              <p class="subtitle" style="font-size: 18px; margin: 8px 0 0 0; color: #666666; line-height: 22px;">
-                The collaborative musicians platform
+              <p class="subtitle" style="font-size: 16px; margin: 5px 0 0 0; color: #7f8c8d; line-height: 20px; font-weight: 400;">
+                Professional Musicians Platform
               </p>
             </td>
           </tr>
@@ -283,115 +283,122 @@ export default class AuditionRequest extends BaseMail {
       </td>
     </tr>
 
+    <!-- Ligne de séparation -->
+    <tr>
+      <td style="padding: 0 30px;">
+        <div style="height: 1px; background-color: #e9ecef; margin: 0;"></div>
+      </td>
+    </tr>
+
     <!-- Contenu principal -->
     <tr>
-      <td class="content-cell" style="padding: 20px 30px;">
+      <td class="content-cell" style="padding: 30px;">
+
+        <!-- Titre principal -->
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
           <tr>
-            <td style="text-align: center; padding-bottom: 20px;">
-              <h2 style="color: #28a745; margin: 0; font-size: 24px;">🎵 Audition Request with Sheet Music 🎵</h2>
+            <td style="text-align: center; padding-bottom: 30px;">
+              <h2 style="color: #2c3e50; margin: 0; font-size: 24px; font-weight: 600;">Audition Request</h2>
+              <p style="color: #6c757d; margin: 8px 0 0 0; font-size: 16px;">Musical Project Assessment</p>
             </td>
           </tr>
         </table>
 
-        <p class="content-text" style="margin: 0 0 15px 0; line-height: 24px; color: #333333; font-size: 16px;">
+        <p class="content-text" style="margin: 0 0 20px 0; line-height: 26px; color: #495057; font-size: 16px;">
           Dear <strong>{NAME}</strong>,
         </p>
 
-        <p class="content-text" style="margin: 0 0 15px 0; line-height: 24px; color: #333333; font-size: 16px;">
-          Congratulations! Your application for the <strong>{PROJECT}</strong> project has caught our attention.
-        </p>
-
-        <p class="content-text" style="margin: 0 0 20px 0; line-height: 24px; color: #333333; font-size: 16px;">
-          We would like to invite you to take an audition to more precisely evaluate your musical skills.
+        <p class="content-text" style="margin: 0 0 20px 0; line-height: 26px; color: #495057; font-size: 16px;">
+          Thank you for your application to the <strong>{PROJECT}</strong> project. We have reviewed your profile and would like to invite you to participate in an audition process.
         </p>
 
         <!-- Instructions d'audition -->
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0;">
           <tr>
-            <td style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #28a745;">
-              <h3 style="margin: 0 0 10px 0; color: #28a745; font-size: 18px;">📋 Specific Instructions:</h3>
-              <div style="margin: 10px 0; color: #333333; line-height: 24px;">{AUDITION_INSTRUCTIONS}</div>
+            <td style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; border-left: 4px solid #6c63ff;">
+              <h3 style="margin: 0 0 15px 0; color: #2c3e50; font-size: 18px; font-weight: 600;">Audition Instructions</h3>
+              <div style="margin: 0; color: #495057; line-height: 26px; font-size: 16px;">{AUDITION_INSTRUCTIONS}</div>
             </td>
           </tr>
         </table>
 
-        <!-- Section des pièces jointes -->
-        {ATTACHMENTS_SECTION}
-
-        <!-- Instructions étape par étape -->
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0;">
+        <!-- Process steps -->
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 30px 0;">
           <tr>
-            <td style="background-color: #ecfdf5; border: 2px solid #10b981; border-radius: 8px; padding: 20px;">
-              <h3 style="margin: 0 0 15px 0; color: #065f46; font-size: 18px;">
-                ✅ How to proceed with your audition
+            <td style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 25px;">
+              <h3 style="margin: 0 0 20px 0; color: #2c3e50; font-size: 18px; font-weight: 600;">
+                Audition Process
               </h3>
 
+              <!-- Step 1 -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 15px;">
+                <tr>
+                  <td style="padding: 15px; background-color: #ffffff; border-radius: 4px; border-left: 3px solid #6c63ff;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td style="width: 35px; vertical-align: top;">
+                          <div style="background-color: #6c63ff; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-weight: 600; text-align: center; line-height: 28px; font-size: 14px;">1</div>
+                        </td>
+                        <td style="padding-left: 15px; vertical-align: middle;">
+                          <strong style="color: #2c3e50; font-size: 16px;">Access the audition portal</strong>
+                          <br><span style="color: #6c757d; font-size: 14px;">Use the link below to access your personal audition space</span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Step 2 -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 15px;">
+                <tr>
+                  <td style="padding: 15px; background-color: #ffffff; border-radius: 4px; border-left: 3px solid #6c63ff;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td style="width: 35px; vertical-align: top;">
+                          <div style="background-color: #6c63ff; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-weight: 600; text-align: center; line-height: 28px; font-size: 14px;">2</div>
+                        </td>
+                        <td style="padding-left: 15px; vertical-align: middle;">
+                          <strong style="color: #2c3e50; font-size: 16px;">Download materials</strong>
+                          <br><span style="color: #6c757d; font-size: 14px;">Access and download any required sheet music or materials</span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Step 3 -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 15px;">
+                <tr>
+                  <td style="padding: 15px; background-color: #ffffff; border-radius: 4px; border-left: 3px solid #6c63ff;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td style="width: 35px; vertical-align: top;">
+                          <div style="background-color: #6c63ff; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-weight: 600; text-align: center; line-height: 28px; font-size: 14px;">3</div>
+                        </td>
+                        <td style="padding-left: 15px; vertical-align: middle;">
+                          <strong style="color: #2c3e50; font-size: 16px;">Prepare your audition</strong>
+                          <br><span style="color: #6c757d; font-size: 14px;">Practice the required pieces and prepare your performance</span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Step 4 -->
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                 <tr>
-                  <td style="padding: 10px; background-color: #ffffff; border-radius: 6px; border-left: 4px solid #10b981; margin: 10px 0;">
+                  <td style="padding: 15px; background-color: #ffffff; border-radius: 4px; border-left: 3px solid #6c63ff;">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                       <tr>
-                        <td style="width: 40px; vertical-align: top;">
-                          <div style="background-color: #10b981; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-weight: bold; text-align: center; line-height: 30px;">1</div>
+                        <td style="width: 35px; vertical-align: top;">
+                          <div style="background-color: #6c63ff; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-weight: 600; text-align: center; line-height: 28px; font-size: 14px;">4</div>
                         </td>
-                        <td style="padding-left: 15px;">
-                          <strong style="color: #333333;">Download the sheet music</strong>
-                          <br><small style="color: #666666;">PDF files are attached to this email. Save them to your computer.</small>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 10px;">
-                <tr>
-                  <td style="padding: 10px; background-color: #ffffff; border-radius: 6px; border-left: 4px solid #10b981;">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                      <tr>
-                        <td style="width: 40px; vertical-align: top;">
-                          <div style="background-color: #10b981; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-weight: bold; text-align: center; line-height: 30px;">2</div>
-                        </td>
-                        <td style="padding-left: 15px;">
-                          <strong style="color: #333333;">Study and practice</strong>
-                          <br><small style="color: #666666;">Take time to properly work on the requested pieces.</small>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 10px;">
-                <tr>
-                  <td style="padding: 10px; background-color: #ffffff; border-radius: 6px; border-left: 4px solid #10b981;">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                      <tr>
-                        <td style="width: 40px; vertical-align: top;">
-                          <div style="background-color: #10b981; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-weight: bold; text-align: center; line-height: 30px;">3</div>
-                        </td>
-                        <td style="padding-left: 15px;">
-                          <strong style="color: #333333;">Record your performance</strong>
-                          <br><small style="color: #666666;">Audio (MP3, WAV) or video (MP4, AVI, MOV) - Max 50MB per file.</small>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 10px;">
-                <tr>
-                  <td style="padding: 10px; background-color: #ffffff; border-radius: 6px; border-left: 4px solid #10b981;">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                      <tr>
-                        <td style="width: 40px; vertical-align: top;">
-                          <div style="background-color: #10b981; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-weight: bold; text-align: center; line-height: 30px;">4</div>
-                        </td>
-                        <td style="padding-left: 15px;">
-                          <strong style="color: #333333;">Upload to the audition portal</strong>
-                          <br><small style="color: #666666;">Use the link below to send your recordings.</small>
+                        <td style="padding-left: 15px; vertical-align: middle;">
+                          <strong style="color: #2c3e50; font-size: 16px;">Submit your recordings</strong>
+                          <br><span style="color: #6c757d; font-size: 14px;">Upload your audio or video recordings (Max 50MB per file)</span>
                         </td>
                       </tr>
                     </table>
@@ -406,42 +413,42 @@ export default class AuditionRequest extends BaseMail {
         {DEADLINE_BLOCK}
 
         <!-- Bouton d'accès -->
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 30px 0;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 35px 0;">
           <tr>
             <td style="text-align: center;">
-              <a href="{REGISTRATION}" class="upload-button"
-                 style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px;
-                        font-weight: bold; font-size: 16px;">
-                🎬 Access audition portal
+              <a href="{REGISTRATION}" class="access-button"
+                 style="display: inline-block; background-color: #6c63ff; color: white;
+                        padding: 16px 32px; text-decoration: none; border-radius: 6px;
+                        font-weight: 600; font-size: 16px; letter-spacing: 0.5px;">
+                Access Audition Portal
               </a>
             </td>
           </tr>
         </table>
 
-        <p class="content-text" style="margin: 0 0 15px 0; line-height: 24px; color: #6c757d; font-size: 16px; font-style: italic;">
-          This link is personal and secure. You can also download the sheet music again from there if needed.
+        <p class="content-text" style="margin: 0 0 20px 0; line-height: 26px; color: #6c757d; font-size: 15px; font-style: italic; text-align: center;">
+          This link is personal and secure. You can access your audition portal at any time before the deadline.
         </p>
 
-        <p class="content-text" style="margin: 0 0 20px 0; line-height: 24px; color: #333333; font-size: 16px;">
-          Once your audition is submitted, our team will evaluate it and communicate our decision to you as soon as possible.
+        <p class="content-text" style="margin: 0 0 25px 0; line-height: 26px; color: #495057; font-size: 16px;">
+          Once you have submitted your audition, our evaluation team will review your performance and communicate our decision as soon as possible.
         </p>
 
-        <p class="content-text" style="margin: 0 0 15px 0; line-height: 24px; color: #333333; font-size: 16px;">
-          Good luck with your audition!
+        <p class="content-text" style="margin: 0 0 15px 0; line-height: 26px; color: #495057; font-size: 16px;">
+          We wish you the best of luck with your audition.
         </p>
 
-        <p class="content-text" style="margin: 0 0 20px 0; line-height: 24px; color: #333333; font-size: 16px;">
+        <p class="content-text" style="margin: 0 0 30px 0; line-height: 26px; color: #495057; font-size: 16px;">
           Best regards,<br>
-          <strong>The {PROJECT} project team</strong>
+          <strong>The {PROJECT} Project Team</strong>
         </p>
 
         <!-- Informations de contact -->
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0;">
           <tr>
-            <td style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px;">
-              <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 16px;">📞 Contact Information:</h4>
-              <div style="white-space: pre-line; color: #6c757d; font-size: 14px; line-height: 20px;">{TO_CONTACT}</div>
+            <td style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 20px;">
+              <h4 style="margin: 0 0 12px 0; color: #495057; font-size: 16px; font-weight: 600;">Contact Information</h4>
+              <div style="white-space: pre-line; color: #6c757d; font-size: 14px; line-height: 22px;">{TO_CONTACT}</div>
             </td>
           </tr>
         </table>
@@ -453,13 +460,13 @@ export default class AuditionRequest extends BaseMail {
       <td style="padding: 0 30px;">
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
           <tr>
-            <td style="border-top: 1px solid #dddddd; padding: 20px 0;">
-              <p style="font-size: 12px; color: #888888; line-height: 16px; margin: 0 0 10px 0;">
-                This email was sent automatically. If you have any questions, please feel free to contact us.
+            <td style="border-top: 1px solid #e9ecef; padding: 20px 0;">
+              <p style="font-size: 12px; color: #adb5bd; line-height: 18px; margin: 0 0 8px 0; text-align: center;">
+                This email was sent automatically. If you have any questions, please contact us using the information above.
               </p>
 
-              <p style="font-size: 11px; color: #999999; line-height: 14px; margin: 15px 0 0 0; border-top: 1px solid #eeeeee; padding-top: 10px;">
-                <strong>Technical note:</strong> If you don't see the PDF attachments, check your email client or download them directly from the audition portal.
+              <p style="font-size: 11px; color: #adb5bd; line-height: 16px; margin: 0; text-align: center;">
+                <strong>Technical note:</strong> Supported file formats: MP3, WAV, MP4, AVI, MOV. Maximum file size: 50MB per upload.
               </p>
             </td>
           </tr>
@@ -480,16 +487,7 @@ export default class AuditionRequest extends BaseMail {
   async prepare() {
     const frontendUrl = this.getFrontendUrl()
 
-    // Charger les PDFs associés à cette audition
-    const pdfFiles = await AuditionPdfFile.query()
-      .where('audition_id', this.audition.id)
-      .preload('file')
-      .orderBy('order', 'asc')
-      .orderBy('title', 'asc')
-
-    console.log(
-      `📧 Preparing audition email for ${this.contact.email} with ${pdfFiles.length} PDF attachments`
-    )
+    console.log(`📧 Preparing audition email for ${this.contact.email} - NO PDF ATTACHMENTS`)
 
     // Génération du lien d'audition
     const auditionUploadUrl = `${frontendUrl}/audition/${this.audition.secure_token}`
@@ -499,84 +497,30 @@ export default class AuditionRequest extends BaseMail {
     const contactName = `${this.contact.first_name || ''} ${this.contact.last_name || ''}`.trim()
     const projectName = this.project.name || ''
     const auditionInstructions =
-      this.audition.instructions || 'Please prepare your best musical performance.'
+      this.audition.instructions || 'Please prepare your best musical performance according to the requirements for your section.'
 
     // Préparer les informations de contact formatées
     const toContactDetails = this.responsible
       ? `${this.responsible.first_name || ''} ${this.responsible.last_name || ''}
-Email: ${this.responsible.email || 'No email provided'}
-Phone: ${this.responsible.phone || 'No phone provided'}
-Messenger: ${this.responsible.messenger || 'No messenger provided'}`
-      : 'No contact details available'
+Email: ${this.responsible.email || 'Not provided'}
+Phone: ${this.responsible.phone || 'Not provided'}
+Messenger: ${this.responsible.messenger || 'Not provided'}`
+      : 'Please refer to the project coordinator for any questions.'
 
     // Préparer le bloc deadline
     const deadlineBlock = this.audition.deadline
-      ? `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0;">
+      ? `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0;">
           <tr>
-            <td style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 8px; text-align: center;">
-              <strong style="color: #856404; font-size: 16px;">⏰ Deadline: ${this.audition.deadline.toFormat('dd/MM/yyyy at HH:mm')}</strong>
+            <td style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 18px; border-radius: 6px; text-align: center;">
+              <strong style="color: #856404; font-size: 16px;">Submission Deadline: ${this.audition.deadline.toFormat('MMMM dd, yyyy \'at\' HH:mm')}</strong>
             </td>
           </tr>
         </table>`
       : ''
 
-    // Préparer la section des attachements
-    const attachmentsSection =
-      pdfFiles.length > 0
-        ? `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0;">
-          <tr>
-            <td style="background-color: #f0f9ff; border: 2px solid #0ea5e9; border-radius: 8px; padding: 20px;">
-              <h3 style="margin: 0 0 15px 0; color: #0369a1; font-size: 18px;">
-                📎 Sheet Music Attached (${pdfFiles.length} file${pdfFiles.length > 1 ? 's' : ''})
-              </h3>
-              <p style="margin: 0 0 15px 0; color: #0c4a6e; font-size: 16px;">The following PDF files are attached to this email:</p>
-
-              ${pdfFiles
-          .map(
-            (pdf) => `
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 10px 0;">
-                <tr>
-                  <td style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 15px;">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                      <tr>
-                        <td style="width: 40px; vertical-align: middle;">
-                          <span style="color: #dc2626; font-size: 24px;">📄</span>
-                        </td>
-                        <td style="padding-left: 15px; vertical-align: middle;">
-                          <strong style="color: #333333; font-size: 16px;">${pdf.title}</strong>
-                          <br><small style="color: #64748b;">PDF attachment</small>
-                        </td>
-                        <td style="text-align: right; vertical-align: middle;">
-                          <span style="background-color: #10b981; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold;">PDF</span>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>`
-          )
-          .join('')}
-
-              <p style="font-size: 14px; color: #475569; margin: 15px 0 0 0; font-style: italic;">
-                💡 <strong>Tip:</strong> If you don't see the attachments, they can also be downloaded from the audition portal.
-              </p>
-            </td>
-          </tr>
-        </table>`
-        : `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0;">
-          <tr>
-            <td style="background-color: #f0f9ff; border: 2px solid #0ea5e9; border-radius: 8px; padding: 20px;">
-              <h3 style="margin: 0 0 15px 0; color: #0369a1; font-size: 18px;">
-                📎 Sheet Music Information
-              </h3>
-              <p style="color: #0c4a6e; font-size: 16px; margin: 0;">Sheet music will be provided via the audition portal.</p>
-            </td>
-          </tr>
-        </table>`
-
-    // Logo depuis l'URL - simple et efficace !
+    // Logo professionnel
     const logoBlock = `<img src="${this.logoUrl}" alt="Melomania Logo" class="logo-img"
-         style="max-width: 125px; width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 6px;">`
+         style="max-width: 100px; width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 4px;">`
 
     // Charger le template
     let htmlContent = ''
@@ -586,7 +530,7 @@ Messenger: ${this.responsible.messenger || 'No messenger provided'}`
       htmlContent = template.content
       console.log('📧 Using template from database')
     } else {
-      console.log('📧 Using default template')
+      console.log('📧 Using default professional template')
       htmlContent = this.getDefaultTemplate()
     }
 
@@ -598,7 +542,6 @@ Messenger: ${this.responsible.messenger || 'No messenger provided'}`
       REGISTRATION: auditionUploadUrl,
       TO_CONTACT: toContactDetails,
       AUDITION_INSTRUCTIONS: auditionInstructions,
-      ATTACHMENTS_SECTION: attachmentsSection,
       DEADLINE_BLOCK: deadlineBlock,
       LOGO_BLOCK: logoBlock,
     }
@@ -606,85 +549,81 @@ Messenger: ${this.responsible.messenger || 'No messenger provided'}`
     console.log('🔧 Starting template variable replacement...')
     console.log('📝 Variables to replace:', Object.keys(templateVariables))
 
-    // Débogage : vérifier si les variables existent dans le template
-    console.log('🔍 Template variables check:')
-    Object.keys(templateVariables).forEach((key) => {
-      const found = htmlContent.includes(`{${key}}`)
-      console.log(`  {${key}}: ${found ? '✅ FOUND' : '❌ NOT FOUND'}`)
-    })
-
     htmlContent = this.replaceTemplateVariables(htmlContent, templateVariables)
 
     console.log('✅ Template variables replaced')
     console.log('📧 Final HTML content length:', htmlContent.length)
 
-    // Configuration du message de base
+    // Configuration du message - SANS PIÈCES JOINTES
     this.message
       .to(this.contact.email)
-      .from(this.from, 'Melomania')  // Nom d'affichage personnalisé
-      .subject(
-        `${this.subject}${pdfFiles.length > 0 ? ` - ${pdfFiles.length} sheet music file(s) attached` : ''}`
-      )
+      .from(this.from, 'Melomania')
+      .subject(`${this.subject} - ${projectName}`)
       .html(htmlContent)
+      .text(this.generateTextVersion(contactName, projectName, auditionInstructions, auditionUploadUrl, toContactDetails))
 
-    // Attacher tous les PDFs en pièces jointes
-    let attachedCount = 0
-    let attachmentErrors: string[] = []
+    console.log(`✅ Professional audition email prepared for ${this.contact.email} - NO ATTACHMENTS`)
+  }
 
-    for (const pdfFile of pdfFiles) {
-      try {
-        const filePath = pdfFile.file.path
+  /**
+   * Générer une version texte propre de l'email
+   */
+  private generateTextVersion(
+    contactName: string,
+    projectName: string,
+    instructions: string,
+    auditionUrl: string,
+    contactDetails: string
+  ): string {
+    const deadlineText = this.audition.deadline
+      ? `\n\nIMPORTANT: Submission deadline is ${this.audition.deadline.toFormat('MMMM dd, yyyy \'at\' HH:mm')}`
+      : ''
 
-        if (!filePath) {
-          attachmentErrors.push(`PDF "${pdfFile.title}": missing file path`)
-          continue
-        }
+    // Nettoyer les instructions HTML pour le texte
+    const cleanInstructions = instructions
+      .replace(/<[^>]*>/g, '') // Supprimer les tags HTML
+      .replace(/\s+/g, ' ') // Normaliser les espaces
+      .trim()
 
-        // Vérifier que le fichier existe physiquement
-        const fs = await import('node:fs/promises')
-        try {
-          await fs.access(filePath)
-        } catch (accessError) {
-          attachmentErrors.push(`PDF "${pdfFile.title}": file not found (${filePath})`)
-          continue
-        }
+    return `
+MELOMANIA - Professional Musicians Platform
 
-        // Générer un nom de fichier propre pour la pièce jointe
-        const cleanFileName = `${pdfFile.title.replace(/[^a-zA-Z0-9\-_.]/g, '_')}.pdf`
+AUDITION REQUEST - ${projectName.toUpperCase()}
 
-        // Attacher le fichier
-        this.message.attach(filePath, {
-          filename: cleanFileName,
-          contentType: 'application/pdf',
-          contentDisposition: 'attachment',
-        } as any)
+Dear ${contactName},
 
-        attachedCount++
-        console.log(`📎 Attached PDF: "${pdfFile.title}" as "${cleanFileName}"`)
-      } catch (error) {
-        attachmentErrors.push(
-          `PDF "${pdfFile.title}": attachment error (${(error as Error).message})`
-        )
-        console.error(`❌ Error attaching PDF "${pdfFile.title}":`, error)
-      }
-    }
+Thank you for your application to the ${projectName} project. We have reviewed your profile and would like to invite you to participate in an audition process.
 
-    // Log du résultat des attachements
-    if (attachedCount > 0) {
-      console.log(
-        `✅ Successfully attached ${attachedCount}/${pdfFiles.length} PDFs to audition email`
-      )
-    }
+AUDITION INSTRUCTIONS:
+${cleanInstructions}
 
-    if (attachmentErrors.length > 0) {
-      console.warn(`⚠️ PDF attachment errors:`, attachmentErrors)
-    }
+AUDITION PROCESS:
+1. Access the audition portal using the link below
+2. Download any required sheet music or materials
+3. Prepare your audition according to the instructions
+4. Submit your audio or video recordings (Max 50MB per file)
 
-    // Si aucune pièce jointe n'a pu être ajoutée mais qu'il y en avait dans la base
-    if (pdfFiles.length > 0 && attachedCount === 0) {
-      console.error(`❌ Failed to attach any PDFs for audition ${this.audition.id}`)
-    }
+ACCESS YOUR AUDITION PORTAL:
+${auditionUrl}
 
-    console.log(`📧 Email preparation completed for ${this.contact.email} with logo from URL`)
+This link is personal and secure. You can access your audition portal at any time before the deadline.
+${deadlineText}
+
+Once you have submitted your audition, our evaluation team will review your performance and communicate our decision as soon as possible.
+
+We wish you the best of luck with your audition.
+
+Best regards,
+The ${projectName} Project Team
+
+---
+CONTACT INFORMATION:
+${contactDetails}
+
+---
+This email was sent automatically. If you have any questions, please contact us using the information above.
+
+Technical note: Supported file formats: MP3, WAV, MP4, AVI, MOV. Maximum file size: 50MB per upload.
+    `.trim()
   }
 }

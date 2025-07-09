@@ -175,7 +175,10 @@ export default class MailingsController {
       'auditionId',
     ])
 
+    console.log('📥 Request data:', { projectId, participantId, auditionId })
+
     if (!projectId || !participantId) {
+      console.error('❌ Missing required fields:', { projectId, participantId, auditionId })
       return response.status(400).json({
         error: 'Missing required fields',
         received: { projectId, participantId, auditionId },
@@ -183,33 +186,73 @@ export default class MailingsController {
     }
 
     try {
-      // ✅ SOLUTION SIMPLE : Charger le projet sans preload
-      let project = await Project.find(projectId)
+      console.log('🔍 Loading project and participant data...')
 
+      // Charger le projet
+      let project = await Project.find(projectId)
+      if (!project) {
+        console.error('❌ Project not found:', projectId)
+        return response.status(404).json({ error: 'Project not found' })
+      }
+      console.log('✅ Project loaded:', project.name)
+
+      // Charger le participant avec ses relations
       let participant = await Participant.query()
         .where('id', participantId)
         .preload('contact')
         .preload('section')
         .first()
 
-      let audition = null
-      if (auditionId) {
-        audition = await Audition.query().where('id', auditionId).first()
+      if (!participant) {
+        console.error('❌ Participant not found:', participantId)
+        return response.status(404).json({ error: 'Participant not found' })
       }
-
-      if (!project || !participant) {
-        return response.status(404).json({ error: 'Project or participant not found' })
-      }
+      console.log('✅ Participant loaded:', participant.contact.first_name, participant.contact.last_name)
 
       // Vérifier que le contact et la section sont bien chargés
       if (!participant.contact || !participant.section) {
+        console.error('❌ Participant missing contact or section:', {
+          hasContact: !!participant.contact,
+          hasSection: !!participant.section
+        })
         return response.status(404).json({ error: 'Participant contact or section not found' })
       }
 
-      // ✅ SOLUTION SIMPLE : Charger les responsables séparément
+      // Charger l'audition
+      let audition = null
+      if (auditionId) {
+        audition = await Audition.query().where('id', auditionId).first()
+        console.log('🎭 Audition loaded by ID:', auditionId)
+      }
+
+      // Si pas d'audition spécifique fournie, essayer de la trouver
+      if (!audition) {
+        audition = await Audition.query()
+          .where('participant_id', participantId)
+          .where('project_id', projectId)
+          .orderBy('created_at', 'desc')
+          .first()
+        console.log('🎭 Audition found by participant/project:', !!audition)
+      }
+
+      if (!audition) {
+        console.error('❌ No audition found for participant:', participantId, 'in project:', projectId)
+        return response.status(404).json({ error: 'No audition found for this participant' })
+      }
+
+      console.log('✅ Audition loaded:', {
+        id: audition.id,
+        secure_token: audition.secure_token ? 'present' : 'missing',
+        instructions: audition.instructions ? 'present' : 'empty',
+        deadline: audition.deadline?.toISO() || 'none'
+      })
+
+      // Charger les responsables
       let responsibles = await Responsibles.query()
         .where('project_id', projectId)
         .preload('contact')
+
+      console.log('👥 Responsibles loaded:', responsibles.length)
 
       let responsibleContact = null
       if (responsibles && responsibles.length > 0) {
@@ -222,21 +265,11 @@ export default class MailingsController {
             phone: firstResponsible.contact.phone,
             messenger: firstResponsible.contact.messenger,
           }
+          console.log('✅ Responsible contact prepared:', responsibleContact.email)
         }
       }
 
-      // Si pas d'audition spécifique fournie, essayer de la trouver
-      if (!audition) {
-        audition = await Audition.query()
-          .where('participant_id', participantId)
-          .where('project_id', projectId)
-          .orderBy('created_at', 'desc')
-          .first()
-      }
-
-      if (!audition) {
-        return response.status(404).json({ error: 'No audition found for this participant' })
-      }
+      console.log('📧 Preparing audition email...')
 
       // Créer et envoyer l'email d'audition
       const AuditionRequest = (await import('#mails/audition_request')).default
@@ -248,29 +281,74 @@ export default class MailingsController {
         responsibleContact
       )
 
-      await mail.send(auditionRequestMail)
+      console.log('📤 Sending audition email to:', participant.contact.email)
+
+      try {
+        await mail.send(auditionRequestMail)
+        console.log('✅ Audition email sent successfully')
+      } catch (emailError) {
+        console.error('❌ Email sending failed:', emailError)
+
+        // Log des détails de l'erreur
+        if (emailError instanceof Error) {
+          console.error('Email error details:', {
+            message: emailError.message,
+            stack: emailError.stack
+          })
+        }
+
+        return response.status(500).json({
+          error: "Failed to send audition email",
+          details: emailError instanceof Error ? emailError.message : 'Unknown email error',
+          participant_email: participant.contact.email,
+          audition_id: audition.id
+        })
+      }
 
       // Créer une trace de l'envoi
-      const outgoingMail = new OutgoingMail()
-      outgoingMail.type = 'audition_request'
-      outgoingMail.receiver_id = participant.contact.id
-      outgoingMail.project_id = projectId
-      outgoingMail.mail_template_id = null
-      outgoingMail.sent = true
-      outgoingMail.createdAt = DateTime.local()
-      outgoingMail.updatedAt = DateTime.local()
-      await outgoingMail.save()
+      console.log('📝 Creating outgoing mail record...')
+      try {
+        const outgoingMail = new OutgoingMail()
+        outgoingMail.type = 'audition_request'
+        outgoingMail.receiver_id = participant.contact.id
+        outgoingMail.project_id = projectId
+        outgoingMail.mail_template_id = null
+        outgoingMail.sent = true
+        outgoingMail.createdAt = DateTime.local()
+        outgoingMail.updatedAt = DateTime.local()
+        await outgoingMail.save()
+        console.log('✅ Outgoing mail record created')
+      } catch (dbError) {
+        console.warn('⚠️ Failed to create outgoing mail record:', dbError)
+        // Ne pas faire échouer la requête pour ça
+      }
+
+      console.log('🎉 Audition request completed successfully')
 
       return response.ok({
         message: "Email d'audition envoyé avec succès",
         audition_id: audition.id,
         participant_email: participant.contact.email,
+        participant_name: `${participant.contact.first_name} ${participant.contact.last_name}`,
+        project_name: project.name
       })
+
     } catch (error) {
       console.error("❌ Erreur lors de l'envoi de l'email d'audition :", error)
+
+      // Log détaillé de l'erreur
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        })
+      }
+
       return response.status(500).json({
         error: "Erreur serveur lors de l'envoi de l'email d'audition",
-        details: error.message || 'Erreur inconnue',
+        details: error instanceof Error ? error.message : 'Erreur inconnue',
+        timestamp: new Date().toISOString()
       })
     }
   }
