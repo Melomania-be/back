@@ -23,6 +23,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download Build Artifact
         uses: actions/download-artifact@v4
         with:
@@ -48,10 +51,22 @@ jobs:
       - name: Installing the SSH Key
         run: |
           eval $(ssh-agent -s)
-          mkdir -p ~/.ssh       
-          chmod 700 ~/.ssh 
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 0400 ~/.ssh/id_rsa
+
+      #  SOLUTION SIMPLE : Copier les resources dans build avant rsync
+      - name: Copy resources to build directory
+        run: |
+          echo "Copying resources directory to build..."
+          if [ -d "resources" ]; then
+            cp -r resources/ build/
+            echo " Resources copied successfully"
+            ls -la build/resources/ || echo " Resources copy failed"
+          else
+            echo " Resources directory not found in source"
+          fi
 
       # Run rsync twice to see if it solves my issue. I have an issue where rsync is hanging randomly.
       # It might be related to the Imunify360 firewall. When this occurs, Imunify seems to be reloading the ipset list.
@@ -60,24 +75,31 @@ jobs:
         run: |
           sleep 2
           rsync --timeout=60 -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa" \
-          --exclude=".git" -av --delete build/ \
-          ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }}:/home/${{ secrets.CPANEL_LOGIN }}/app/back || true
-
+            --exclude=".git" -av --delete build/ \
+            ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }}:/home/${{ secrets.CPANEL_LOGIN }}/app/back || true
           sleep 2
           rsync --timeout=60 -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa" \
-          --exclude=".git" -av --delete build/ \
-          ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }}:/home/${{ secrets.CPANEL_LOGIN }}/app/back
+            --exclude=".git" -av --delete build/ \
+            ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }}:/home/${{ secrets.CPANEL_LOGIN }}/app/back
 
       - name: Restarting NodeJS application via ssh
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
-          ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }} \
-          '/usr/sbin/cloudlinux-selector stop --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
-          /usr/sbin/cloudlinux-selector start --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
-          /usr/sbin/cloudlinux-selector install-modules --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
-          source /home/sc1ciro3903/nodevenv/app/back/20/bin/activate && cd /home/sc1ciro3903/app/back/build && npm ci --omit="dev" && \
-          cd .. && npm run migrate-prod && \
-          npm run seed-prod'
+            ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }} \
+            '/usr/sbin/cloudlinux-selector stop --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
+            /usr/sbin/cloudlinux-selector start --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
+            /usr/sbin/cloudlinux-selector install-modules --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
+            source /home/sc1ciro3903/nodevenv/app/back/20/bin/activate && cd /home/sc1ciro3903/app/back/build && npm ci --omit="dev" && \
+            cd .. && npm run migrate-prod && \
+            npm run seed-prod'
+
+      # SOLUTION : Vérifier que les fichiers sont bien présents
+      - name: Verify deployment files
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
+            ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }} \
+            'echo "📋 Checking logo file..." && \
+            ls -la /home/${{ secrets.CPANEL_LOGIN }}/app/back/resources/mail_assets/logoMelomania.png || echo "❌ Logo file not found at expected location"'
 
       - name: Cleaning SSH keys
         if: always()
