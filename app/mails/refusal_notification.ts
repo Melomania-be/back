@@ -6,6 +6,7 @@ import type Section from '#models/section'
 import MailTemplate from '#models/mail_template'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import fs from 'node:fs'
 
 const currentFilename = fileURLToPath(import.meta.url)
 const currentDirname = path.dirname(currentFilename)
@@ -26,14 +27,37 @@ export default class RefusalNotification extends BaseMail {
 
   async prepare() {
     const url = env.get('URL') || ''
-    const logoPath = path.join(
-      currentDirname,
-      '..',
-      '..',
-      'resources',
-      'mail_assets',
-      'logoMelomania.png'
-    )
+    
+    // ✅ SOLUTION 1 : Essayer plusieurs chemins possibles pour le logo
+    const possibleLogoPaths = [
+      // Chemin original (développement)
+      path.join(currentDirname, '..', '..', 'resources', 'mail_assets', 'logoMelomania.png'),
+      // Chemin après build
+      path.join(currentDirname, '..', '..', '..', 'resources', 'mail_assets', 'logoMelomania.png'),
+      // Chemin depuis la racine du projet
+      path.join(process.cwd(), 'resources', 'mail_assets', 'logoMelomania.png'),
+      // Chemin depuis la racine du build
+      path.join(process.cwd(), 'build', 'resources', 'mail_assets', 'logoMelomania.png'),
+      // Chemin absolu si défini dans l'environnement
+      env.get('LOGO_PATH') || '',
+    ].filter(Boolean)
+
+    let logoPath: string | null = null
+    
+    // Trouver le premier chemin qui existe
+    for (const testPath of possibleLogoPaths) {
+      try {
+        if (fs.existsSync(testPath)) {
+          logoPath = testPath
+          console.log(`✅ Logo trouvé à : ${logoPath}`)
+          break
+        } else {
+          console.log(`❌ Logo non trouvé à : ${testPath}`)
+        }
+      } catch (error) {
+        console.log(`❌ Erreur lors de la vérification du chemin ${testPath}:`, error)
+      }
+    }
 
     let htmlContent = ''
 
@@ -99,8 +123,7 @@ export default class RefusalNotification extends BaseMail {
 
     <!-- En-tête avec logo et nom -->
     <div class="header-flex" style="display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 30px; text-align: center;">
-      <img src="cid:logoMelomania.png" alt="Logo Melomania" class="logo"
-           style="max-width: 125px; width: 100%; height: auto; border-radius: 6px; display: block; margin: 0 auto;">
+      \${LOGO_BLOCK}
       <div style="flex: 1; min-width: 200px;">
         <h1 class="title" style="margin: 0; font-size: 40px; color: #333; line-height: 1.2;">Melomania</h1>
         <p class="subtitle" style="font-size: 18px; margin-top: 8px; color: #666; line-height: 1.3;">La plateforme collaborative des musiciens</p>
@@ -149,6 +172,12 @@ export default class RefusalNotification extends BaseMail {
       ? `<p>Contact : <a href="mailto:${this.responsible.email}">${this.responsible.email}</a></p>`
       : ''
 
+    // ✅ SOLUTION : Gérer le logo de manière conditionnelle
+    const logoBlock = logoPath 
+      ? `<img src="cid:logoMelomania.png" alt="Logo Melomania" class="logo"
+           style="max-width: 125px; width: 100%; height: auto; border-radius: 6px; display: block; margin: 0 auto;">`
+      : `<!-- Logo non disponible sur ce serveur -->`
+
     // Remplacer toutes les variables dans le template
     htmlContent = htmlContent
       .replace(/\$\{URL\}/g, url)
@@ -158,12 +187,25 @@ export default class RefusalNotification extends BaseMail {
       .replace(/\$\{PROJECT_NAME\}/g, this.project.name || '')
       .replace(/\$\{CUSTOM_MESSAGE_BLOCK\}/g, customMessageBlock)
       .replace(/\$\{CONTACT_EMAIL_BLOCK\}/g, contactEmailBlock)
+      .replace(/\$\{LOGO_BLOCK\}/g, logoBlock)
 
     this.message
       .to(this.contact.email)
       .from(this.from)
       .subject(this.subject)
       .html(htmlContent)
-      .attach(logoPath, { cid: 'logoMelomania.png' } as any)
+
+    // ✅ SOLUTION : N'attacher le logo que s'il existe
+    if (logoPath) {
+      try {
+        this.message.attach(logoPath, { cid: 'logoMelomania.png' } as any)
+        console.log(`✅ Logo attaché avec succès depuis : ${logoPath}`)
+      } catch (error) {
+        console.error(`❌ Erreur lors de l'attachement du logo depuis ${logoPath}:`, error)
+        // On continue sans le logo plutôt que de faire échouer l'email
+      }
+    } else {
+      console.warn('⚠️ Aucun logo trouvé, envoi de l\'email sans logo')
+    }
   }
 }
