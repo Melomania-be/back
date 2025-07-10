@@ -36,15 +36,15 @@ jobs:
       - name: Removing all whitelisted IP
         run: |
           curl -sm 45 -k 'https://${{secrets.CPANEL_LOGIN}}:${{secrets.CPANEL_PASSWORD}}@${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/remove_all'
-
+      
       - name: Whitelisting the runner IP
         run: |
           curl -sm 45 -k 'https://${{secrets.CPANEL_LOGIN}}:${{secrets.CPANEL_PASSWORD}}@${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/add?address=${{ steps.ip.outputs.ipv4 }}&port=22'
-
+      
       - name: Making sure the IP is whitelisted
         run: |
           curl -sm 45 -k 'https://${{secrets.CPANEL_LOGIN}}:${{secrets.CPANEL_PASSWORD}}@${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/list' | grep ${{ steps.ip.outputs.ipv4 }}
-
+      
       - name: Installing the SSH Key
         run: |
           eval $(ssh-agent -s)
@@ -60,25 +60,60 @@ jobs:
         run: |
           sleep 2
           rsync --timeout=60 -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa" \
-          --exclude=".git" -av --delete build/ \
-          ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }}:/home/${{ secrets.CPANEL_LOGIN }}/app/back || true
-
+            --exclude=".git" -av --delete build/ \
+            ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }}:/home/${{ secrets.CPANEL_LOGIN }}/app/back || true
           sleep 2
           rsync --timeout=60 -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa" \
-          --exclude=".git" -av --delete build/ \
-          ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }}:/home/${{ secrets.CPANEL_LOGIN }}/app/back
+            --exclude=".git" -av --delete build/ \
+            ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }}:/home/${{ secrets.CPANEL_LOGIN }}/app/back
+
+      # ✅ SEULE ADDITION : Créer le fichier .env manquant
+      - name: Create .env file
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
+            ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }} \
+            'cd /home/${{ secrets.CPANEL_LOGIN }}/app/back && \
+            cat > .env << "EOF"
+          TZ=UTC
+          PORT=3333
+          HOST=0.0.0.0
+          LOG_LEVEL=info
+          APP_KEY=lM0csJmmRWcgTKfP7_Brh8OCJxVojh98
+          NODE_ENV=development
+          
+          # Database - Configuration basée sur votre Docker
+          DB_HOST=127.0.0.1
+          DB_PORT=5432
+          DB_USER=admin123
+          DB_PASSWORD=admin123
+          DB_DATABASE=melomania
+          
+          # Admin credentials
+          ADMIN_EMAIL=admin@melomania.be
+          ADMIN_PASSWORD=admin123
+          
+          # SMTP Configuration (à configurer selon vos besoins)
+          SMTP_HOST=smtp.gmail.com
+          SMTP_PORT=587
+          SMTP_USERNAME=
+          SMTP_PASSWORD=
+          
+          # Frontend URLs
+          URL=http://tool.sc1ciro3903.universe.wf
+          FRONTEND_URL=http://tool.sc1ciro3903.universe.wf
+          EOF'
 
       - name: Restarting NodeJS application via ssh
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
-          ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }} \
-          '/usr/sbin/cloudlinux-selector stop --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
-          /usr/sbin/cloudlinux-selector start --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
-          /usr/sbin/cloudlinux-selector install-modules --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
-          source /home/sc1ciro3903/nodevenv/app/back/20/bin/activate && cd /home/sc1ciro3903/app/back/build && npm ci --omit="dev" && \
-          cd .. && npm run migrate-prod && \
-          npm run seed-prod'
-
+            ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }} \
+            '/usr/sbin/cloudlinux-selector stop --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
+            /usr/sbin/cloudlinux-selector start --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
+            /usr/sbin/cloudlinux-selector install-modules --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
+            source /home/${{ secrets.CPANEL_LOGIN }}/nodevenv/app/back/20/bin/activate && cd /home/${{ secrets.CPANEL_LOGIN }}/app/back/build && npm ci --omit="dev" && \
+            cd .. && npm run migrate-prod && \
+            npm run seed-prod'
+      
       - name: Cleaning SSH keys
         if: always()
         run: rm -fr ~/.ssh
@@ -87,5 +122,5 @@ jobs:
         uses: geekyeggo/delete-artifact@v5
         if: always()
         with:
-          name: build
+          name: build 
           failOnError: false
