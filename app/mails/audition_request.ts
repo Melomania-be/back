@@ -1,4 +1,4 @@
-// app/mails/audition_request.ts - FIXED VERSION
+// app/mails/audition_request.ts - VERSION SANS LOGO
 
 import env from '#start/env'
 import { BaseMail } from '@adonisjs/mail'
@@ -8,11 +8,6 @@ import type Section from '#models/section'
 import type Audition from '#models/audition'
 import MailTemplate from '#models/mail_template'
 import AuditionPdfFile from '#models/audition_pdf_file'
-import { fileURLToPath } from 'node:url'
-import path from 'node:path'
-
-const currentFilename = fileURLToPath(import.meta.url)
-const currentDirname = path.dirname(currentFilename)
 
 export default class AuditionRequest extends BaseMail {
   override from: string
@@ -117,7 +112,7 @@ export default class AuditionRequest extends BaseMail {
   }
 
   /**
-   * ✅ TEMPLATE HTML CORRIGÉ sans variables échappées
+   * ✅ TEMPLATE HTML CORRIGÉ sans logo
    */
   private getDefaultTemplate(): string {
     return `<!DOCTYPE html>
@@ -138,9 +133,6 @@ export default class AuditionRequest extends BaseMail {
       .header-flex {
         flex-direction: column !important;
         gap: 15px !important;
-      }
-      .logo {
-        max-width: 100px !important;
       }
       .title {
         font-size: 28px !important;
@@ -168,9 +160,6 @@ export default class AuditionRequest extends BaseMail {
       }
       .subtitle {
         font-size: 14px !important;
-      }
-      .logo {
-        max-width: 80px !important;
       }
     }
 
@@ -288,14 +277,10 @@ export default class AuditionRequest extends BaseMail {
 <body style="margin: 0; padding: 0; background-color: #f9f9f9; font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
   <div class="container" style="max-width: 600px; width: 100%; margin: 20px auto; background-color: #ffffff; border-radius: 10px; padding: 20px; color: #333333; box-shadow: 0 0 10px rgba(0,0,0,0.05); box-sizing: border-box;">
 
-    <!-- Header with logo and name -->
-    <div class="header-flex" style="display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 30px; text-align: center;">
-      <img src="cid:logoMelomania.png" alt="Melomania Logo" class="logo"
-           style="max-width: 125px; width: 100%; height: auto; border-radius: 6px; display: block; margin: 0 auto;">
-      <div style="flex: 1; min-width: 200px;">
-        <h1 class="title" style="margin: 0; font-size: 40px; color: #333; line-height: 1.2;">Melomania</h1>
-        <p class="subtitle" style="font-size: 18px; margin-top: 8px; color: #666; line-height: 1.3;">The collaborative musicians platform</p>
-      </div>
+    <!-- Header without logo -->
+    <div class="header-flex" style="text-align: center; margin-bottom: 30px;">
+      <h1 class="title" style="margin: 0; font-size: 40px; color: #333; line-height: 1.2;">🎵 Melomania</h1>
+      <p class="subtitle" style="font-size: 18px; margin-top: 8px; color: #666; line-height: 1.3;">The collaborative musicians platform</p>
     </div>
 
     <!-- Main content -->
@@ -400,14 +385,6 @@ export default class AuditionRequest extends BaseMail {
 
   async prepare() {
     const frontendUrl = this.getFrontendUrl()
-    const logoPath = path.join(
-      currentDirname,
-      '..',
-      '..',
-      'resources',
-      'mail_assets',
-      'logoMelomania.png'
-    )
 
     // Charger les PDFs associés à cette audition
     const pdfFiles = await AuditionPdfFile.query()
@@ -456,8 +433,8 @@ Messenger: ${this.responsible.messenger || 'No messenger provided'}`
           <p style="margin-bottom: 15px; color: #0c4a6e;">The following PDF files are attached to this email:</p>
 
           ${pdfFiles
-            .map(
-              (pdf) => `
+          .map(
+            (pdf) => `
           <div class="attachment-item">
             <div style="display: flex; align-items: center;">
               <span class="attachment-icon">📄</span>
@@ -468,8 +445,8 @@ Messenger: ${this.responsible.messenger || 'No messenger provided'}`
             </div>
             <span class="attachment-badge">PDF</span>
           </div>`
-            )
-            .join('')}
+          )
+          .join('')}
 
           <p style="font-size: 14px; color: #475569; margin-top: 15px; font-style: italic;">
             💡 <strong>Tip:</strong> If you don't see the attachments, they can also be downloaded from the audition portal.
@@ -533,7 +510,7 @@ Messenger: ${this.responsible.messenger || 'No messenger provided'}`
     )
     console.log('📧 Final HTML content length:', htmlContent.length)
 
-    // Configuration du message de base
+    // Configuration du message de base SANS LOGO
     this.message
       .to(this.contact.email)
       .from(`Melomania <${env.get('SMTP_USERNAME')}>`)
@@ -541,7 +518,7 @@ Messenger: ${this.responsible.messenger || 'No messenger provided'}`
         `${this.subject}${pdfFiles.length > 0 ? ` - ${pdfFiles.length} sheet music file(s) attached` : ''}`
       )
       .html(htmlContent)
-      .attach(logoPath, { cid: 'logoMelomania.png' } as any)
+
 
     // Attacher tous les PDFs en pièces jointes
     let attachedCount = 0

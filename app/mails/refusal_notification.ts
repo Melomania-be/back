@@ -4,11 +4,6 @@ import type Contact from '#models/contact'
 import type Project from '#models/project'
 import type Section from '#models/section'
 import MailTemplate from '#models/mail_template'
-import { fileURLToPath } from 'node:url'
-import path from 'node:path'
-
-const currentFilename = fileURLToPath(import.meta.url)
-const currentDirname = path.dirname(currentFilename)
 
 export default class RefusalNotification extends BaseMail {
   from = env.get('SMTP_USERNAME') || 'benskotlemogo@gmail.com'
@@ -26,14 +21,6 @@ export default class RefusalNotification extends BaseMail {
 
   async prepare() {
     const url = env.get('URL') || ''
-    const logoPath = path.join(
-      currentDirname,
-      '..',
-      '..',
-      'resources',
-      'mail_assets',
-      'logoMelomania.png'
-    )
 
     let htmlContent = ''
 
@@ -43,7 +30,7 @@ export default class RefusalNotification extends BaseMail {
     if (template) {
       htmlContent = template.content
     } else {
-      // Template par défaut identique à celui de la base de données
+      // Template par défaut identique à celui de la base de données SANS LOGO
       htmlContent = `<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -62,9 +49,6 @@ export default class RefusalNotification extends BaseMail {
       .header-flex {
         flex-direction: column !important;
         gap: 15px !important;
-      }
-      .logo {
-        max-width: 100px !important;
       }
       .title {
         font-size: 28px !important;
@@ -88,23 +72,16 @@ export default class RefusalNotification extends BaseMail {
       .subtitle {
         font-size: 14px !important;
       }
-      .logo {
-        max-width: 80px !important;
-      }
     }
   </style>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f9f9f9; font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
   <div class="container" style="max-width: 600px; width: 100%; margin: 20px auto; background-color: #ffffff; border-radius: 10px; padding: 20px; color: #333333; box-shadow: 0 0 10px rgba(0,0,0,0.05); box-sizing: border-box;">
 
-    <!-- En-tête avec logo et nom -->
-    <div class="header-flex" style="display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 30px; text-align: center;">
-      <img src="cid:logoMelomania.png" alt="Logo Melomania" class="logo"
-           style="max-width: 125px; width: 100%; height: auto; border-radius: 6px; display: block; margin: 0 auto;">
-      <div style="flex: 1; min-width: 200px;">
-        <h1 class="title" style="margin: 0; font-size: 40px; color: #333; line-height: 1.2;">Melomania</h1>
-        <p class="subtitle" style="font-size: 18px; margin-top: 8px; color: #666; line-height: 1.3;">La plateforme collaborative des musiciens</p>
-      </div>
+    <!-- En-tête sans logo -->
+    <div class="header-flex" style="text-align: center; margin-bottom: 30px;">
+      <h1 class="title" style="margin: 0; font-size: 40px; color: #333; line-height: 1.2;">🎵 Melomania</h1>
+      <p class="subtitle" style="font-size: 18px; margin-top: 8px; color: #666; line-height: 1.3;">La plateforme collaborative des musiciens</p>
     </div>
 
     <!-- Contenu principal -->
@@ -164,6 +141,6 @@ export default class RefusalNotification extends BaseMail {
       .from(this.from)
       .subject(this.subject)
       .html(htmlContent)
-      .attach(logoPath, { cid: 'logoMelomania.png' } as any)
+    // ❌ LOGO SUPPRIMÉ : .attach(logoPath, { cid: 'logoMelomania.png' } as any)
   }
 }
