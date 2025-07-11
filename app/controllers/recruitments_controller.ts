@@ -171,8 +171,15 @@ export default class RecruitmentController {
             query.where(col, 'ILIKE', `%${filterValue}%`) // ILIKE for case-insensitive LIKE in PostgreSQL
             break
           case 'status':
-            // For enum status, exact match
-            query.where(col, filterValue)
+            if (Array.isArray(filterValue)) {
+              // If multiple statuses are selected, use whereIn
+              query.whereIn(col, filterValue)
+            } else {
+              // If only one status is selected (or if it's an empty string for 'All'), use where
+              // The frontend should send an empty array for 'All', not an empty string.
+              // So, this else block will only hit if a single status is selected.
+              query.where(col, filterValue)
+            }
             break
           default:
             // For any other column, apply exact match
