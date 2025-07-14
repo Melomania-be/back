@@ -9,6 +9,11 @@ export const createRecruitmentValidator = vine.compile(
     firstName: vine.string().trim(),
     lastName: vine.string().trim(),
     sectionGroupId: vine.number(), // Corrected: Remove .notNullable()
+
+    // --- NEW FIELD: projectId ---
+    projectId: vine.number().optional().nullable(), // Allow projectId to be optional and nullable
+    // --- END NEW FIELD ---
+
     contactDate: vine
       .string() // Expecting an ISO string date for provided values
       .transform((val) => (val ? DateTime.fromISO(val) : null)) // Transform to DateTime or null
@@ -36,6 +41,10 @@ export const updateRecruitmentValidator = vine.compile(
     firstName: vine.string().trim().optional(),
     lastName: vine.string().trim().optional(),
     sectionGroupId: vine.number().optional(),
+
+    // --- NEW FIELD: projectId ---
+    projectId: vine.number().optional().nullable(), // Allow projectId to be optional and nullable for updates
+    // --- END NEW FIELD ---
 
     contactDate: vine
       .string()
@@ -69,6 +78,11 @@ export const mergeRecruitmentsValidator = vine.compile(
     recruitmentId2: vine.number(), // Corrected: Remove .notNullable() - implicit for required fields
     firstName: vine.string().trim().optional(),
     lastName: vine.string().trim().optional(),
+
+    // --- NEW FIELD: projectId ---
+    projectId: vine.number().optional().nullable(), // Allow projectId to be optional and nullable for merges
+    // --- END NEW FIELD ---
+
     contactDate: vine
       .string()
       .transform((val) => (val ? DateTime.fromISO(val) : null))

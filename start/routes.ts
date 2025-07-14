@@ -61,6 +61,14 @@ router.group(() => {
   //protected routes
   router
     .group(() => {
+      router
+        .get('/projects-for-dropdown', [
+          RecruitmentsController, // Pointing to your RecruitmentsController as planned
+          'getProjectsForDropdown',
+        ])
+        .use(middleware.auth({ guards: ['api'] }))
+        .use(middleware.routeLogger())
+
       router.group(() => {
         // GET all recruitments with simple filtering
         // router.get('/recruitments', [RecruitmentsController, 'getAll'])

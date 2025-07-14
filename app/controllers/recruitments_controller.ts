@@ -11,6 +11,7 @@ import vine from '@vinejs/vine'
 import db from '@adonisjs/lucid/services/db'
 import User from '#models/user'
 import SectionGroup from '#models/section_group'
+import Project from '#models/project'
 
 export const checkStatusValidator = vine.compile(
   vine.object({
@@ -88,7 +89,29 @@ export default class RecruitmentController {
   //   }
   // }
 
+  // async getAll(ctx: HttpContext) {
+  //   const baseQuery = Recruitment.query()
+  //     .preload('sectionGroup', (query) => {
+  //       query.select('id', 'name')
+  //     })
+  //     .preload('user', (query) => {
+  //       query.select('id', 'fullName')
+  //     })
+
+  //   // --- MODIFIED: Call our new private filter method ---
+  //   const results = await this._applySimpleFilters(
+  //     ctx,
+  //     baseQuery,
+  //     ['firstName', 'lastName', 'comment', 'status', 'sectionGroupId', 'contactedBy', 'contactDate'] // Include contactDate here
+  //   )
+  //   // --- END MODIFIED ---
+  //   return results
+  // }
+
   async getAll(ctx: HttpContext) {
+    const { request } = ctx
+    const filters = request.qs() // Get query string parameters
+
     const baseQuery = Recruitment.query()
       .preload('sectionGroup', (query) => {
         query.select('id', 'name')
@@ -96,42 +119,65 @@ export default class RecruitmentController {
       .preload('user', (query) => {
         query.select('id', 'fullName')
       })
+      .preload('project', (query) => {
+        // NEW: Preload the project relationship
+        query.select('id', 'name') // Select only necessary project fields
+      })
 
-    // --- MODIFIED: Call our new private filter method ---
-    const results = await this._applySimpleFilters(
-      ctx,
-      baseQuery,
-      ['firstName', 'lastName', 'comment', 'status', 'sectionGroupId', 'contactedBy', 'contactDate'] // Include contactDate here
-    )
-    // --- END MODIFIED ---
-    return results
-  }
-
-  private async simpleFilter(ctx: HttpContext, query: any, columns: string[], relations: string[]) {
-    const { request } = ctx
-    const filters = request.qs()
-    console.log('Backend query params:', filters) // Debug log
-
-    columns.forEach((col) => {
-      if (filters[col] !== undefined) {
-        // Cast to number for numeric columns
-        const value = ['sectionGroupId', 'contactedBy'].includes(col)
-          ? Number(filters[col])
-          : filters[col]
-
-        if (value !== null && value !== undefined && !isNaN(value)) {
-          console.log(`Applying filter: ${col} = ${value}`) // Debug log
-          query.where(col, value)
-        } else {
-          console.log(`Skipping invalid filter: ${col} = ${filters[col]}`) // Debug log
-        }
+    // --- NEW: Filter by projectId from query string ---
+    if (
+      filters.projectId !== undefined &&
+      filters.projectId !== null &&
+      String(filters.projectId).trim() !== ''
+    ) {
+      const projectId = Number(filters.projectId)
+      if (!isNaN(projectId)) {
+        baseQuery.where('projectId', projectId)
+      } else if (filters.projectId === 'null') {
+        // Handle explicit 'null' string from frontend for unassigned
+        baseQuery.whereNull('projectId')
       }
-    })
+    }
+    // --- END NEW ---
 
-    const results = await query
-    console.log('Filtered results:', results) // Debug log
+    // Apply other simple filters (using your custom _applySimpleFilters)
+    const results = await this._applySimpleFilters(ctx, baseQuery, [
+      'firstName',
+      'lastName',
+      'comment',
+      'status',
+      'sectionGroupId',
+      'contactedBy',
+      'contactDate',
+    ])
     return results
   }
+
+  // private async simpleFilter(ctx: HttpContext, query: any, columns: string[], relations: string[]) {
+  //   const { request } = ctx
+  //   const filters = request.qs()
+  //   console.log('Backend query params:', filters) // Debug log
+
+  //   columns.forEach((col) => {
+  //     if (filters[col] !== undefined) {
+  //       // Cast to number for numeric columns
+  //       const value = ['sectionGroupId', 'contactedBy'].includes(col)
+  //         ? Number(filters[col])
+  //         : filters[col]
+
+  //       if (value !== null && value !== undefined && !isNaN(value)) {
+  //         console.log(`Applying filter: ${col} = ${value}`) // Debug log
+  //         query.where(col, value)
+  //       } else {
+  //         console.log(`Skipping invalid filter: ${col} = ${filters[col]}`) // Debug log
+  //       }
+  //     }
+  //   })
+
+  //   const results = await query
+  //   console.log('Filtered results:', results) // Debug log
+  //   return results
+  // }
 
   // --- NEW PRIVATE METHOD: _applySimpleFilters ---
   private async _applySimpleFilters(
@@ -194,6 +240,20 @@ export default class RecruitmentController {
     return results
   }
 
+  // --- NEW METHOD: getProjectsForDropdown ---
+  /**
+   * Get a list of all projects for dropdowns.
+   */
+  async getProjectsForDropdown({ response }: HttpContext) {
+    try {
+      const projects = await Project.query().select('id', 'name').orderBy('name', 'asc')
+      return response.ok(projects)
+    } catch (error) {
+      console.error('Error fetching projects for dropdown:', error)
+      return response.internalServerError({ message: 'Failed to retrieve project list.' })
+    }
+  }
+
   /**
    * Get a list of all users for dropdowns.
    */
@@ -224,6 +284,33 @@ export default class RecruitmentController {
   }
 
   // Get one recruitment by id with any relations if needed
+  // async getOne({ params, response }: HttpContext) {
+  //   try {
+  //     return await Recruitment.query()
+  //       .where('id', params.id)
+  //       .preload('sectionGroup', (query) => {
+  //         query.select('id', 'name')
+  //       })
+  //       .preload('user', (query) => {
+  //         query.select('id', 'fullName')
+  //       })
+  //       .firstOrFail()
+  //   } catch (error) {
+  //     console.error('Error in getOne:', error)
+  //     // AdonisJS's global exception handler will likely catch ModelNotFoundException
+  //     // and convert it to 404, so explicit catch here might be redundant unless
+  //     // you want a custom 404 message or further logic.
+  //     if (error.code === 'E_ROW_NOT_FOUND') {
+  //       // Example specific check for 404
+  //       return response.notFound({ message: 'Recruitment not found' })
+  //     }
+  //     return response.internalServerError({
+  //       message: 'Failed to fetch recruitment.',
+  //       error: error.message,
+  //     })
+  //   }
+  // }
+
   async getOne({ params, response }: HttpContext) {
     try {
       return await Recruitment.query()
@@ -234,14 +321,14 @@ export default class RecruitmentController {
         .preload('user', (query) => {
           query.select('id', 'fullName')
         })
+        .preload('project', (query) => {
+          // NEW: Preload the project relationship
+          query.select('id', 'name')
+        })
         .firstOrFail()
     } catch (error) {
       console.error('Error in getOne:', error)
-      // AdonisJS's global exception handler will likely catch ModelNotFoundException
-      // and convert it to 404, so explicit catch here might be redundant unless
-      // you want a custom 404 message or further logic.
       if (error.code === 'E_ROW_NOT_FOUND') {
-        // Example specific check for 404
         return response.notFound({ message: 'Recruitment not found' })
       }
       return response.internalServerError({
@@ -252,42 +339,96 @@ export default class RecruitmentController {
   }
 
   // Advanced search with more complex filtering
-  async advancedSearch(ctx: HttpContext) {
-    try {
-      const baseQuery = Recruitment.query()
-        .preload('sectionGroup', (query) => {
-          query.select('id', 'name')
-        })
-        .preload('user', (query) => {
-          query.select('id', 'fullName')
-        })
-      const data = await advancedFilter(ctx, baseQuery)
+  // async advancedSearch(ctx: HttpContext) {
+  //   try {
+  //     const baseQuery = Recruitment.query()
+  //       .preload('sectionGroup', (query) => {
+  //         query.select('id', 'name')
+  //       })
+  //       .preload('user', (query) => {
+  //         query.select('id', 'fullName')
+  //       })
+  //     const data = await advancedFilter(ctx, baseQuery)
 
-      return {
-        data,
-        columns: {
-          self: [
-            'id',
-            'firstName',
-            'lastName',
-            'contactDate',
-            'contactedBy',
-            'status',
-            'statusUpdatedAt',
-            'comment',
-            'sectionGroup.name',
-            'user.fullName',
-          ],
-        },
-      }
-    } catch (error) {
-      console.error('Error in advancedSearch:', error)
-      // adonisjs-filters might throw errors for invalid filter syntax.
-      // Assuming a generic internal server error for now.
-      return ctx.response.internalServerError({
-        message: 'Failed to perform advanced search.',
-        error: error.message,
+  //     return {
+  //       data,
+  //       columns: {
+  //         self: [
+  //           'id',
+  //           'firstName',
+  //           'lastName',
+  //           'contactDate',
+  //           'contactedBy',
+  //           'status',
+  //           'statusUpdatedAt',
+  //           'comment',
+  //           'sectionGroup.name',
+  //           'user.fullName',
+  //         ],
+  //       },
+  //     }
+  //   } catch (error) {
+  //     console.error('Error in advancedSearch:', error)
+  //     // adonisjs-filters might throw errors for invalid filter syntax.
+  //     // Assuming a generic internal server error for now.
+  //     return ctx.response.internalServerError({
+  //       message: 'Failed to perform advanced search.',
+  //       error: error.message,
+  //     })
+  //   }
+  // }
+
+  async advancedSearch(ctx: HttpContext) {
+    const { request } = ctx
+    const filters = request.qs() // Get query string parameters
+
+    const baseQuery = Recruitment.query()
+      .preload('sectionGroup', (query) => {
+        query.select('id', 'name')
       })
+      .preload('user', (query) => {
+        query.select('id', 'fullName')
+      })
+      .preload('project', (query) => {
+        // NEW: Preload the project relationship
+        query.select('id', 'name')
+      })
+
+    // --- NEW: Filter by projectId from query string for advanced search ---
+    if (
+      filters.projectId !== undefined &&
+      filters.projectId !== null &&
+      String(filters.projectId).trim() !== ''
+    ) {
+      const projectId = Number(filters.projectId)
+      if (!isNaN(projectId)) {
+        baseQuery.where('projectId', projectId)
+      } else if (filters.projectId === 'null') {
+        // Handle explicit 'null' string from frontend for unassigned
+        baseQuery.whereNull('projectId')
+      }
+    }
+    // --- END NEW ---
+
+    const data = await advancedFilter(ctx, baseQuery)
+
+    return {
+      data,
+      columns: {
+        self: [
+          'id',
+          'firstName',
+          'lastName',
+          'contactDate',
+          'contactedBy',
+          'status',
+          'statusUpdatedAt',
+          'comment',
+          'sectionGroup.name',
+          'user.fullName',
+          'project.name', // NEW: Include project name for display
+        ],
+      },
     }
   }
 
@@ -452,31 +593,124 @@ export default class RecruitmentController {
     }
   }
 
-  /**
-   * Creates a new recruitment record.
-   * This method now assumes NO ID is passed and always creates a new record.
-   * If you need an `upsert` functionality, you'd create a separate method for it.
-   */
   // async store(ctx: HttpContext) {
-  //   const payload = await ctx.request.validateUsing(createRecruitmentValidator)
+  //   try {
+  //     const payload = await ctx.request.validateUsing(createRecruitmentValidator)
 
-  //   // Check for existing recruitment based on first and last name BEFORE creation
-  //   // This is a business logic decision. Adjust if uniqueness rules differ.
-  //   const existing = await Recruitment.query()
-  //     .where('firstName', payload.firstName)
-  //     .andWhere('lastName', payload.lastName)
-  //     .first()
+  //     const existing = await Recruitment.query()
+  //       .where('firstName', payload.firstName)
+  //       .andWhere('lastName', payload.lastName)
+  //       .first()
 
-  //   if (existing) {
-  //     // You might return 409 Conflict if you don't want duplicates
-  //     return ctx.response.conflict({
-  //       message: 'Recruitment with this first and last name already exists.',
+  //     if (existing) {
+  //       return ctx.response.conflict({
+  //         message: 'Recruitment with this first and last name already exists.',
+  //       })
+  //     }
+
+  //     const finalStatus: RecruitmentStatus = payload.status || 'not yet contacted'
+
+  //     // The validator now correctly allows contactDate and contactedBy to be null or undefined
+  //     // when status is 'not yet contacted'. We can directly use payload values.
+  //     let contactDateForCreate: DateTime | null | undefined = payload.contactDate
+  //     let contactedByForCreate: number | null | undefined = payload.contactedBy
+
+  //     if (finalStatus === 'not yet contacted') {
+  //       // For 'not yet contacted', ensure contactDate and contactedBy are null (or undefined for DB)
+  //       contactDateForCreate = null // Will store as NULL in DB
+  //       contactedByForCreate = null // Will store as NULL in DB
+  //     } else {
+  //       // If status is not 'not yet contacted', ensure contactDate is present.
+  //       // If not provided in payload, default to now.
+  //       contactDateForCreate = payload.contactDate ?? DateTime.now().toUTC()
+  //       contactedByForCreate = payload.contactedBy ?? null // If not provided, allow null.
+  //     }
+
+  //     const recruitment = await Recruitment.create({
+  //       firstName: payload.firstName,
+  //       lastName: payload.lastName,
+  //       sectionGroupId: payload.sectionGroupId,
+  //       comment: payload.comment,
+  //       status: finalStatus,
+  //       contactDate: contactDateForCreate,
+  //       contactedBy: contactedByForCreate,
+  //     })
+
+  //     return ctx.response.created({
+  //       message: 'Recruitment created successfully',
+  //       data: recruitment,
+  //     })
+  //   } catch (error) {
+  //     console.error('Error in store:', error)
+  //     if (error.messages) {
+  //       // VineJS validation error
+  //       return ctx.response.badRequest({
+  //         message: 'Validation failed for creation.',
+  //         errors: error.messages,
+  //       })
+  //     }
+  //     // Catch other unexpected errors
+  //     return ctx.response.internalServerError({
+  //       message: 'Failed to create recruitment.',
+  //       error: error.message,
   //     })
   //   }
+  // }
 
-  //   const recruitment = await Recruitment.create(payload)
+  // async store(ctx: HttpContext) {
+  //   try {
+  //     const payload = await ctx.request.validateUsing(createRecruitmentValidator)
 
-  //   return ctx.response.created({ message: 'Recruitment created successfully', data: recruitment })
+  //     const existing = await Recruitment.query()
+  //       .where('firstName', payload.firstName)
+  //       .andWhere('lastName', payload.lastName)
+  //       .first()
+
+  //     if (existing) {
+  //       return ctx.response.conflict({
+  //         message: 'Recruitment with this first and last name already exists.',
+  //       })
+  //     }
+
+  //     const finalStatus: RecruitmentStatus = payload.status || 'not yet contacted'
+
+  //     let contactDateForCreate: DateTime | null = null // Initialize as null
+  //     let contactedByForCreate: number | null = null // Initialize as null
+
+  //     if (finalStatus === 'not yet contacted') {
+  //       contactDateForCreate = null // contactDate remains null for 'not yet contacted'
+  //       // --- MODIFIED: contactedBy is taken from payload, not forced to null ---
+  //       contactedByForCreate = payload.contactedBy ?? null // Use payload's value, or null if not provided
+  //       // --- END MODIFIED ---
+  //     } else {
+  //       contactDateForCreate = payload.contactDate ?? DateTime.now().toUTC()
+  //       contactedByForCreate = payload.contactedBy ?? null
+  //     }
+
+  //     const recruitment = await Recruitment.create({
+  //       firstName: payload.firstName,
+  //       lastName: payload.lastName,
+  //       sectionGroupId: payload.sectionGroupId,
+  //       comment: payload.comment,
+  //       status: finalStatus,
+  //       contactDate: contactDateForCreate,
+  //       contactedBy: contactedByForCreate, // Use the determined value
+  //     })
+
+  //     return ctx.response.created({
+  //       message: 'Recruitment created successfully',
+  //       data: recruitment,
+  //     })
+  //   } catch (error) {
+  //     console.error('Error creating user:', error)
+  //     if (error.messages) {
+  //       return ctx.response.badRequest({
+  //         message: 'Validation failed for user creation.',
+  //         errors: error.messages,
+  //       })
+  //     }
+  //     return ctx.response.internalServerError({ message: 'Failed to create user.' })
+  //   }
   // }
 
   async store(ctx: HttpContext) {
@@ -496,21 +730,23 @@ export default class RecruitmentController {
 
       const finalStatus: RecruitmentStatus = payload.status || 'not yet contacted'
 
-      // The validator now correctly allows contactDate and contactedBy to be null or undefined
-      // when status is 'not yet contacted'. We can directly use payload values.
-      let contactDateForCreate: DateTime | null | undefined = payload.contactDate
-      let contactedByForCreate: number | null | undefined = payload.contactedBy
+      let contactDateForCreate: DateTime | null = null
+      let contactedByForCreate: number | null = null
+      let projectIdForCreate: number | null = null // NEW: Initialize projectId
 
       if (finalStatus === 'not yet contacted') {
-        // For 'not yet contacted', ensure contactDate and contactedBy are null (or undefined for DB)
-        contactDateForCreate = null // Will store as NULL in DB
-        contactedByForCreate = null // Will store as NULL in DB
+        contactDateForCreate = null
+        contactedByForCreate = payload.contactedBy ?? null
       } else {
-        // If status is not 'not yet contacted', ensure contactDate is present.
-        // If not provided in payload, default to now.
         contactDateForCreate = payload.contactDate ?? DateTime.now().toUTC()
-        contactedByForCreate = payload.contactedBy ?? null // If not provided, allow null.
+        contactedByForCreate = payload.contactedBy ?? null
       }
+
+      // --- NEW: Handle projectId from payload ---
+      // If payload.projectId is undefined, it will remain null. If it's a number, use it.
+      // If it's explicitly null from frontend, it will be null.
+      projectIdForCreate = payload.projectId ?? null
+      // --- END NEW ---
 
       const recruitment = await Recruitment.create({
         firstName: payload.firstName,
@@ -520,6 +756,7 @@ export default class RecruitmentController {
         status: finalStatus,
         contactDate: contactDateForCreate,
         contactedBy: contactedByForCreate,
+        projectId: projectIdForCreate, // NEW: Assign projectId
       })
 
       return ctx.response.created({
@@ -527,36 +764,92 @@ export default class RecruitmentController {
         data: recruitment,
       })
     } catch (error) {
-      console.error('Error in store:', error)
+      console.error('Error creating user:', error)
       if (error.messages) {
-        // VineJS validation error
         return ctx.response.badRequest({
-          message: 'Validation failed for creation.',
+          message: 'Validation failed for user creation.',
           errors: error.messages,
         })
       }
-      // Catch other unexpected errors
-      return ctx.response.internalServerError({
-        message: 'Failed to create recruitment.',
-        error: error.message,
-      })
+      return ctx.response.internalServerError({ message: 'Failed to create user.' })
     }
   }
+
+  // async update({ params, request, response }: HttpContext) {
+  //   try {
+  //     const recruitment = await Recruitment.find(params.id)
+  //     if (!recruitment) {
+  //       return response.notFound({ message: 'Recruitment not found' })
+  //     }
+
+  //     const updatePayload = await request.validateUsing(updateRecruitmentValidator)
+
+  //     let newContactDateValue: DateTime | null = recruitment.contactDate // Initialize with current DB value
+  //     let newContactedByValue: number | null = recruitment.contactedBy // Initialize with current DB value
+
+  //     const incomingStatus: RecruitmentStatus | undefined = updatePayload.status
+  //     const oldStatus: RecruitmentStatus = recruitment.status
+
+  //     if (incomingStatus !== undefined) {
+  //       // If status is being changed by the payload
+  //       if (oldStatus === 'not yet contacted' && incomingStatus !== 'not yet contacted') {
+  //         // Status changes FROM 'not yet contacted' TO something else
+  //         newContactDateValue = DateTime.now().toUTC() // Set contactDate to now
+  //         // --- MODIFIED: contactedBy is taken from payload, not forced to null ---
+  //         newContactedByValue = updatePayload.contactedBy ?? recruitment.contactedBy // Use payload's value or keep existing
+  //         // --- END MODIFIED ---
+  //       } else if (incomingStatus === 'not yet contacted') {
+  //         // Status changes TO 'not yet contacted'
+  //         newContactDateValue = null // Clear contactDate
+  //         // --- MODIFIED: contactedBy is taken from payload, not forced to null ---
+  //         newContactedByValue = updatePayload.contactedBy ?? recruitment.contactedBy // Use payload's value or keep existing
+  //         // --- END MODIFIED ---
+  //       } else {
+  //         // Status changed to something else, not involving 'not yet contacted'
+  //         newContactDateValue = updatePayload.contactDate ?? recruitment.contactDate
+  //         newContactedByValue = updatePayload.contactedBy ?? recruitment.contactedBy
+  //       }
+  //     } else {
+  //       // Status is NOT changing, just other fields are potentially changing
+  //       newContactDateValue = updatePayload.contactDate ?? recruitment.contactDate
+  //       newContactedByValue = updatePayload.contactedBy ?? recruitment.contactedBy
+  //     }
+
+  //     recruitment.merge({
+  //       ...updatePayload,
+  //       contactDate: newContactDateValue,
+  //       contactedBy: newContactedByValue,
+  //     })
+  //     await recruitment.save()
+
+  //     return response.ok({ message: 'Recruitment updated successfully', data: recruitment })
+  //   } catch (error) {
+  //     console.error('Error in update:', error)
+  //     if (error.messages) {
+  //       return response.badRequest({
+  //         message: 'Validation failed for update.',
+  //         errors: error.messages,
+  //       })
+  //     }
+  //     return response.internalServerError({
+  //       message: 'Failed to update recruitment.',
+  //       error: error.message,
+  //     })
+  //   }
+  // }
 
   async update({ params, request, response }: HttpContext) {
     try {
       const recruitment = await Recruitment.find(params.id)
-
       if (!recruitment) {
         return response.notFound({ message: 'Recruitment not found' })
       }
 
-      // --- USING THE NEW updateRecruitmentValidator ---
       const updatePayload = await request.validateUsing(updateRecruitmentValidator)
-      // --- END NEW VALIDATOR USE ---
 
-      let newContactDateValue: DateTime | null | undefined = recruitment.contactDate
-      let newContactedByValue: number | null | undefined = recruitment.contactedBy
+      let newContactDateValue: DateTime | null = recruitment.contactDate
+      let newContactedByValue: number | null = recruitment.contactedBy
+      let newProjectIdValue: number | null = recruitment.projectId // NEW: Initialize projectId
 
       const incomingStatus: RecruitmentStatus | undefined = updatePayload.status
       const oldStatus: RecruitmentStatus = recruitment.status
@@ -567,7 +860,7 @@ export default class RecruitmentController {
           newContactedByValue = updatePayload.contactedBy ?? recruitment.contactedBy
         } else if (incomingStatus === 'not yet contacted') {
           newContactDateValue = null
-          newContactedByValue = null
+          newContactedByValue = updatePayload.contactedBy ?? recruitment.contactedBy
         } else {
           newContactDateValue = updatePayload.contactDate ?? recruitment.contactDate
           newContactedByValue = updatePayload.contactedBy ?? recruitment.contactedBy
@@ -577,10 +870,17 @@ export default class RecruitmentController {
         newContactedByValue = updatePayload.contactedBy ?? recruitment.contactedBy
       }
 
+      // --- NEW: Handle projectId from updatePayload ---
+      // If projectId is provided in payload, use it. Otherwise, keep existing.
+      // If payload.projectId is explicitly null, it will be set to null.
+      newProjectIdValue = updatePayload.projectId ?? recruitment.projectId
+      // --- END NEW ---
+
       recruitment.merge({
         ...updatePayload,
         contactDate: newContactDateValue,
         contactedBy: newContactedByValue,
+        projectId: newProjectIdValue, // NEW: Assign projectId
       })
       await recruitment.save()
 
@@ -588,13 +888,11 @@ export default class RecruitmentController {
     } catch (error) {
       console.error('Error in update:', error)
       if (error.messages) {
-        // VineJS validation error
         return response.badRequest({
           message: 'Validation failed for update.',
           errors: error.messages,
         })
       }
-      // This catch will also handle ModelNotFoundException from findOrFail (if used), which global handler turns to 404
       return response.internalServerError({
         message: 'Failed to update recruitment.',
         error: error.message,
