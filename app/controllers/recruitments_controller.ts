@@ -920,6 +920,128 @@ export default class RecruitmentController {
     }
   }
 
+  async copyRecruitmentsToProject({ request, response }: HttpContext) {
+    const { recruitmentIds, targetProjectId } = request.body()
+
+    // --- LOG 1: Incoming Request Data ---
+    console.log('LOG: copyRecruitmentsToProject - Received request data:', {
+      recruitmentIds,
+      targetProjectId,
+    })
+
+    // 1. Validate Input: recruitmentIds
+    if (!Array.isArray(recruitmentIds) || recruitmentIds.length === 0) {
+      console.log('LOG: Validation failed: recruitmentIds missing or empty.')
+      return response.badRequest({
+        message: 'recruitmentIds (array of numbers) is required and cannot be empty.',
+      })
+    }
+    if (recruitmentIds.some((id) => typeof id !== 'number' || !Number.isInteger(id))) {
+      console.log('LOG: Validation failed: All recruitmentIds must be integers.')
+      return response.badRequest({ message: 'All recruitmentIds must be integers.' })
+    }
+
+    // 2. Validate and Parse Input: targetProjectId
+    let finalTargetProjectId: number | null
+
+    if (targetProjectId === null) {
+      finalTargetProjectId = null
+    } else {
+      const numericTargetProjectId = Number(targetProjectId)
+      if (isNaN(numericTargetProjectId) || !Number.isInteger(numericTargetProjectId)) {
+        console.log('LOG: Validation failed: Invalid targetProjectId.')
+        return response.badRequest({
+          message: 'Invalid targetProjectId provided. Must be an integer or null.',
+        })
+      }
+      finalTargetProjectId = numericTargetProjectId
+    }
+    console.log('LOG: Parsed finalTargetProjectId:', finalTargetProjectId)
+
+    try {
+      let copiedCount = 0
+      await db.transaction(async (trx) => {
+        // Fetch the original recruitment records
+        const originalRecruitments = await Recruitment.query()
+          .useTransaction(trx)
+          .whereIn('id', recruitmentIds)
+
+        // --- LOG 2: Original Recruitments Fetched ---
+        console.log(
+          'LOG: Original recruitments fetched (IDs):',
+          originalRecruitments.map((r) => r.id)
+        )
+
+        if (originalRecruitments.length === 0) {
+          console.log('LOG: No original recruitments found for provided IDs.')
+          throw new Error('No original recruitments found for the provided IDs.')
+        }
+
+        // Prepare new recruitment data as plain JavaScript objects for insertion
+        const newRecruitmentsData = originalRecruitments.map((original) => {
+          // Get current UTC timestamp for created_at and updated_at
+          const now = DateTime.now().toUTC().toISO() // ISO string format
+
+          return {
+            first_name: original.firstName,
+            last_name: original.lastName,
+            section_group_id: original.sectionGroupId,
+            comment: original.comment,
+
+            project_id: finalTargetProjectId,
+            status: 'not yet contacted' as RecruitmentStatus,
+            contact_date: null,
+            contacted_by: null,
+
+            // --- FIX APPLIED HERE: Manually set created_at and updated_at ---
+            created_at: now,
+            updated_at: now,
+            // --- END FIX ---
+          }
+        })
+
+        // --- LOG 3: Data Prepared for Insertion ---
+        console.log(
+          'LOG: Data prepared for insertion (first 2 records):',
+          JSON.stringify(newRecruitmentsData.slice(0, 2), null, 2)
+        )
+        if (newRecruitmentsData.length > 2) {
+          console.log(`LOG: ...and ${newRecruitmentsData.length - 2} more records.`)
+        }
+
+        // Insert all new recruitments in a batch within the transaction
+        const createdRecords = await db
+          .table('recruitments')
+          .useTransaction(trx)
+          .insert(newRecruitmentsData)
+          .returning('id')
+
+        // --- LOG 4: Records Created ---
+        console.log('LOG: Successfully created records with IDs:', createdRecords)
+
+        copiedCount = createdRecords.length
+      })
+
+      return response.ok({
+        message: `${copiedCount} recruitment(s) successfully copied and status set to 'not yet contacted'.`,
+      })
+    } catch (error: any) {
+      // --- LOG 5: Error Caught ---
+      console.error('LOG: Error copying recruitments to project - Detailed Error:', error)
+      console.error('LOG: Error message:', error.message)
+      console.error('LOG: Error code:', error.code)
+      console.error('LOG: Error stack:', error.stack)
+
+      if (error.message === 'No original recruitments found for the provided IDs.') {
+        return response.notFound({ message: error.message })
+      }
+
+      return response.internalServerError({
+        message: 'Failed to copy recruitments. Please try again.',
+      })
+    }
+  }
+
   async checkAndUpdateStatuses({ request, response }: HttpContext) {
     try {
       // Validate the number of days (X) from frontend

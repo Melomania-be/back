@@ -61,11 +61,13 @@ router.group(() => {
   //protected routes
   router
     .group(() => {
+      router.get('/projects-for-dropdown', [
+        RecruitmentsController, // Pointing to your RecruitmentsController as planned
+        'getProjectsForDropdown',
+      ])
       router
-        .get('/projects-for-dropdown', [
-          RecruitmentsController, // Pointing to your RecruitmentsController as planned
-          'getProjectsForDropdown',
-        ])
+        .post('recruitments/copy-to-project', [RecruitmentsController, 'copyRecruitmentsToProject'])
+        .use(middleware.auth())
         .use(middleware.auth({ guards: ['api'] }))
         .use(middleware.routeLogger())
 
