@@ -125,6 +125,7 @@ router.group(() => {
             .group(() => {
               router.get('/', [ParticipantsController, 'getAll'])
               router.post('/', [ParticipantsController, 'createOrUpdate'])
+              router.get('/answers', [ParticipantsController , 'getParticipantsAnswers'])
               router.get('/:participantId', [ParticipantsController, 'getOne'])
               router.delete('/:participantId', [ParticipantsController, 'delete'])
 

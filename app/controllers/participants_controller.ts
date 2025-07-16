@@ -25,7 +25,8 @@ export default class ParticipantsController {
       ctx,
       baseQuery,
       ['contact_id'],
-      [{ relationColumns: ['first_name', 'last_name'], relationName: 'contact' }]
+      [{ relationColumns: ['first_name', 'last_name','email','phone','messenger'] as any, relationName: 'contact' },
+      { relationColumns: ['name'] as any, relationName: 'section' }]
     )
   }
 
@@ -192,6 +193,7 @@ export default class ParticipantsController {
     return response.send('Participant validated')
   }
 
+  //delete : deletes a participant from the given project at /projects/:id/management/participants/:id
   async delete({ params, response }: HttpContext) {
     const { id, participantId } = params
 
@@ -211,4 +213,44 @@ export default class ParticipantsController {
 
     return response.send('Participant deleted from the project')
   }
+
+  async getParticipantsCountBySection(ctx: HttpContext) {
+    const projectId = ctx.params.id;
+
+    // On construit la requête sur Participant
+    const baseQuery = Participant.query()
+      .where('project_id', projectId)
+      .andWhere('accepted', true)
+      .select('section_id')
+      .count('id as participants_count')
+      .groupBy('section_id')
+      .preload('section', (query) => {
+        query.select('id', 'name');
+      });
+
+    const counts = await baseQuery;
+
+    // On mappe le résultat pour ne garder que l'essentiel
+    const result = counts.map((item) => ({
+      section_id: item.section_id,
+      section_name: item.section ? item.section.name : null,
+      participants_count: Number(item.$extras.participants_count) || 0,
+    }));
+
+    return result;
+  }
+
+
+  //get all the participants answers for a project
+  async getParticipantsAnswers({ params }: HttpContext) {
+    const projectId = params.id;
+
+    // On récupère tous les participants du projet avec leurs réponses preloadées
+    const participants = await Participant.query()
+      .where('project_id', projectId)
+      .preload('answers')   // preload les réponses de chaque participant
+
+    return participants;
+  }
+
 }
