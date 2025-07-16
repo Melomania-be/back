@@ -1,8 +1,11 @@
+// Dans app/models/folder.ts - Ajouter ces colonnes et relations
+
 import { DateTime } from 'luxon'
-import { BaseModel, column, hasMany, manyToMany } from '@adonisjs/lucid/orm'
+import { BaseModel, column, hasMany, manyToMany, belongsTo } from '@adonisjs/lucid/orm'
 import Piece from './piece.js'
 import File from './file.js'
-import type { HasMany, ManyToMany } from '@adonisjs/lucid/types/relations'
+import Project from './project.js'
+import type { HasMany, ManyToMany, BelongsTo } from '@adonisjs/lucid/types/relations'
 
 export default class Folder extends BaseModel {
   @column({ isPrimary: true })
@@ -11,6 +14,41 @@ export default class Folder extends BaseModel {
   @column()
   declare name: string
 
+  // ✅ NOUVELLES COLONNES À AJOUTER
+  @column()
+  declare parent_id: number | null
+
+  @column()
+  declare project_id: number | null
+
+  @column()
+  declare piece_id: number | null
+
+  @column()
+  declare is_system_generated: boolean
+
+  // ✅ NOUVELLES RELATIONS À AJOUTER
+  @belongsTo(() => Folder, {
+    foreignKey: 'parent_id',
+  })
+  declare parent: BelongsTo<typeof Folder>
+
+  @hasMany(() => Folder, {
+    foreignKey: 'parent_id',
+  })
+  declare children: HasMany<typeof Folder>
+
+  @belongsTo(() => Project, {
+    foreignKey: 'project_id',
+  })
+  declare project: BelongsTo<typeof Project>
+
+  @belongsTo(() => Piece, {
+    foreignKey: 'piece_id',
+  })
+  declare piece: BelongsTo<typeof Piece>
+
+  // Relations existantes modifiées
   @manyToMany(() => File, {
     pivotTable: 'contains',
     pivotForeignKey: 'folder_id',

@@ -30,6 +30,7 @@ const FormsController = () => import('#controllers/forms_controller')
 const SectionsController = () => import('#controllers/sections_controller')
 const TemplateController = () => import('#controllers/template_controller')
 const DefaultTemplatesController = () => import('#controllers/default_templates_controller')
+const FilesystemController = () => import('#controllers/filesystem_controller')
 
 router.group(() => {
   // =============================================================================
@@ -48,8 +49,8 @@ router.group(() => {
 
   // ✅ ROUTES FICHIERS PUBLIQUES ÉTENDUES
   router.get('/files/download/:id', [FilesController, 'download'])
-  router.get('/files/stream/:id', [FilesController, 'stream']) // ← NOUVELLE ROUTE STREAMING
-  router.get('/files/info/:id', [FilesController, 'info']) // ← NOUVELLE ROUTE INFO (debug)
+  router.get('/files/stream/:id', [FilesController, 'stream'])
+  router.get('/files/info/:id', [FilesController, 'info'])
 
   // Recommend someone (public)
   router.post('/recommend_someone', [RecommendSomeonesController, 'create'])
@@ -58,7 +59,7 @@ router.group(() => {
   router.get('/registration/:id', [RegistrationsController, 'getOne'])
   router.put('/registration/submit', [RegistrationsController, 'submit'])
 
-  // Forms routes (public - pour récupérer les formulaires d'inscription)
+  // Forms routes (public)
   router.get('/registration/:id/forms', [FormsController, 'getFromProject'])
 
   // Call sheets (public access)
@@ -68,26 +69,15 @@ router.group(() => {
   router.put('/unsubscribe', [ContactsController, 'unsubscribe_from_mails'])
 
   // =============================================================================
-  // ROUTES PUBLIQUES POUR AUDITIONS (CANDIDATS) - CORRIGÉ
+  // ROUTES PUBLIQUES POUR AUDITIONS (CANDIDATS)
   // =============================================================================
   router
     .group(() => {
-      // Page d'audition sécurisée pour les candidats
       router.get('/:token', [AuditionsController, 'getAuditionPage'])
-
-      // Upload de fichier d'audition
       router.post('/:token/upload', [AuditionsController, 'uploadAuditionFile'])
-
-      // Sauvegarder les notes temporaires
       router.post('/:token/save-notes', [AuditionsController, 'saveTemporaryNotes'])
-
-      // Soumettre l'audition complète
       router.post('/:token/submit', [AuditionsController, 'submitAudition'])
-
-      // Supprimer un fichier d'audition
       router.delete('/:token/files/:fileId', [AuditionsController, 'deleteAuditionFile'])
-
-      // Gestion des PDFs d'audition (côté participant)
       router.get('/:token/pdfs', [AuditionsController, 'getAuditionPdfs'])
       router.get('/:token/pdf/:pdfFileId/download', [AuditionsController, 'downloadAuditionPdf'])
     })
@@ -105,6 +95,35 @@ router.group(() => {
 
       // Sign out
       router.get('/sign_out', [UsersController, 'signOut'])
+
+      // =============================================================================
+      // FILESYSTEM ROUTES (DÉPLACÉES AU NIVEAU GLOBAL)
+      // =============================================================================
+      router
+        .group(() => {
+          // Project filesystem
+          router.get('/projects/:id', [FilesystemController, 'getProjectStructure'])
+          router.post('/projects/:id/init', [FilesystemController, 'initProjectStructure'])
+          router.post('/projects/:id/sync-pieces', [FilesystemController, 'syncPieceFolders'])
+
+          // Folders
+          router.get('/folders/:id/contents', [FilesystemController, 'getFolderContents'])
+          router.post('/folders', [FilesystemController, 'createFolder'])
+          router.delete('/folders/:id', [FilesystemController, 'deleteFolder'])
+          router.patch('/folders/:id', [FilesystemController, 'renameFolder'])
+
+          // Files
+          router.post('/upload', [FilesystemController, 'uploadFiles'])
+          router.delete('/files/:id', [FilesystemController, 'deleteFile'])
+          router.patch('/files/:id', [FilesystemController, 'renameFile'])
+
+          // General files
+          router.get('/general', [FilesystemController, 'getGeneralFiles'])
+
+          // Piece scores for callsheet
+          router.get('/pieces/:pieceId/scores/:fileName', [FilesystemController, 'getPieceScores'])
+        })
+        .prefix('/filesystem')
 
       // =============================================================================
       // GESTION DES PROJETS
@@ -141,37 +160,15 @@ router.group(() => {
           // =============================================================================
           router
             .group(() => {
-              // Voir toutes les auditions d'un projet
               router.get('/', [AuditionsController, 'getProjectAuditions'])
-
-              // Supprimer une audition
               router.delete('/:auditionId', [AuditionsController, 'deleteAudition'])
-
-              // Upload de PDF pour audition
               router.post('/upload-pdf', [AuditionsController, 'uploadPdfForAudition'])
-
-              // Upload de PDF pour une section spécifique
               router.post('/upload-pdf-section', [AuditionsController, 'uploadPdfForSection'])
-
-              // Obtenir tous les PDFs groupés par section
               router.get('/pdfs', [AuditionsController, 'getProjectPdfs'])
-
-              // ✅ NOUVELLE ROUTE : Statistiques PDF par section
               router.get('/section-pdfs', [AuditionsController, 'getProjectPdfs'])
-
-              // Envoyer des PDFs en masse à une section
               router.post('/bulk-send-pdfs', [AuditionsController, 'bulkSendPdfsToSection'])
-
-              // Supprimer un PDF d'audition
               router.delete('/pdf/:pdfFileId', [AuditionsController, 'deleteAuditionPdf'])
-
-              // Supprimer un PDF d'une section (toutes ses associations)
-              router.delete('/section-pdfs/:pdfFileId', [
-                AuditionsController,
-                'removePdfFromSection',
-              ])
-
-              // ✅ ROUTE DE DEBUG (à supprimer en production)
+              router.delete('/section-pdfs/:pdfFileId', [AuditionsController, 'removePdfFromSection'])
               router.get('/debug-files', [AuditionsController, 'debugFiles'])
             })
             .prefix('/:id/management/auditions')
@@ -254,7 +251,7 @@ router.group(() => {
         .prefix('/type_of_pieces')
 
       // =============================================================================
-      // GESTION DES FICHIERS (PROTÉGÉE)
+      // GESTION DES FICHIERS (ANCIEN SYSTÈME - GARDÉ POUR COMPATIBILITÉ)
       // =============================================================================
       router
         .group(() => {
@@ -262,14 +259,12 @@ router.group(() => {
           router.get('/', [FilesController, 'getAll'])
           router.put('/:id', [FilesController, 'update'])
           router.delete('/:id', [FilesController, 'delete'])
-
-          // ✅ ROUTES ADDITIONNELLES POUR ADMIN
-          router.get('/:id/info', [FilesController, 'info']) // Info détaillée sur un fichier
+          router.get('/:id/info', [FilesController, 'info'])
         })
         .prefix('/files')
 
       // =============================================================================
-      // GESTION DES DOSSIERS
+      // GESTION DES DOSSIERS (ANCIEN SYSTÈME - GARDÉ POUR COMPATIBILITÉ)
       // =============================================================================
       router
         .group(() => {
@@ -333,37 +328,18 @@ router.group(() => {
       // =============================================================================
       router
         .group(() => {
-          // Mailing pour participants spécifiques
           router.post('/sendRefusalEmailToParticipant', [
             MailingsController,
             'sendRefusalEmailToParticipant',
           ])
-
           router.post('/sendAuditionRequest', [MailingsController, 'sendAuditionRequest'])
-
-          // Mailing pour des listes de contacts
           router.post('/sendTemplateToList', [MailingsController, 'sendTemplateToList'])
-
-          // Notifications automatiques
-          router.post('/sendCallsheetNotification', [
-            MailingsController,
-            'sendCallsheetNotification',
-          ])
-          router.post('/sendRecommendedNotification', [
-            MailingsController,
-            'sendRecommendedNotification',
-          ])
-          router.post('/sendRecruitmentNotification', [
-            MailingsController,
-            'sendRecruitmentNotification',
-          ])
-          router.post('/sendParticipationValidationNotification', [
-            MailingsController,
-            'sendParticipationValidationNotification',
-          ])
+          router.post('/sendCallsheetNotification', [MailingsController, 'sendCallsheetNotification'])
+          router.post('/sendRecommendedNotification', [MailingsController, 'sendRecommendedNotification'])
+          router.post('/sendRecruitmentNotification', [MailingsController, 'sendRecruitmentNotification'])
+          router.post('/sendParticipationValidationNotification', [MailingsController, 'sendParticipationValidationNotification'])
           router.post('/sendMailToParticipants', [MailingsController, 'sendMailToParticipants'])
 
-          // Templates par défaut
           router
             .group(() => {
               router.get('/default', [DefaultTemplatesController, 'getDefaultTemplates'])
