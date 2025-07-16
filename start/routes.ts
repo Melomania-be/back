@@ -8,6 +8,8 @@
 */
 import router from '@adonisjs/core/services/router'
 import { middleware } from './kernel.js'
+import Accounting from '#models/accounting'
+import AccountingsController from '#controllers/accounting_controller'
 
 const AuditionsController = () => import('#controllers/auditions_controller')
 const UsersController = () => import('#controllers/users_controller')
@@ -30,6 +32,7 @@ const FormsController = () => import('#controllers/forms_controller')
 const SectionsController = () => import('#controllers/sections_controller')
 const TemplateController = () => import('#controllers/template_controller')
 const DefaultTemplatesController = () => import('#controllers/default_templates_controller')
+const ExpenseCategoriesController = () => import('#controllers/expenses_categories_controller')
 const FilesystemController = () => import('#controllers/filesystem_controller')
 const SharedFolderController = () => import('#controllers/shared_folder_controller')
 const RecruitmentController = () => import('#controllers/recruitment_controller')
@@ -208,6 +211,9 @@ router.group(() => {
           router.delete('/:id', [ProjectsController, 'delete'])
           router.get('/:id/management', [ProjectsController, 'getDashboard'])
           router.get('/:id/management/attendance', [ProjectsController, 'getAttendance'])
+          router.get('/projects/:id/management/accounting', [AccountingsController, 'getAll'])
+          router.post('/projects/:id/management/accounting', [AccountingsController, 'createOrUpdate'])
+          router.delete('/projects/:id/management/accounting/:accountingId', [AccountingsController, 'delete'])
 
           // ✅ ROUTES MATÉRIELS POUR PROJETS (SANS DUPLICATION)
           router.get('/:id/material-selections', [
@@ -538,6 +544,15 @@ router.group(() => {
           router.delete('/:id', [TemplateController, 'delete'])
         })
         .prefix('/templates')
+
+      // =============================================================================
+      // GESTION DES CATEGORIES DE DEPENSES
+      // =============================================================================
+      router.group(() => {
+        router.get('/expense_categories', [ExpenseCategoriesController, 'getAll'])
+        router.post('/expense_categories', [ExpenseCategoriesController, 'createOrUpdate'])
+        router.delete('/expense_categories/:id', [ExpenseCategoriesController, 'delete'])
+      })
     })
     .use(middleware.auth({ guards: ['api'] }))
     .use(middleware.routeLogger())
