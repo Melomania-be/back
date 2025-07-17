@@ -105,12 +105,12 @@ export default class FilesystemController {
       .whereNull('parent_id')
       .preload('children', (query) => {
         query.preload('children', (subQuery) => {
-          subQuery.preload('files') // Charger les fichiers dans les sous-dossiers
+          subQuery.preload('files')
           subQuery.preload('children', (subSubQuery) => {
-            subSubQuery.preload('files') // Charger encore plus profond si nécessaire
+            subSubQuery.preload('files')
           })
         })
-        query.preload('files') // Charger les fichiers dans les dossiers
+        query.preload('files')
       })
       .first()
 
@@ -118,7 +118,6 @@ export default class FilesystemController {
       return ctx.response.notFound({ message: 'Project structure not found' })
     }
 
-    // ✅ FONCTION RÉCURSIVE pour compter les fichiers
     function addFileCounts(folder: any): any {
       let totalFiles = 0
       const processedChildren = []
@@ -193,7 +192,6 @@ export default class FilesystemController {
     } catch (error) {
       console.error('Error creating folder:', error)
 
-      // Handle validation errors
       if (error.messages) {
         return ctx.response.status(422).json({
           success: false,
@@ -210,7 +208,7 @@ export default class FilesystemController {
     }
   }
 
-  // Get folder contents - ✅ CORRECTION MAJEURE
+  // Get folder contents
   async getFolderContents(ctx: HttpContext) {
     const folderId = ctx.params.id
 
@@ -218,12 +216,11 @@ export default class FilesystemController {
 
     const subfolders = await Folder.query()
       .where('parent_id', folderId)
-      .preload('files') // ✅ AJOUT : Charger les fichiers des sous-dossiers
+      .preload('files')
       .orderBy('name', 'asc')
 
     const files = await File.query().where('folder_id', folderId).orderBy('name', 'asc')
 
-    // ✅ CORRECTION : Formatter correctement les données
     const contents = [
       ...subfolders.map((f) => ({
         id: f.id,
@@ -238,17 +235,17 @@ export default class FilesystemController {
         updatedAt: f.updatedAt,
         children: f.files
           ? f.files.map((file) => ({
-              id: file.id,
-              name: file.name,
-              type: 'file',
-              size: file.size,
-              mimeType: file.type,
-              parentId: file.folder_id,
-              projectId: file.project_id,
-              pieceId: file.piece_id,
-              createdAt: file.createdAt,
-              updatedAt: file.updatedAt,
-            }))
+            id: file.id,
+            name: file.name,
+            type: 'file',
+            size: file.size,
+            mimeType: file.type,
+            parentId: file.folder_id,
+            projectId: file.project_id,
+            pieceId: file.piece_id,
+            createdAt: file.createdAt,
+            updatedAt: file.updatedAt,
+          }))
           : [],
         isSystemGenerated: f.is_system_generated,
       })),
@@ -269,7 +266,7 @@ export default class FilesystemController {
     return ctx.response.json(contents)
   }
 
-  // Upload files - ✅ CORRECTION MAJEURE
+  // ✅ CORRECTION MAJEURE : Upload files avec détection automatique du piece_id
   async uploadFiles(ctx: HttpContext) {
     try {
       const data = await ctx.request.validateUsing(filesystemUploadValidator)
@@ -283,6 +280,18 @@ export default class FilesystemController {
       })
 
       const uploadedFiles = []
+
+      // ✅ AJOUT : Déterminer automatiquement le piece_id si on est dans un dossier de pièce
+      let pieceId = data.pieceId
+      let parentFolder = null
+
+      if (data.parentId) {
+        parentFolder = await Folder.find(data.parentId)
+        if (parentFolder && parentFolder.piece_id) {
+          pieceId = parentFolder.piece_id
+          console.log('🎵 Detected piece folder, setting piece_id to:', pieceId)
+        }
+      }
 
       // Handle multiple files
       if (data.files) {
@@ -302,11 +311,11 @@ export default class FilesystemController {
             size: file.size || 0,
             folder_id: data.parentId || null,
             project_id: data.projectId || null,
-            piece_id: data.pieceId || null,
-            content: '', // ✅ AJOUT : Champ requis
+            piece_id: pieceId || null, // ✅ CORRECTION : Utiliser pieceId détecté
+            content: '',
           })
 
-          console.log('File uploaded successfully:', dbFile.id)
+          console.log('File uploaded successfully:', dbFile.id, 'linked to piece:', pieceId)
           uploadedFiles.push(dbFile)
         }
       }
@@ -328,18 +337,17 @@ export default class FilesystemController {
           size: data.file.size || 0,
           folder_id: data.parentId || null,
           project_id: data.projectId || null,
-          piece_id: data.pieceId || null,
-          content: '', // ✅ AJOUT : Champ requis
+          piece_id: pieceId || null, // ✅ CORRECTION : Utiliser pieceId détecté
+          content: '',
         })
 
-        console.log('Single file uploaded successfully:', dbFile.id)
+        console.log('Single file uploaded successfully:', dbFile.id, 'linked to piece:', pieceId)
         uploadedFiles.push(dbFile)
       }
 
-      // ✅ CORRECTION : Synchroniser avec l'ancien système si nécessaire
+      // ✅ AJOUT : Synchroniser avec l'ancienne relation folder->files si nécessaire
       for (const dbFile of uploadedFiles) {
         if (data.parentId) {
-          // Lier avec l'ancien système de dossiers (table contains)
           try {
             await dbFile.related('folder_id').sync([data.parentId])
           } catch (error) {
@@ -356,7 +364,6 @@ export default class FilesystemController {
     } catch (error) {
       console.error('Error uploading files:', error)
 
-      // Handle validation errors
       if (error.messages) {
         return ctx.response.status(422).json({
           success: false,
@@ -378,13 +385,13 @@ export default class FilesystemController {
     try {
       const files = await File.query()
         .whereNull('project_id')
-        .whereNull('folder_id') // ✅ AJOUT : Fichiers qui ne sont dans aucun dossier
+        .whereNull('folder_id')
         .orderBy('name', 'asc')
 
       const folders = await Folder.query()
         .whereNull('project_id')
-        .whereNull('parent_id') // ✅ AJOUT : Dossiers racine seulement
-        .preload('files') // ✅ AJOUT : Charger les fichiers des dossiers
+        .whereNull('parent_id')
+        .preload('files')
         .orderBy('name', 'asc')
 
       const items = [
@@ -401,17 +408,17 @@ export default class FilesystemController {
           updatedAt: f.updatedAt,
           children: f.files
             ? f.files.map((file) => ({
-                id: file.id,
-                name: file.name,
-                type: 'file',
-                size: file.size,
-                mimeType: file.type,
-                parentId: file.folder_id,
-                projectId: file.project_id,
-                pieceId: file.piece_id,
-                createdAt: file.createdAt,
-                updatedAt: file.updatedAt,
-              }))
+              id: file.id,
+              name: file.name,
+              type: 'file',
+              size: file.size,
+              mimeType: file.type,
+              parentId: file.folder_id,
+              projectId: file.project_id,
+              pieceId: file.piece_id,
+              createdAt: file.createdAt,
+              updatedAt: file.updatedAt,
+            }))
             : [],
         })),
         ...files.map((f) => ({
@@ -441,17 +448,14 @@ export default class FilesystemController {
 
     const folder = await Folder.findOrFail(folderId)
 
-    // Check if it's a system-generated folder
     if (folder.is_system_generated) {
       return ctx.response.badRequest({
         message: 'Cannot delete system-generated folders',
       })
     }
 
-    // Delete all files in the folder
     await File.query().where('folder_id', folderId).delete()
 
-    // Delete all subfolders recursively
     const subfolders = await Folder.query().where('parent_id', folderId)
     for (const subfolder of subfolders) {
       await this.deleteFolder({ params: { id: subfolder.id } } as any)
@@ -468,7 +472,6 @@ export default class FilesystemController {
 
     const file = await File.findOrFail(fileId)
 
-    // Delete physical file
     try {
       await file.delete()
     } catch (error) {
@@ -485,7 +488,6 @@ export default class FilesystemController {
 
     const folder = await Folder.findOrFail(folderId)
 
-    // Check if it's a system-generated folder
     if (folder.is_system_generated) {
       return ctx.response.badRequest({
         message: 'Cannot rename system-generated folders',
@@ -510,7 +512,7 @@ export default class FilesystemController {
     return ctx.response.json(file)
   }
 
-  // Get piece scores for callsheet - ✅ NOUVELLE MÉTHODE
+  // Get piece scores for callsheet
   async getPieceScores(ctx: HttpContext) {
     const pieceId = ctx.params.pieceId
     const fileName = ctx.params.fileName
@@ -536,7 +538,6 @@ export default class FilesystemController {
     const project = await Project.findOrFail(projectId)
     const pieces = await project.related('pieces').query()
 
-    // Find scores folder
     const scoresFolder = await Folder.query()
       .where('project_id', projectId)
       .where('name', 'Scores')
@@ -546,12 +547,10 @@ export default class FilesystemController {
       return ctx.response.badRequest({ message: 'Scores folder not found' })
     }
 
-    // Get existing piece folders
     const existingPieceFolders = await Folder.query()
       .where('parent_id', scoresFolder.id)
       .whereNotNull('piece_id')
 
-    // Create folders for new pieces
     for (const piece of pieces) {
       const existingFolder = existingPieceFolders.find((f) => f.piece_id === piece.id)
 
@@ -564,7 +563,6 @@ export default class FilesystemController {
           is_system_generated: true,
         })
 
-        // Copy existing scores from other projects
         const existingScores = await File.query()
           .where('piece_id', piece.id)
           .whereNot('project_id', projectId)
@@ -584,7 +582,6 @@ export default class FilesystemController {
       }
     }
 
-    // Remove folders for pieces no longer in project
     const currentPieceIds = pieces.map((p) => p.id)
     const foldersToRemove = existingPieceFolders.filter(
       (f) => !currentPieceIds.includes(f.piece_id)

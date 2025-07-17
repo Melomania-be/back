@@ -3,7 +3,7 @@ import { BaseModel, belongsTo, column, manyToMany, hasMany } from '@adonisjs/luc
 import Composer from '#models/composer'
 import TypeOfPiece from '#models/type_of_piece'
 import Folder from '#models/folder'
-import File from '#models/file' // ✅ AJOUT
+import File from '#models/file' // ✅ VÉRIFICATION : Import correct
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import type { ManyToMany } from '@adonisjs/lucid/types/relations'
 import Project from '#models/project'
@@ -52,7 +52,7 @@ export default class Piece extends BaseModel {
   })
   declare folder: BelongsTo<typeof Folder>
 
-  // ✅ AJOUT : Relation directe avec les fichiers
+  // ✅ VÉRIFICATION : Cette relation existe déjà et est correcte
   @hasMany(() => File, {
     foreignKey: 'piece_id',
   })

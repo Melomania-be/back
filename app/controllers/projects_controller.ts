@@ -1,5 +1,3 @@
-// import type { HttpContext } from '@adonisjs/core/http'
-
 import Project from '#models/project'
 import { HttpContext } from '@adonisjs/core/http'
 import { createProjectValidator } from '#validators/project'
@@ -61,6 +59,7 @@ export default class ProjectsController {
     return data
   }
 
+  // ✅ CORRECTION : Méthode getDashboard avec chargement des fichiers
   async getDashboard({ params }: HttpContext) {
     try {
       const projectId = params.id;
@@ -68,13 +67,11 @@ export default class ProjectsController {
       console.log('📊 DASHBOARD - Request for project:', projectId);
       console.log('📊 DASHBOARD - Project ID type:', typeof projectId);
 
-      // ✅ VALIDATION : Vérifier que l'ID existe
       if (!projectId) {
         console.error('❌ DASHBOARD - No project ID provided');
         throw new Error('Project ID is required');
       }
 
-      // ✅ CORRECTION : Requête principale avec tous les preloads nécessaires
       console.log('📊 DASHBOARD - Loading project data...');
       const data = await Project.query()
         .where('id', projectId)
@@ -101,7 +98,7 @@ export default class ProjectsController {
             .preload('folder', (subQuery) => {
               subQuery.preload('files')
             })
-            .preload('files') // Charger les fichiers directement liés aux pièces
+            .preload('files') // ✅ AJOUT : Charger les fichiers directement liés aux pièces
             .pivotColumns(['order'])
             .orderBy('order', 'asc')
         })
@@ -124,7 +121,6 @@ export default class ProjectsController {
         rehearsalsCount: data.rehearsals?.length || 0
       });
 
-      // ✅ CORRECTION : Participants non validés
       console.log('📊 DASHBOARD - Loading participants not validated...');
       const participantsNotValidated = await Participant.query()
         .preload('contact')
@@ -135,7 +131,6 @@ export default class ProjectsController {
 
       console.log('📊 DASHBOARD - Participants not validated:', participantsNotValidated.length);
 
-      // ✅ CORRECTION : Participants sans email
       console.log('📊 DASHBOARD - Loading participants without email...');
       const participantsWithoutEmail = await Participant.query()
         .preload('contact')
@@ -149,7 +144,6 @@ export default class ProjectsController {
 
       console.log('📊 DASHBOARD - Participants without email:', participantsWithoutEmail.length);
 
-      // ✅ CORRECTION : Participants qui n'ont pas vu la dernière callsheet
       console.log('📊 DASHBOARD - Loading participants not seen callsheet...');
       const participantsNotSeenCallsheet = await Participant.query()
         .preload('contact')
@@ -175,7 +169,6 @@ export default class ProjectsController {
 
       console.log('📊 DASHBOARD - Participants not seen callsheet:', participantsNotSeenCallsheet.length);
 
-      // ✅ AJOUT : Statistiques supplémentaires
       const stats = {
         totalParticipants: data.participants?.length || 0,
         acceptedParticipants: data.participants?.filter(p => p.accepted).length || 0,
@@ -196,7 +189,6 @@ export default class ProjectsController {
 
       console.log('📊 DASHBOARD - Statistics calculated:', stats);
 
-      // ✅ CORRECTION : Préparation des données de retour
       const projectData = {
         id: data.id,
         name: data.name,
@@ -205,7 +197,6 @@ export default class ProjectsController {
         createdAt: data.createdAt,
         updatedAt: data.updatedAt,
 
-        // Relations
         concerts: data.concerts || [],
         rehearsals: data.rehearsals || [],
         pieces: data.pieces || [],
@@ -216,7 +207,6 @@ export default class ProjectsController {
         registration: data.registration || null,
         folder: data.folder || null,
 
-        // Statistiques
         stats
       };
 
@@ -228,7 +218,6 @@ export default class ProjectsController {
         hasConcerts: projectData.concerts.length > 0
       });
 
-      // ✅ CORRECTION : Structure de retour finale
       const result = {
         data: projectData,
         participantsNotValidated: participantsNotValidated || [],
@@ -254,7 +243,6 @@ export default class ProjectsController {
       console.error('❌ DASHBOARD - Error stack:', error.stack);
       console.error('❌ DASHBOARD - Project ID:', params.id);
 
-      // ✅ CORRECTION : Retourner une erreur HTTP appropriée
       throw error;
     }
   }
@@ -286,7 +274,6 @@ export default class ProjectsController {
 
     const pieces = data.pieces
 
-    // Prepare the pivot data with order
     const pivotData = pieces.reduce(
       (acc: Record<number, { order: number }>, piece) => {
         acc[piece.id] = { order: piece.pivot_order }

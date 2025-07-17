@@ -28,6 +28,8 @@ export default class CallsheetsController {
             pieceQuery.preload('folder', (folderQuery) => {
               folderQuery.preload('files')
             })
+            // ✅ AJOUT : Charger les fichiers directement liés à la pièce
+            pieceQuery.preload('files')
           })
           .preload('sectionGroup', (sectionGroupQuery) => {
             sectionGroupQuery.preload('sections', (sectionQuery) => {
