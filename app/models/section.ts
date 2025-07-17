@@ -27,7 +27,8 @@ export default class Section extends BaseModel {
   @manyToMany(() => SectionGroup, {
     pivotTable: 'section_section_groups',
     localKey: 'id',
-    pivotForeignKey: 'sections_id',
+    pivotForeignKey: 'section_id',
+    // pivotForeignKey: 'sections_id',
     relatedKey: 'id',
     pivotRelatedForeignKey: 'section_group_id',
     pivotTimestamps: true,

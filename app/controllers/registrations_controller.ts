@@ -6,6 +6,22 @@ import Participant from '#models/participant'
 import Answer from '#models/answer'
 import Project from '#models/project'
 
+import Section from '#models/section' // NEW: Import Section model
+import Recruitment from '#models/recruitment' // NEW: Import Recruitment model
+import User from '#models/user' // NEW: Import User model for `contactedBy` if needed
+import { DateTime } from 'luxon' // NEW: Import DateTime for timestamps
+
+export type RecruitmentStatus =
+  | 'not yet contacted'
+  | 'awaiting response'
+  | 'interested'
+  | 'participating'
+  | 'registered'
+  | 'not available'
+  | 'to follow up'
+  | 'cancelled'
+  | 'other'
+
 export default class RegistrationsController {
   async getAll() {
     return await Registration.query()
@@ -149,6 +165,9 @@ export default class RegistrationsController {
 
     //Puting the answer in the answer table if there is a form to fill
     if (data.answers.length === 0) {
+      // --- NEW: Call recruitment creation here if no answers ---
+      await this._createRecruitmentFromParticipant(contact, participant)
+      // --- END NEW ---
       return ctx.response.json({ success: true, participant })
     }
 
@@ -161,7 +180,69 @@ export default class RegistrationsController {
         }
       })
     )
-
+    // --- NEW: Call recruitment creation here after answers are saved ---
+    await this._createRecruitmentFromParticipant(contact, participant)
+    // --- END NEW ---
     return ctx.response.json({ success: true, participant, answer })
+  }
+
+  /**
+   * NEW PRIVATE METHOD: _createRecruitmentFromParticipant
+   * Helper function to encapsulate the logic for creating a Recruitment record.
+   */
+  private async _createRecruitmentFromParticipant(contact: Contact, participant: Participant) {
+    try {
+      // 1. Determine the final section_group_id for the Recruitment record
+      let finalSectionGroupId: number
+
+      await participant.load('section', (sectionQuery) => {
+        sectionQuery.preload('section_groups')
+      })
+
+      if (
+        participant.section &&
+        participant.section.section_groups &&
+        participant.section.section_groups.length > 0
+      ) {
+        finalSectionGroupId = participant.section.section_groups[0].id
+      } else {
+        console.error(
+          `ERROR: Participant ${participant.id} (Section ID: ${participant.section_id}) could not be linked to a SectionGroup. Recruitment creation requires a valid sectionGroupId.`
+        )
+        throw new Error(
+          'Missing associated section group for recruitment creation. Cannot create record.'
+        )
+      }
+
+      // 2. Determine the system user for 'contactedBy'
+      const SYSTEM_USER_ID = 1 // <<< IMPORTANT: Replace with an actual ID of a system user
+      let systemUserIdForRecruitment: number | null = SYSTEM_USER_ID
+
+      // 3. Construct the new Recruitment data object
+      const newRecruitmentData = {
+        firstName: contact.first_name,
+        lastName: contact.last_name,
+        sectionGroupId: finalSectionGroupId,
+        projectId: participant.project_id,
+        status: 'registered' as RecruitmentStatus,
+        // --- FIX 2: Convert ISO string to DateTime object ---
+        contactDate: DateTime.now().toUTC(), // Pass DateTime object directly
+        // --- END FIX 2 ---
+        contactedBy: systemUserIdForRecruitment,
+        comment: 'Automatically created from participant registration.',
+      }
+
+      // 4. Create the Recruitment record
+      const newRecruitment = await Recruitment.create(newRecruitmentData)
+      console.log(
+        `LOG: Successfully created new Recruitment record for ${newRecruitment.firstName} ${newRecruitment.lastName} (ID: ${newRecruitment.id})`
+      )
+    } catch (error) {
+      console.error(
+        'ERROR: Failed to automatically create Recruitment record during participant registration:',
+        error
+      )
+      throw error
+    }
   }
 }
