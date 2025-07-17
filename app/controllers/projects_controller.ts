@@ -29,6 +29,7 @@ export default class ProjectsController {
     })
   }
 
+  // ✅ CORRECTION : Méthode getOne avec chargement des fichiers
   async getOne({ params }: HttpContext) {
     const data = await Project.query()
       .where('id', params.id)
@@ -39,6 +40,7 @@ export default class ProjectsController {
           .preload('folder', (subQuery) => {
             subQuery.preload('files')
           })
+          .preload('files') // ✅ AJOUT : Charger les fichiers directement liés à la pièce
           .pivotColumns(['order'])
           .orderBy('order', 'asc')
       })
@@ -60,73 +62,200 @@ export default class ProjectsController {
   }
 
   async getDashboard({ params }: HttpContext) {
-    const data = await Project.query()
-      .where('id', params.id)
-      .preload('concerts', (query) => {
-        query.limit(3).orderBy('date', 'desc')
-      })
-      .preload('participants')
-      .preload('callsheets', (query) => {
-        query.limit(3).orderBy('updated_at', 'desc')
-      })
-      .preload('registration')
-      .preload('rehearsals')
-      .preload('concerts')
-      .preload('responsibles')
-      .preload('pieces', (query) => {
-        query
-          .preload('composer')
-          .preload('folder', (subQuery) => {
-            subQuery.preload('files')
+    try {
+      const projectId = params.id;
+
+      console.log('📊 DASHBOARD - Request for project:', projectId);
+      console.log('📊 DASHBOARD - Project ID type:', typeof projectId);
+
+      // ✅ VALIDATION : Vérifier que l'ID existe
+      if (!projectId) {
+        console.error('❌ DASHBOARD - No project ID provided');
+        throw new Error('Project ID is required');
+      }
+
+      // ✅ CORRECTION : Requête principale avec tous les preloads nécessaires
+      console.log('📊 DASHBOARD - Loading project data...');
+      const data = await Project.query()
+        .where('id', projectId)
+        .preload('concerts', (query) => {
+          query.limit(3).orderBy('start_date', 'desc')
+        })
+        .preload('participants', (query) => {
+          query.preload('contact').preload('section')
+        })
+        .preload('callsheets', (query) => {
+          query.limit(3).orderBy('updated_at', 'desc')
+        })
+        .preload('registration', (query) => {
+          query.preload('content').preload('form')
+        })
+        .preload('rehearsals', (query) => {
+          query.orderBy('start_date', 'asc')
+        })
+        .preload('responsibles')
+        .preload('pieces', (query) => {
+          query
+            .preload('composer')
+            .preload('typeOfPiece')
+            .preload('folder', (subQuery) => {
+              subQuery.preload('files')
+            })
+            .preload('files') // Charger les fichiers directement liés aux pièces
+            .pivotColumns(['order'])
+            .orderBy('order', 'asc')
+        })
+        .preload('sectionGroup', (query) => {
+          query.preload('sections', (subQuery) => {
+            subQuery.preload('instruments').pivotColumns(['order']).orderBy('order', 'asc')
           })
-          .pivotColumns(['order'])
-          .orderBy('order', 'asc')
-      })
-      .preload('sectionGroup', (query) => {
-        query.preload('sections')
-      })
-      .preload('folder', (query) => {
-        query.preload('files')
-      })
+        })
+        .preload('folder', (query) => {
+          query.preload('files')
+        })
+        .firstOrFail()
 
-    const participantsNotValidated = await Participant.query()
-      .preload('contact')
-      .where('project_id', params.id)
-      .andWhere('accepted', false)
+      console.log('📊 DASHBOARD - Project loaded:', {
+        id: data.id,
+        name: data.name,
+        participantsCount: data.participants?.length || 0,
+        piecesCount: data.pieces?.length || 0,
+        concertsCount: data.concerts?.length || 0,
+        rehearsalsCount: data.rehearsals?.length || 0
+      });
 
-    const participantsWithoutEmail = await Participant.query()
-      .preload('contact')
-      .where('project_id', params.id)
-      .andWhere('accepted', true)
-      .andWhereHas('contact', (subQuery) => {
-        subQuery.whereNull('email').orWhere('email', '')
-      })
+      // ✅ CORRECTION : Participants non validés
+      console.log('📊 DASHBOARD - Loading participants not validated...');
+      const participantsNotValidated = await Participant.query()
+        .preload('contact')
+        .preload('section')
+        .where('project_id', projectId)
+        .andWhere('accepted', false)
+        .orderBy('created_at', 'desc')
 
-    const participantsNotSeenCallsheet = await Participant.query()
-      .preload('contact')
-      .where('participants.project_id', params.id)
-      .andWhere('accepted', true)
-      .andWhere((subQuery) => {
-        subQuery
-          .where(
-            'last_activity',
-            '<',
-            db
-              .from('callsheets')
-              .select('updated_at')
-              .where('project_id', params.id)
-              .andWhereNotNull('updated_at')
-              .orderBy('updated_at', 'desc')
-              .limit(1)
-          )
-          .orDoesntHave('hasSeenCallsheets')
-      })
+      console.log('📊 DASHBOARD - Participants not validated:', participantsNotValidated.length);
 
-    return {
-      data,
-      participantsNotValidated,
-      participantsWithoutEmail,
-      participantsNotSeenCallsheet,
+      // ✅ CORRECTION : Participants sans email
+      console.log('📊 DASHBOARD - Loading participants without email...');
+      const participantsWithoutEmail = await Participant.query()
+        .preload('contact')
+        .preload('section')
+        .where('project_id', projectId)
+        .andWhere('accepted', true)
+        .andWhereHas('contact', (subQuery) => {
+          subQuery.whereNull('email').orWhere('email', '').orWhere('email', 'NOT LIKE', '%@%')
+        })
+        .orderBy('created_at', 'desc')
+
+      console.log('📊 DASHBOARD - Participants without email:', participantsWithoutEmail.length);
+
+      // ✅ CORRECTION : Participants qui n'ont pas vu la dernière callsheet
+      console.log('📊 DASHBOARD - Loading participants not seen callsheet...');
+      const participantsNotSeenCallsheet = await Participant.query()
+        .preload('contact')
+        .preload('section')
+        .where('participants.project_id', projectId)
+        .andWhere('accepted', true)
+        .andWhere((subQuery) => {
+          subQuery
+            .whereNull('last_activity')
+            .orWhere(
+              'last_activity',
+              '<',
+              db
+                .from('callsheets')
+                .select('updated_at')
+                .where('project_id', projectId)
+                .andWhereNotNull('updated_at')
+                .orderBy('updated_at', 'desc')
+                .limit(1)
+            )
+        })
+        .orderBy('last_activity', 'asc')
+
+      console.log('📊 DASHBOARD - Participants not seen callsheet:', participantsNotSeenCallsheet.length);
+
+      // ✅ AJOUT : Statistiques supplémentaires
+      const stats = {
+        totalParticipants: data.participants?.length || 0,
+        acceptedParticipants: data.participants?.filter(p => p.accepted).length || 0,
+        pendingParticipants: participantsNotValidated.length,
+        participantsWithoutEmail: participantsWithoutEmail.length,
+        participantsNotSeenCallsheet: participantsNotSeenCallsheet.length,
+        totalPieces: data.pieces?.length || 0,
+        totalConcerts: data.concerts?.length || 0,
+        totalRehearsals: data.rehearsals?.length || 0,
+        totalCallsheets: data.callsheets?.length || 0,
+        upcomingConcerts: data.concerts?.filter(c =>
+          new Date(c.start_date.toString()) > new Date()
+        ).length || 0,
+        upcomingRehearsals: data.rehearsals?.filter(r =>
+          new Date(r.start_date.toString()) > new Date()
+        ).length || 0
+      }
+
+      console.log('📊 DASHBOARD - Statistics calculated:', stats);
+
+      // ✅ CORRECTION : Préparation des données de retour
+      const projectData = {
+        id: data.id,
+        name: data.name,
+        sectionGroupId: data.section_group_id,
+        folderId: data.folder_id,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+
+        // Relations
+        concerts: data.concerts || [],
+        rehearsals: data.rehearsals || [],
+        pieces: data.pieces || [],
+        participants: data.participants || [],
+        callsheets: data.callsheets || [],
+        responsibles: data.responsibles || [],
+        sectionGroup: data.sectionGroup || null,
+        registration: data.registration || null,
+        folder: data.folder || null,
+
+        // Statistiques
+        stats
+      };
+
+      console.log('📊 DASHBOARD - Project data prepared:', {
+        id: projectData.id,
+        name: projectData.name,
+        hasParticipants: projectData.participants.length > 0,
+        hasPieces: projectData.pieces.length > 0,
+        hasConcerts: projectData.concerts.length > 0
+      });
+
+      // ✅ CORRECTION : Structure de retour finale
+      const result = {
+        data: projectData,
+        participantsNotValidated: participantsNotValidated || [],
+        participantsWithoutEmail: participantsWithoutEmail || [],
+        participantsNotSeenCallsheet: participantsNotSeenCallsheet || []
+      }
+
+      console.log('📊 DASHBOARD - Final result prepared:', {
+        hasData: !!result.data,
+        dataId: result.data.id,
+        dataName: result.data.name,
+        participantsNotValidatedCount: result.participantsNotValidated.length,
+        participantsWithoutEmailCount: result.participantsWithoutEmail.length,
+        participantsNotSeenCallsheetCount: result.participantsNotSeenCallsheet.length
+      });
+
+      console.log('📊 DASHBOARD - Returning result to client');
+      return result;
+
+    } catch (error) {
+      console.error('❌ DASHBOARD - Error occurred:', error);
+      console.error('❌ DASHBOARD - Error message:', error.message);
+      console.error('❌ DASHBOARD - Error stack:', error.stack);
+      console.error('❌ DASHBOARD - Project ID:', params.id);
+
+      // ✅ CORRECTION : Retourner une erreur HTTP appropriée
+      throw error;
     }
   }
 

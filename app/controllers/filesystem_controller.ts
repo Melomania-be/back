@@ -27,7 +27,7 @@ export default class FilesystemController {
     const rootFolder = await Folder.create({
       name: project.name,
       project_id: projectId,
-      is_system_generated: true
+      is_system_generated: true,
     })
 
     // Create default folders
@@ -35,28 +35,28 @@ export default class FilesystemController {
       name: 'Scores',
       parent_id: rootFolder.id,
       project_id: projectId,
-      is_system_generated: true
+      is_system_generated: true,
     })
 
     const photosFolder = await Folder.create({
       name: 'Photos',
       parent_id: rootFolder.id,
       project_id: projectId,
-      is_system_generated: true
+      is_system_generated: true,
     })
 
     const videosFolder = await Folder.create({
       name: 'Videos',
       parent_id: rootFolder.id,
       project_id: projectId,
-      is_system_generated: true
+      is_system_generated: true,
     })
 
     const documentsFolder = await Folder.create({
       name: 'Documents',
       parent_id: rootFolder.id,
       project_id: projectId,
-      is_system_generated: true
+      is_system_generated: true,
     })
 
     // Create folders for each piece in scores
@@ -67,13 +67,11 @@ export default class FilesystemController {
         parent_id: scoresFolder.id,
         project_id: projectId,
         piece_id: piece.id,
-        is_system_generated: true
+        is_system_generated: true,
       })
 
       // Check if piece has existing scores in other projects
-      const existingScores = await File.query()
-        .where('piece_id', piece.id)
-        .whereNotNull('piece_id')
+      const existingScores = await File.query().where('piece_id', piece.id).whereNotNull('piece_id')
 
       // Copy existing scores to this project
       for (const score of existingScores) {
@@ -84,7 +82,7 @@ export default class FilesystemController {
           size: score.size,
           folder_id: pieceFolder.id,
           project_id: projectId,
-          piece_id: piece.id
+          piece_id: piece.id,
         })
       }
     }
@@ -94,7 +92,7 @@ export default class FilesystemController {
       scoresFolder: await scoresFolder.load('children'),
       photosFolder,
       videosFolder,
-      documentsFolder
+      documentsFolder,
     })
   }
 
@@ -106,7 +104,13 @@ export default class FilesystemController {
       .where('project_id', projectId)
       .whereNull('parent_id')
       .preload('children', (query) => {
-        query.preload('children')
+        query.preload('children', (subQuery) => {
+          subQuery.preload('files') // Charger les fichiers dans les sous-dossiers
+          subQuery.preload('children', (subSubQuery) => {
+            subSubQuery.preload('files') // Charger encore plus profond si nécessaire
+          })
+        })
+        query.preload('files') // Charger les fichiers dans les dossiers
       })
       .first()
 
@@ -114,21 +118,53 @@ export default class FilesystemController {
       return ctx.response.notFound({ message: 'Project structure not found' })
     }
 
-    const scoresFolder = rootFolder.children?.find(f => f.name === 'Scores')
-    const photosFolder = rootFolder.children?.find(f => f.name === 'Photos')
-    const videosFolder = rootFolder.children?.find(f => f.name === 'Videos')
-    const documentsFolder = rootFolder.children?.find(f => f.name === 'Documents')
-    const customFolders = rootFolder.children?.filter(f =>
-      !['Scores', 'Photos', 'Videos', 'Documents'].includes(f.name)
-    ) || []
+    // ✅ FONCTION RÉCURSIVE pour compter les fichiers
+    function addFileCounts(folder: any): any {
+      let totalFiles = 0
+      const processedChildren = []
+
+      if (folder.children) {
+        for (const child of folder.children) {
+          if (child.type === 'folder' || child.constructor.name === 'Folder') {
+            const processedChild = addFileCounts(child)
+            totalFiles += processedChild.fileCount || 0
+            processedChildren.push(processedChild)
+          } else {
+            processedChildren.push(child)
+          }
+        }
+      }
+
+      if (folder.files) {
+        totalFiles += folder.files.length
+      }
+
+      return {
+        ...folder.serialize(),
+        children: processedChildren,
+        files: folder.files || [],
+        fileCount: totalFiles,
+      }
+    }
+
+    const processedRootFolder = addFileCounts(rootFolder)
+
+    const scoresFolder = processedRootFolder.children?.find((f) => f.name === 'Scores')
+    const photosFolder = processedRootFolder.children?.find((f) => f.name === 'Photos')
+    const videosFolder = processedRootFolder.children?.find((f) => f.name === 'Videos')
+    const documentsFolder = processedRootFolder.children?.find((f) => f.name === 'Documents')
+    const customFolders =
+      processedRootFolder.children?.filter(
+        (f) => !['Scores', 'Photos', 'Videos', 'Documents'].includes(f.name)
+      ) || []
 
     return ctx.response.json({
-      rootFolder,
+      rootFolder: processedRootFolder,
       scoresFolder,
       photosFolder,
       videosFolder,
       documentsFolder,
-      customFolders
+      customFolders,
     })
   }
 
@@ -144,7 +180,7 @@ export default class FilesystemController {
         parent_id: data.parentId || null,
         project_id: data.projectId || null,
         piece_id: data.pieceId || null,
-        is_system_generated: false
+        is_system_generated: false,
       })
 
       console.log('Folder created successfully:', folder.id)
@@ -152,7 +188,7 @@ export default class FilesystemController {
       return ctx.response.json({
         success: true,
         folder: folder,
-        message: 'Folder created successfully'
+        message: 'Folder created successfully',
       })
     } catch (error) {
       console.error('Error creating folder:', error)
@@ -162,19 +198,19 @@ export default class FilesystemController {
         return ctx.response.status(422).json({
           success: false,
           error: 'Validation failed',
-          details: error.messages
+          details: error.messages,
         })
       }
 
       return ctx.response.status(500).json({
         success: false,
         error: 'Failed to create folder',
-        details: error.message
+        details: error.message,
       })
     }
   }
 
-  // Get folder contents
+  // Get folder contents - ✅ CORRECTION MAJEURE
   async getFolderContents(ctx: HttpContext) {
     const folderId = ctx.params.id
 
@@ -182,21 +218,58 @@ export default class FilesystemController {
 
     const subfolders = await Folder.query()
       .where('parent_id', folderId)
+      .preload('files') // ✅ AJOUT : Charger les fichiers des sous-dossiers
       .orderBy('name', 'asc')
 
-    const files = await File.query()
-      .where('folder_id', folderId)
-      .orderBy('name', 'asc')
+    const files = await File.query().where('folder_id', folderId).orderBy('name', 'asc')
 
+    // ✅ CORRECTION : Formatter correctement les données
     const contents = [
-      ...subfolders.map(f => ({ ...f.serialize(), type: 'folder' })),
-      ...files.map(f => ({ ...f.serialize(), type: 'file' }))
+      ...subfolders.map((f) => ({
+        id: f.id,
+        name: f.name,
+        type: 'folder',
+        size: null,
+        mimeType: null,
+        parentId: f.parent_id,
+        projectId: f.project_id,
+        pieceId: f.piece_id,
+        createdAt: f.createdAt,
+        updatedAt: f.updatedAt,
+        children: f.files
+          ? f.files.map((file) => ({
+              id: file.id,
+              name: file.name,
+              type: 'file',
+              size: file.size,
+              mimeType: file.type,
+              parentId: file.folder_id,
+              projectId: file.project_id,
+              pieceId: file.piece_id,
+              createdAt: file.createdAt,
+              updatedAt: file.updatedAt,
+            }))
+          : [],
+        isSystemGenerated: f.is_system_generated,
+      })),
+      ...files.map((f) => ({
+        id: f.id,
+        name: f.name,
+        type: 'file',
+        size: f.size,
+        mimeType: f.type,
+        parentId: f.folder_id,
+        projectId: f.project_id,
+        pieceId: f.piece_id,
+        createdAt: f.createdAt,
+        updatedAt: f.updatedAt,
+      })),
     ]
 
     return ctx.response.json(contents)
   }
 
-  // Upload files
+  // Upload files - ✅ CORRECTION MAJEURE
   async uploadFiles(ctx: HttpContext) {
     try {
       const data = await ctx.request.validateUsing(filesystemUploadValidator)
@@ -204,7 +277,9 @@ export default class FilesystemController {
       console.log('Upload request received:', {
         parentId: data.parentId,
         projectId: data.projectId,
-        pieceId: data.pieceId
+        pieceId: data.pieceId,
+        hasFiles: !!data.files,
+        hasFile: !!data.file,
       })
 
       const uploadedFiles = []
@@ -227,7 +302,8 @@ export default class FilesystemController {
             size: file.size || 0,
             folder_id: data.parentId || null,
             project_id: data.projectId || null,
-            piece_id: data.pieceId || null
+            piece_id: data.pieceId || null,
+            content: '', // ✅ AJOUT : Champ requis
           })
 
           console.log('File uploaded successfully:', dbFile.id)
@@ -252,17 +328,30 @@ export default class FilesystemController {
           size: data.file.size || 0,
           folder_id: data.parentId || null,
           project_id: data.projectId || null,
-          piece_id: data.pieceId || null
+          piece_id: data.pieceId || null,
+          content: '', // ✅ AJOUT : Champ requis
         })
 
         console.log('Single file uploaded successfully:', dbFile.id)
         uploadedFiles.push(dbFile)
       }
 
+      // ✅ CORRECTION : Synchroniser avec l'ancien système si nécessaire
+      for (const dbFile of uploadedFiles) {
+        if (data.parentId) {
+          // Lier avec l'ancien système de dossiers (table contains)
+          try {
+            await dbFile.related('folder_id').sync([data.parentId])
+          } catch (error) {
+            console.warn('Could not sync with old folder system:', error)
+          }
+        }
+      }
+
       return ctx.response.json({
         success: true,
         files: uploadedFiles,
-        message: `${uploadedFiles.length} file(s) uploaded successfully`
+        message: `${uploadedFiles.length} file(s) uploaded successfully`,
       })
     } catch (error) {
       console.error('Error uploading files:', error)
@@ -272,32 +361,71 @@ export default class FilesystemController {
         return ctx.response.status(422).json({
           success: false,
           error: 'Validation failed',
-          details: error.messages
+          details: error.messages,
         })
       }
 
       return ctx.response.status(500).json({
         success: false,
         error: 'Upload failed',
-        details: error.message
+        details: error.message,
       })
     }
   }
 
-  // Get general files (not project-specific)
+  // Get general files
   async getGeneralFiles(ctx: HttpContext) {
     try {
       const files = await File.query()
         .whereNull('project_id')
+        .whereNull('folder_id') // ✅ AJOUT : Fichiers qui ne sont dans aucun dossier
         .orderBy('name', 'asc')
 
       const folders = await Folder.query()
         .whereNull('project_id')
+        .whereNull('parent_id') // ✅ AJOUT : Dossiers racine seulement
+        .preload('files') // ✅ AJOUT : Charger les fichiers des dossiers
         .orderBy('name', 'asc')
 
       const items = [
-        ...folders.map(f => ({ ...f.serialize(), type: 'folder' })),
-        ...files.map(f => ({ ...f.serialize(), type: 'file' }))
+        ...folders.map((f) => ({
+          id: f.id,
+          name: f.name,
+          type: 'folder',
+          size: null,
+          mimeType: null,
+          parentId: f.parent_id,
+          projectId: f.project_id,
+          pieceId: f.piece_id,
+          createdAt: f.createdAt,
+          updatedAt: f.updatedAt,
+          children: f.files
+            ? f.files.map((file) => ({
+                id: file.id,
+                name: file.name,
+                type: 'file',
+                size: file.size,
+                mimeType: file.type,
+                parentId: file.folder_id,
+                projectId: file.project_id,
+                pieceId: file.piece_id,
+                createdAt: file.createdAt,
+                updatedAt: file.updatedAt,
+              }))
+            : [],
+        })),
+        ...files.map((f) => ({
+          id: f.id,
+          name: f.name,
+          type: 'file',
+          size: f.size,
+          mimeType: f.type,
+          parentId: f.folder_id,
+          projectId: f.project_id,
+          pieceId: f.piece_id,
+          createdAt: f.createdAt,
+          updatedAt: f.updatedAt,
+        })),
       ]
 
       return ctx.response.json(items)
@@ -316,7 +444,7 @@ export default class FilesystemController {
     // Check if it's a system-generated folder
     if (folder.is_system_generated) {
       return ctx.response.badRequest({
-        message: 'Cannot delete system-generated folders'
+        message: 'Cannot delete system-generated folders',
       })
     }
 
@@ -360,7 +488,7 @@ export default class FilesystemController {
     // Check if it's a system-generated folder
     if (folder.is_system_generated) {
       return ctx.response.badRequest({
-        message: 'Cannot rename system-generated folders'
+        message: 'Cannot rename system-generated folders',
       })
     }
 
@@ -382,21 +510,23 @@ export default class FilesystemController {
     return ctx.response.json(file)
   }
 
-  // Get piece scores for callsheet
+  // Get piece scores for callsheet - ✅ NOUVELLE MÉTHODE
   async getPieceScores(ctx: HttpContext) {
     const pieceId = ctx.params.pieceId
     const fileName = ctx.params.fileName
 
-    const file = await File.query()
-      .where('piece_id', pieceId)
-      .where('name', fileName)
-      .first()
+    try {
+      const file = await File.query().where('piece_id', pieceId).where('name', fileName).first()
 
-    if (!file) {
-      return ctx.response.notFound({ message: 'Score not found' })
+      if (!file) {
+        return ctx.response.notFound({ message: 'Score not found' })
+      }
+
+      return ctx.response.download(file.path, file.name)
+    } catch (error) {
+      console.error('Error getting piece score:', error)
+      return ctx.response.status(500).json({ error: 'Failed to get score' })
     }
-
-    return ctx.response.download(file.path, file.name)
   }
 
   // Sync piece folders when pieces are added/removed from project
@@ -423,7 +553,7 @@ export default class FilesystemController {
 
     // Create folders for new pieces
     for (const piece of pieces) {
-      const existingFolder = existingPieceFolders.find(f => f.piece_id === piece.id)
+      const existingFolder = existingPieceFolders.find((f) => f.piece_id === piece.id)
 
       if (!existingFolder) {
         const pieceFolder = await Folder.create({
@@ -431,7 +561,7 @@ export default class FilesystemController {
           parent_id: scoresFolder.id,
           project_id: projectId,
           piece_id: piece.id,
-          is_system_generated: true
+          is_system_generated: true,
         })
 
         // Copy existing scores from other projects
@@ -447,16 +577,17 @@ export default class FilesystemController {
             size: score.size,
             folder_id: pieceFolder.id,
             project_id: projectId,
-            piece_id: piece.id
+            piece_id: piece.id,
+            content: score.content,
           })
         }
       }
     }
 
     // Remove folders for pieces no longer in project
-    const currentPieceIds = pieces.map(p => p.id)
-    const foldersToRemove = existingPieceFolders.filter(f =>
-      !currentPieceIds.includes(f.piece_id)
+    const currentPieceIds = pieces.map((p) => p.id)
+    const foldersToRemove = existingPieceFolders.filter(
+      (f) => !currentPieceIds.includes(f.piece_id)
     )
 
     for (const folder of foldersToRemove) {
