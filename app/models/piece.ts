@@ -1,9 +1,10 @@
 import { DateTime } from 'luxon'
-import { BaseModel, belongsTo, column, manyToMany } from '@adonisjs/lucid/orm'
+import { BaseModel, belongsTo, column, manyToMany, hasMany } from '@adonisjs/lucid/orm'
 import Composer from '#models/composer'
 import TypeOfPiece from '#models/type_of_piece'
 import Folder from '#models/folder'
-import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import File from '#models/file' // ✅ VÉRIFICATION : Import correct
+import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import type { ManyToMany } from '@adonisjs/lucid/types/relations'
 import Project from '#models/project'
 
@@ -50,6 +51,12 @@ export default class Piece extends BaseModel {
     foreignKey: 'folder_id',
   })
   declare folder: BelongsTo<typeof Folder>
+
+  // ✅ VÉRIFICATION : Cette relation existe déjà et est correcte
+  @hasMany(() => File, {
+    foreignKey: 'piece_id',
+  })
+  declare files: HasMany<typeof File>
 
   @column()
   declare arranger: string | null

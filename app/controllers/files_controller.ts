@@ -71,7 +71,7 @@ export default class FilesController {
     }
   }
 
-  // ✅ CORRECTION LIGNE 115 : Méthode download améliorée
+  // ✅ CORRECTION : Méthode download corrigée avec gestion d'erreurs améliorée
   async download(ctx: HttpContext) {
     try {
       const file = await File.findOrFail(ctx.params.id)
@@ -116,7 +116,7 @@ export default class FilesController {
       ctx.response.header('Content-Disposition', `attachment; filename="${file.name}"`)
       ctx.response.header('Cache-Control', 'no-cache')
 
-      // ✅ CORRECTION : Retourner le fichier sans deuxième paramètre
+      // ✅ CORRECTION : Retourner le fichier correctement
       return ctx.response.download(file.path)
     } catch (error) {
       console.error('❌ Download error:', error)
@@ -133,7 +133,7 @@ export default class FilesController {
     }
   }
 
-  // ✅ CORRECTION LIGNE 210 : Méthode stream améliorée
+  // ✅ CORRECTION : Méthode stream corrigée avec gestion des types
   async stream({ params, request, response }: HttpContext) {
     try {
       const file = await File.findOrFail(params.id)
@@ -170,7 +170,7 @@ export default class FilesController {
       const fileSize = stats.size
       const range = request.header('range')
 
-      // ✅ CORRECTION LIGNE 210 : Détection améliorée du content-type avec typage correct
+      // ✅ CORRECTION : Détection améliorée du content-type
       const ext = extname(file.name).toLowerCase()
       const mimeTypes: Record<string, string> = {
         // Vidéos
@@ -230,7 +230,7 @@ export default class FilesController {
 
         // Parser le header Range (format: "bytes=start-end")
         const parts = range.replace(/bytes=/, '').split('-')
-        const start = Number.parseInt(parts[0] || '0', 10) // ✅ Correction: valeur par défaut
+        const start = Number.parseInt(parts[0] || '0', 10)
         const end = parts[1] ? Number.parseInt(parts[1], 10) : fileSize - 1
         const chunksize = end - start + 1
 
