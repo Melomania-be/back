@@ -8,6 +8,7 @@ import SectionGroup from '#models/section_group'
 import { DateTime } from 'luxon'
 import Contact from '#models/contact'
 import Folder from '#models/folder'
+import fs from 'node:fs/promises'
 
 export default class ProjectsController {
   async getAll(ctx: HttpContext) {
@@ -27,10 +28,15 @@ export default class ProjectsController {
     })
   }
 
-  // ✅ CORRECTION : Méthode getOne avec chargement des fichiers
+  // ✅ CORRECTION : Méthode getOne avec chargement synchronisé des fichiers
   async getOne({ params }: HttpContext) {
+    const projectId = params.id
+
+    // ✅ AJOUT : Synchroniser les fichiers avant de charger le projet
+    await this.syncProjectFiles(projectId)
+
     const data = await Project.query()
-      .where('id', params.id)
+      .where('id', projectId)
       .preload('concerts')
       .preload('pieces', (query) => {
         query
@@ -38,7 +44,7 @@ export default class ProjectsController {
           .preload('folder', (subQuery) => {
             subQuery.preload('files')
           })
-          .preload('files') // ✅ AJOUT : Charger les fichiers directement liés à la pièce
+          .preload('files')
           .pivotColumns(['order'])
           .orderBy('order', 'asc')
       })
@@ -59,18 +65,20 @@ export default class ProjectsController {
     return data
   }
 
-  // ✅ CORRECTION : Méthode getDashboard avec chargement des fichiers
+  // ✅ CORRECTION : Méthode getDashboard avec synchronisation des fichiers
   async getDashboard({ params }: HttpContext) {
     try {
       const projectId = params.id;
 
       console.log('📊 DASHBOARD - Request for project:', projectId);
-      console.log('📊 DASHBOARD - Project ID type:', typeof projectId);
 
       if (!projectId) {
         console.error('❌ DASHBOARD - No project ID provided');
         throw new Error('Project ID is required');
       }
+
+      // ✅ AJOUT : Synchroniser les fichiers avant de charger le dashboard
+      await this.syncProjectFiles(projectId)
 
       console.log('📊 DASHBOARD - Loading project data...');
       const data = await Project.query()
@@ -98,7 +106,7 @@ export default class ProjectsController {
             .preload('folder', (subQuery) => {
               subQuery.preload('files')
             })
-            .preload('files') // ✅ AJOUT : Charger les fichiers directement liés aux pièces
+            .preload('files')
             .pivotColumns(['order'])
             .orderBy('order', 'asc')
         })
@@ -210,14 +218,6 @@ export default class ProjectsController {
         stats
       };
 
-      console.log('📊 DASHBOARD - Project data prepared:', {
-        id: projectData.id,
-        name: projectData.name,
-        hasParticipants: projectData.participants.length > 0,
-        hasPieces: projectData.pieces.length > 0,
-        hasConcerts: projectData.concerts.length > 0
-      });
-
       const result = {
         data: projectData,
         participantsNotValidated: participantsNotValidated || [],
@@ -225,24 +225,11 @@ export default class ProjectsController {
         participantsNotSeenCallsheet: participantsNotSeenCallsheet || []
       }
 
-      console.log('📊 DASHBOARD - Final result prepared:', {
-        hasData: !!result.data,
-        dataId: result.data.id,
-        dataName: result.data.name,
-        participantsNotValidatedCount: result.participantsNotValidated.length,
-        participantsWithoutEmailCount: result.participantsWithoutEmail.length,
-        participantsNotSeenCallsheetCount: result.participantsNotSeenCallsheet.length
-      });
-
       console.log('📊 DASHBOARD - Returning result to client');
       return result;
 
     } catch (error) {
       console.error('❌ DASHBOARD - Error occurred:', error);
-      console.error('❌ DASHBOARD - Error message:', error.message);
-      console.error('❌ DASHBOARD - Error stack:', error.stack);
-      console.error('❌ DASHBOARD - Project ID:', params.id);
-
       throw error;
     }
   }
@@ -419,6 +406,39 @@ export default class ProjectsController {
     return {
       ...project.serialize(),
       participants: sortedParticipants,
+    }
+  }
+
+  // ✅ NOUVELLE MÉTHODE : Synchronisation des fichiers du projet
+  private async syncProjectFiles(projectId: number) {
+    try {
+      console.log(`🔄 Synchronizing files for project ${projectId}`)
+
+      // Obtenir tous les fichiers liés au projet dans la base
+      const dbFiles = await db
+        .from('files')
+        .where('project_id', projectId)
+        .whereNotNull('path')
+
+      let deletedCount = 0
+      let verifiedCount = 0
+
+      for (const file of dbFiles) {
+        try {
+          // Vérifier si le fichier existe physiquement
+          await fs.access(file.path)
+          verifiedCount++
+        } catch (error) {
+          // Le fichier n'existe plus physiquement, le supprimer de la base
+          console.log(`🗑️ Removing deleted file from database: ${file.name} (${file.path})`)
+          await db.from('files').where('id', file.id).delete()
+          deletedCount++
+        }
+      }
+
+      console.log(`✅ Sync completed for project ${projectId}: ${verifiedCount} verified, ${deletedCount} removed`)
+    } catch (error) {
+      console.error(`❌ Error during file sync for project ${projectId}:`, error)
     }
   }
 }

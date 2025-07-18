@@ -6,6 +6,7 @@ import Folder from '#models/folder'
 import File from '#models/file'
 import Piece from '#models/piece'
 import { filesystemUploadValidator, createFolderValidator } from '#validators/filesystem'
+import fs from 'node:fs/promises'
 
 export default class FilesystemController {
   // Initialize project file structure
@@ -70,10 +71,9 @@ export default class FilesystemController {
         is_system_generated: true,
       })
 
-      // Check if piece has existing scores in other projects
+      // ✅ CORRECTION : Copier les fichiers existants ET créer les liens
       const existingScores = await File.query().where('piece_id', piece.id).whereNotNull('piece_id')
 
-      // Copy existing scores to this project
       for (const score of existingScores) {
         await File.create({
           name: score.name,
@@ -83,6 +83,7 @@ export default class FilesystemController {
           folder_id: pieceFolder.id,
           project_id: projectId,
           piece_id: piece.id,
+          content: score.content,
         })
       }
     }
@@ -96,7 +97,7 @@ export default class FilesystemController {
     })
   }
 
-  // Get project file structure
+  // ✅ CORRECTION MAJEURE : Méthode getProjectStructure avec synchronisation automatique
   async getProjectStructure(ctx: HttpContext) {
     const projectId = ctx.params.id
 
@@ -117,6 +118,24 @@ export default class FilesystemController {
     if (!rootFolder) {
       return ctx.response.notFound({ message: 'Project structure not found' })
     }
+
+    // ✅ AJOUT : Synchronisation automatique avant de retourner la structure
+    await this.syncProjectFiles(projectId)
+
+    // Recharger la structure après synchronisation
+    const updatedRootFolder = await Folder.query()
+      .where('project_id', projectId)
+      .whereNull('parent_id')
+      .preload('children', (query) => {
+        query.preload('children', (subQuery) => {
+          subQuery.preload('files')
+          subQuery.preload('children', (subSubQuery) => {
+            subSubQuery.preload('files')
+          })
+        })
+        query.preload('files')
+      })
+      .first()
 
     function addFileCounts(folder: any): any {
       let totalFiles = 0
@@ -146,15 +165,15 @@ export default class FilesystemController {
       }
     }
 
-    const processedRootFolder = addFileCounts(rootFolder)
+    const processedRootFolder = addFileCounts(updatedRootFolder)
 
-    const scoresFolder = processedRootFolder.children?.find((f) => f.name === 'Scores')
-    const photosFolder = processedRootFolder.children?.find((f) => f.name === 'Photos')
-    const videosFolder = processedRootFolder.children?.find((f) => f.name === 'Videos')
-    const documentsFolder = processedRootFolder.children?.find((f) => f.name === 'Documents')
+    const scoresFolder = processedRootFolder.children?.find((f: any) => f.name === 'Scores')
+    const photosFolder = processedRootFolder.children?.find((f: any) => f.name === 'Photos')
+    const videosFolder = processedRootFolder.children?.find((f: any) => f.name === 'Videos')
+    const documentsFolder = processedRootFolder.children?.find((f: any) => f.name === 'Documents')
     const customFolders =
       processedRootFolder.children?.filter(
-        (f) => !['Scores', 'Photos', 'Videos', 'Documents'].includes(f.name)
+        (f: any) => !['Scores', 'Photos', 'Videos', 'Documents'].includes(f.name)
       ) || []
 
     return ctx.response.json({
@@ -165,6 +184,38 @@ export default class FilesystemController {
       documentsFolder,
       customFolders,
     })
+  }
+
+  // ✅ NOUVELLE MÉTHODE : Synchronisation des fichiers du projet
+  private async syncProjectFiles(projectId: number) {
+    try {
+      console.log(`🔄 Synchronizing files for project ${projectId}`)
+
+      // Obtenir tous les fichiers liés au projet dans la base
+      const dbFiles = await File.query()
+        .where('project_id', projectId)
+        .whereNotNull('path')
+
+      let deletedCount = 0
+      let verifiedCount = 0
+
+      for (const file of dbFiles) {
+        try {
+          // Vérifier si le fichier existe physiquement
+          await fs.access(file.path)
+          verifiedCount++
+        } catch (error) {
+          // Le fichier n'existe plus physiquement, le supprimer de la base
+          console.log(`🗑️ Removing deleted file from database: ${file.name} (${file.path})`)
+          await file.delete()
+          deletedCount++
+        }
+      }
+
+      console.log(`✅ Sync completed for project ${projectId}: ${verifiedCount} verified, ${deletedCount} removed`)
+    } catch (error) {
+      console.error(`❌ Error during file sync for project ${projectId}:`, error)
+    }
   }
 
   // Create folder
@@ -213,6 +264,11 @@ export default class FilesystemController {
     const folderId = ctx.params.id
 
     const folder = await Folder.findOrFail(folderId)
+
+    // ✅ AJOUT : Synchroniser les fichiers avant de retourner le contenu
+    if (folder.project_id) {
+      await this.syncProjectFiles(folder.project_id)
+    }
 
     const subfolders = await Folder.query()
       .where('parent_id', folderId)
@@ -266,7 +322,7 @@ export default class FilesystemController {
     return ctx.response.json(contents)
   }
 
-  // ✅ CORRECTION MAJEURE : Upload files avec détection automatique du piece_id
+  // Upload files avec détection automatique du piece_id
   async uploadFiles(ctx: HttpContext) {
     try {
       const data = await ctx.request.validateUsing(filesystemUploadValidator)
@@ -281,7 +337,7 @@ export default class FilesystemController {
 
       const uploadedFiles = []
 
-      // ✅ AJOUT : Déterminer automatiquement le piece_id si on est dans un dossier de pièce
+      // Déterminer automatiquement le piece_id si on est dans un dossier de pièce
       let pieceId = data.pieceId
       let parentFolder = null
 
@@ -311,7 +367,7 @@ export default class FilesystemController {
             size: file.size || 0,
             folder_id: data.parentId || null,
             project_id: data.projectId || null,
-            piece_id: pieceId || null, // ✅ CORRECTION : Utiliser pieceId détecté
+            piece_id: pieceId || null,
             content: '',
           })
 
@@ -337,23 +393,12 @@ export default class FilesystemController {
           size: data.file.size || 0,
           folder_id: data.parentId || null,
           project_id: data.projectId || null,
-          piece_id: pieceId || null, // ✅ CORRECTION : Utiliser pieceId détecté
+          piece_id: pieceId || null,
           content: '',
         })
 
         console.log('Single file uploaded successfully:', dbFile.id, 'linked to piece:', pieceId)
         uploadedFiles.push(dbFile)
-      }
-
-      // ✅ AJOUT : Synchroniser avec l'ancienne relation folder->files si nécessaire
-      for (const dbFile of uploadedFiles) {
-        if (data.parentId) {
-          try {
-            await dbFile.related('folder_id').sync([data.parentId])
-          } catch (error) {
-            console.warn('Could not sync with old folder system:', error)
-          }
-        }
       }
 
       return ctx.response.json({
@@ -442,7 +487,7 @@ export default class FilesystemController {
     }
   }
 
-  // Delete folder
+  // ✅ CORRECTION : Delete folder avec nettoyage physique
   async deleteFolder(ctx: HttpContext) {
     const folderId = ctx.params.id
 
@@ -454,29 +499,59 @@ export default class FilesystemController {
       })
     }
 
-    await File.query().where('folder_id', folderId).delete()
-
-    const subfolders = await Folder.query().where('parent_id', folderId)
-    for (const subfolder of subfolders) {
-      await this.deleteFolder({ params: { id: subfolder.id } } as any)
-    }
-
-    await folder.delete()
+    // Supprimer récursivement tous les fichiers et dossiers
+    await this.deleteFolderRecursive(folder)
 
     return ctx.response.noContent()
   }
 
-  // Delete file
+  // ✅ NOUVELLE MÉTHODE : Suppression récursive avec nettoyage physique
+  private async deleteFolderRecursive(folder: Folder) {
+    // Obtenir tous les fichiers dans ce dossier
+    const files = await File.query().where('folder_id', folder.id)
+
+    // Supprimer physiquement et en base chaque fichier
+    for (const file of files) {
+      try {
+        if (file.path) {
+          await fs.unlink(file.path)
+        }
+      } catch (error) {
+        console.warn(`Could not delete physical file: ${file.path}`, error)
+      }
+      await file.delete()
+    }
+
+    // Obtenir tous les sous-dossiers
+    const subfolders = await Folder.query().where('parent_id', folder.id)
+
+    // Supprimer récursivement chaque sous-dossier
+    for (const subfolder of subfolders) {
+      await this.deleteFolderRecursive(subfolder)
+    }
+
+    // Supprimer le dossier lui-même
+    await folder.delete()
+  }
+
+  // ✅ CORRECTION : Delete file avec nettoyage physique
   async deleteFile(ctx: HttpContext) {
     const fileId = ctx.params.id
 
     const file = await File.findOrFail(fileId)
 
     try {
-      await file.delete()
+      // Supprimer le fichier physique
+      if (file.path) {
+        await fs.unlink(file.path)
+        console.log(`🗑️ Physical file deleted: ${file.path}`)
+      }
     } catch (error) {
-      console.error('Error deleting file:', error)
+      console.warn(`Could not delete physical file: ${file.path}`, error)
     }
+
+    // Supprimer l'entrée en base
+    await file.delete()
 
     return ctx.response.noContent()
   }
@@ -524,14 +599,14 @@ export default class FilesystemController {
         return ctx.response.notFound({ message: 'Score not found' })
       }
 
-      return ctx.response.download(file.path, file.name)
+      return ctx.response.download(file.path)
     } catch (error) {
       console.error('Error getting piece score:', error)
       return ctx.response.status(500).json({ error: 'Failed to get score' })
     }
   }
 
-  // Sync piece folders when pieces are added/removed from project
+  // ✅ CORRECTION : Sync piece folders avec nettoyage
   async syncPieceFolders(ctx: HttpContext) {
     const projectId = ctx.params.id
 
@@ -551,6 +626,7 @@ export default class FilesystemController {
       .where('parent_id', scoresFolder.id)
       .whereNotNull('piece_id')
 
+    // Créer les dossiers manquants
     for (const piece of pieces) {
       const existingFolder = existingPieceFolders.find((f) => f.piece_id === piece.id)
 
@@ -563,6 +639,7 @@ export default class FilesystemController {
           is_system_generated: true,
         })
 
+        // Copier les partitions existantes
         const existingScores = await File.query()
           .where('piece_id', piece.id)
           .whereNot('project_id', projectId)
@@ -582,14 +659,18 @@ export default class FilesystemController {
       }
     }
 
+    // ✅ CORRECTION : Supprimer les dossiers orphelins
     const currentPieceIds = pieces.map((p) => p.id)
     const foldersToRemove = existingPieceFolders.filter(
-      (f) => !currentPieceIds.includes(f.piece_id)
+      (f) => f.piece_id !== null && !currentPieceIds.includes(f.piece_id)
     )
 
     for (const folder of foldersToRemove) {
-      await folder.delete()
+      await this.deleteFolderRecursive(folder)
     }
+
+    // ✅ AJOUT : Synchroniser les fichiers après la synchronisation des dossiers
+    await this.syncProjectFiles(projectId)
 
     return ctx.response.json({ message: 'Piece folders synced successfully' })
   }

@@ -24,7 +24,7 @@ export default class File extends BaseModel {
   @column()
   declare size: number | null
 
-  // ✅ VÉRIFICATION : Ces colonnes existent déjà et sont correctes
+  // ✅ NOUVELLES COLONNES ÉTRANGÈRES
   @column()
   declare folder_id: number | null
 
@@ -34,7 +34,7 @@ export default class File extends BaseModel {
   @column()
   declare piece_id: number | null
 
-  // ✅ VÉRIFICATION : Ces relations existent déjà et sont correctes
+  // ✅ RELATIONS BELONGSTO POUR LES NOUVELLES COLONNES
   @belongsTo(() => Folder, {
     foreignKey: 'folder_id',
   })
@@ -50,14 +50,14 @@ export default class File extends BaseModel {
   })
   declare piece: BelongsTo<typeof Piece>
 
-  // Relations existantes modifiées
+  // ✅ CORRECTION : Relation many-to-many avec nom différent pour éviter le conflit
   @manyToMany(() => Folder, {
     pivotTable: 'contains',
     pivotForeignKey: 'file_id',
     pivotRelatedForeignKey: 'folder_id',
     pivotTimestamps: true,
   })
-  declare folder_id: ManyToMany<typeof Folder>
+  declare folders: ManyToMany<typeof Folder>
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
