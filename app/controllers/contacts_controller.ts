@@ -42,16 +42,15 @@ export default class ContactsController {
       .preload('lists')
       .preload('participants')
       .preload('projects')
-
+      
     const data = await advancedFilter(ctx, baseQuery)
-
     return {
       data,
       columns: {
         self: ['id', 'first_name', 'last_name', 'email', 'comments', 'messenger', 'phone'],
         instruments: ['id', 'family', 'name'],
         projects: ['id', 'name'],
-        participants: ['id', 'project', 'section', 'answers'],
+        participants: ['id', 'project', 'section', 'answers','project_id'],
         lists: ['id', 'name'],
       },
     }
@@ -166,6 +165,7 @@ export default class ContactsController {
   async delete({ params, response }: HttpContext) {
     let contact = await Contact.find(params.id)
     if (contact) {
+      
       let participations = await contact.related('participants').query()
 
       for (let participation of participations) {
