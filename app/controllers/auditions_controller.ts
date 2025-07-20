@@ -315,7 +315,7 @@ export default class AuditionsController {
     }
   }
 
-  // ✅ MÉTHODE MISE À JOUR : Récupérer toutes les auditions d'un projet avec statistiques enrichies
+  // ✅ MÉTHODE MISE À JOUR : Récupérer toutes les auditions d'un projet avec mapping complet
   async getProjectAuditions({ params }: HttpContext) {
     try {
       console.log('📊 Getting auditions for project:', params.id)
@@ -325,10 +325,12 @@ export default class AuditionsController {
         .preload('participant', (query) => {
           query.preload('contact').preload('section')
         })
+        .preload('project') // ✅ AJOUT : Preload du projet
         .orderBy('auditions.created_at', 'desc')
 
       console.log(`📋 Found ${auditions.length} auditions for project ${params.id}`)
 
+      // ✅ CORRECTION COMPLÈTE : Mapping explicite de tous les champs
       const processedAuditions = await Promise.all(
         auditions.map(async (audition) => {
           const auditionFiles = await AuditionFile.query()
@@ -343,12 +345,39 @@ export default class AuditionsController {
             .orderBy('order', 'asc')
 
           return {
-            ...audition.toJSON(),
-            submitted_at: formatDateSafely(audition.submitted_at),
+            // ✅ CORRECTION : Inclure explicitement tous les champs nécessaires
+            id: audition.id,
+            participant_id: audition.participant_id,
+            project_id: audition.project_id,
+            secure_token: audition.secure_token, // ← AJOUT EXPLICITE DU TOKEN
+            instructions: audition.instructions,
+            required_files: audition.required_files,
             deadline: formatDateSafely(audition.deadline),
+            is_submitted: Boolean(audition.is_submitted),
+            submitted_at: formatDateSafely(audition.submitted_at),
+            candidate_notes: audition.candidate_notes,
             createdAt: formatDateSafely(audition.createdAt),
             updatedAt: formatDateSafely(audition.updatedAt),
-            is_submitted: Boolean(audition.is_submitted),
+
+            // ✅ CORRECTION : Relation participant avec structure cohérente
+            participant: {
+              id: audition.participant.id,
+              contact: {
+                firstName: audition.participant.contact.first_name,
+                lastName: audition.participant.contact.last_name,
+                email: audition.participant.contact.email,
+              },
+              section: {
+                id: audition.participant.section?.id,
+                name: audition.participant.section?.name || 'Non définie'
+              }
+            },
+
+            // ✅ CORRECTION : Relation project
+            project: {
+              id: audition.project?.id,
+              name: audition.project?.name
+            },
 
             files: auditionFiles.map((af) => ({
               id: af.id,
@@ -362,7 +391,7 @@ export default class AuditionsController {
                 name: af.file.name || 'Nom de fichier non disponible',
                 type: af.file.type || 'Type inconnu',
                 path: af.file.path || '',
-                size: af.file.size ?? 0, // ✅ Correction size
+                size: af.file.size ?? 0,
               },
             })),
 
@@ -380,7 +409,7 @@ export default class AuditionsController {
                 name: apf.file.name || 'Nom de fichier non disponible',
                 type: apf.file.type || 'application/pdf',
                 path: apf.file.path || '',
-                size: apf.file.size ?? 0, // ✅ Correction size
+                size: apf.file.size ?? 0,
               },
             })),
           }
@@ -409,6 +438,17 @@ export default class AuditionsController {
           ? Math.round((processedAuditions.reduce((sum, a) => sum + (a.files?.length || 0), 0) / processedAuditions.length) * 100) / 100
           : 0
       }
+
+      // ✅ DEBUG : Log pour vérifier la présence des tokens
+      console.log('🔍 Checking secure_tokens in processed data:');
+      processedAuditions.forEach((audition, index) => {
+        console.log(`  Audition ${index + 1}:`, {
+          id: audition.id,
+          has_secure_token: !!audition.secure_token,
+          secure_token_preview: audition.secure_token ? `${audition.secure_token.substring(0, 8)}...` : 'MISSING',
+          participant_name: `${audition.participant?.contact?.firstName} ${audition.participant?.contact?.lastName}`
+        });
+      });
 
       console.log('📊 Enhanced auditions stats:', stats)
 
@@ -1043,14 +1083,33 @@ export default class AuditionsController {
 
       console.log(`📄 Loading audition page for token: ${token}`)
 
-      // Trouver l'audition par token
-      const audition = await Audition.query()
-        .where('secure_token', token)
-        .preload('participant', (query) => {
-          query.preload('contact').preload('section')
+      // ✅ CORRECTION : Meilleure gestion des tokens invalides
+      if (!token || token.length < 10) {
+        console.log(`❌ Invalid token format: ${token}`)
+        return response.status(400).json({
+          error: 'Invalid audition token format',
+          message: 'The audition link appears to be malformed. Please check the link and try again.',
         })
-        .preload('project')
-        .firstOrFail()
+      }
+
+      // Trouver l'audition par token avec gestion d'erreur spécifique
+      let audition
+      try {
+        audition = await Audition.query()
+          .where('secure_token', token)
+          .preload('participant', (query) => {
+            query.preload('contact').preload('section')
+          })
+          .preload('project')
+          .firstOrFail()
+      } catch (auditionError) {
+        console.log(`❌ Audition not found for token: ${token}`)
+        return response.status(404).json({
+          error: 'Audition not found',
+          message: 'This audition link is invalid or has expired. Please contact the project organizers for assistance.',
+          token: token
+        })
+      }
 
       console.log(`✅ Audition found: ID ${audition.id} for ${audition.participant.contact.first_name} ${audition.participant.contact.last_name}`)
 
@@ -1060,6 +1119,7 @@ export default class AuditionsController {
         console.log(`⏰ Audition expired: deadline was ${audition.deadline}`)
         return response.status(410).json({
           error: 'Audition deadline has passed',
+          message: 'The deadline for this audition has passed. Please contact the project organizers if you need assistance.',
           deadline: audition.deadline
         })
       }
@@ -1070,12 +1130,18 @@ export default class AuditionsController {
         .preload('file')
         .orderBy('uploaded_at', 'desc')
 
-      // ✅ CORRECTION : Récupérer les PDFs avec la section préchargée
-      const auditionPdfs = await AuditionPdfFile.query()
-        .where('audition_id', audition.id)
-        .preload('file')
-        .preload('section')
-        .orderBy('order', 'asc')
+      // Récupérer les PDFs avec gestion d'erreur
+      let auditionPdfs: any[] = []
+      try {
+        auditionPdfs = await AuditionPdfFile.query()
+          .where('audition_id', audition.id)
+          .preload('file')
+          .preload('section')
+          .orderBy('order', 'asc')
+      } catch (pdfError) {
+        console.warn(`⚠️ Error loading PDFs for audition ${audition.id}:`, pdfError)
+        // Continue sans PDFs plutôt que de faire échouer toute la requête
+      }
 
       console.log(`📎 Audition has ${auditionFiles.length} uploaded files and ${auditionPdfs.length} PDF documents`)
 
@@ -1113,10 +1179,9 @@ export default class AuditionsController {
             id: af.file.id,
             name: af.file.name,
             type: af.file.type,
-            size: af.file.size ?? 0 // ✅ Correction size
+            size: af.file.size ?? 0
           }
         })),
-        // ✅ CORRECTION : Utiliser apf.section.name au lieu de audition.participant.section.name
         pdfs: auditionPdfs.map(apf => ({
           id: apf.id,
           title: apf.title,
@@ -1127,7 +1192,7 @@ export default class AuditionsController {
             id: apf.file.id,
             name: apf.file.name,
             type: apf.file.type,
-            size: apf.file.size ?? 0 // ✅ Correction size
+            size: apf.file.size ?? 0
           }
         }))
       })
@@ -1136,10 +1201,12 @@ export default class AuditionsController {
       console.error('❌ Error getting audition page:', error)
       return response.status(500).json({
         error: 'Error retrieving audition',
+        message: 'An unexpected error occurred while loading the audition. Please try again later.',
         details: error.message || 'Unknown error'
       })
     }
   }
+
 
   // Upload de fichier d'audition par les candidats
   async uploadAuditionFile({ request, response, params }: HttpContext) {
@@ -1383,17 +1450,41 @@ export default class AuditionsController {
     try {
       const { token } = params
 
-      // Trouver l'audition par token
-      const audition = await Audition.query()
-        .where('secure_token', token)
-        .firstOrFail()
+      // Validation du token
+      if (!token || token.length < 10) {
+        return response.status(400).json({
+          error: 'Invalid token format',
+          message: 'The audition token appears to be malformed.'
+        })
+      }
 
-      // ✅ CORRECTION : Récupérer les PDFs avec la section préchargée
-      const auditionPdfs = await AuditionPdfFile.query()
-        .where('audition_id', audition.id)
-        .preload('file')
-        .preload('section')
-        .orderBy('order', 'asc')
+      // Trouver l'audition par token
+      let audition
+      try {
+        audition = await Audition.query()
+          .where('secure_token', token)
+          .firstOrFail()
+      } catch (auditionError) {
+        return response.status(404).json({
+          error: 'Audition not found',
+          message: 'This audition link is invalid or has expired.',
+          token: token
+        })
+      }
+
+      // Récupérer les PDFs avec gestion d'erreur
+      let auditionPdfs = []
+      try {
+        auditionPdfs = await AuditionPdfFile.query()
+          .where('audition_id', audition.id)
+          .preload('file')
+          .preload('section')
+          .orderBy('order', 'asc')
+      } catch (pdfError) {
+        console.warn(`⚠️ Error loading PDFs for audition ${audition.id}:`, pdfError)
+        // Retourner un tableau vide plutôt qu'une erreur
+        return response.ok([])
+      }
 
       return response.ok(
         auditionPdfs.map(apf => ({
@@ -1406,15 +1497,16 @@ export default class AuditionsController {
             id: apf.file.id,
             name: apf.file.name,
             type: apf.file.type,
-            size: apf.file.size ?? 0 // ✅ Correction size
+            size: apf.file.size ?? 0
           }
         }))
       )
 
     } catch (error) {
-      console.error('Error getting audition PDFs:', error)
+      console.error('❌ Error getting audition PDFs:', error)
       return response.status(500).json({
         error: 'Error retrieving PDFs',
+        message: 'An error occurred while loading the PDFs.',
         details: error.message || 'Unknown error'
       })
     }
