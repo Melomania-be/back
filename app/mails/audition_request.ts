@@ -1,4 +1,4 @@
-// app/mails/audition_request.ts - VERSION SANS LOGO
+// app/mails/audition_request.ts - VERSION SANS PIÈCES JOINTES POUR TEST
 
 import env from '#start/env'
 import { BaseMail } from '@adonisjs/mail'
@@ -313,7 +313,7 @@ export default class AuditionRequest extends BaseMail {
           <div class="step-number">1</div>
           <div>
             <strong>Download the sheet music</strong>
-            <br><small style="color: #666;">PDF files are attached to this email. Save them to your computer.</small>
+            <br><small style="color: #666;">Access the audition portal to download PDF files.</small>
           </div>
         </div>
 
@@ -352,7 +352,7 @@ export default class AuditionRequest extends BaseMail {
         </a>
       </div>
 
-      <p style="margin-bottom: 15px; line-height: 1.5; font-style: italic; color: #6c757d;">This link is personal and secure. You can also download the sheet music again from there if needed.</p>
+      <p style="margin-bottom: 15px; line-height: 1.5; font-style: italic; color: #6c757d;">This link is personal and secure. You can download the sheet music and upload your recordings from there.</p>
 
       <p style="margin-bottom: 20px; line-height: 1.5;">Once your audition is submitted, our team will evaluate it and communicate our decision to you as soon as possible.</p>
 
@@ -375,7 +375,7 @@ export default class AuditionRequest extends BaseMail {
 
       <!-- Technical note -->
       <p style="font-size: 11px; color: #999; line-height: 1.3; margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
-        <strong>Technical note:</strong> If you don't see the PDF attachments, check your email client or download them directly from the audition portal.
+        <strong>Technical note:</strong> All sheet music and instructions are available through the audition portal.
       </p>
     </div>
   </div>
@@ -386,7 +386,7 @@ export default class AuditionRequest extends BaseMail {
   async prepare() {
     const frontendUrl = this.getFrontendUrl()
 
-    // Charger les PDFs associés à cette audition
+    // ⚠️ CHARGER LES PDFs MAIS NE PAS LES ATTACHER
     const pdfFiles = await AuditionPdfFile.query()
       .where('audition_id', this.audition.id)
       .preload('file')
@@ -394,11 +394,14 @@ export default class AuditionRequest extends BaseMail {
       .orderBy('title', 'asc')
 
     console.log(
-      `📧 Preparing audition email for ${this.contact.email} with ${pdfFiles.length} PDF attachments`
+      `📧 TEST MODE: Preparing audition email for ${this.contact.email} with ${pdfFiles.length} PDFs (NOT ATTACHED)`
     )
 
-    // Génération du lien d'audition
+    // ✅ CORRECTION CRITIQUE : Utiliser le VRAI token de l'audition
     const auditionUploadUrl = `${frontendUrl}/audition/${this.audition.secure_token}`
+    
+    // ✅ DEBUG : Vérifier le token
+    console.log(`🔑 Using audition token: ${this.audition.secure_token}`)
     console.log(`🎭 Generated audition link: ${auditionUploadUrl}`)
 
     // Préparer les données pour le template
@@ -422,15 +425,14 @@ Messenger: ${this.responsible.messenger || 'No messenger provided'}`
          </div>`
       : ''
 
-    // Préparer la section des attachements
-    const attachmentsSection =
-      pdfFiles.length > 0
-        ? `<div class="attachments-section">
+    // ⚠️ MODIFICATION : Section des attachements SANS pièces jointes
+    const attachmentsSection = pdfFiles.length > 0
+      ? `<div class="attachments-section">
           <h3 style="margin-top: 0; color: #0369a1; display: flex; align-items: center;">
             <span style="margin-right: 10px;">📎</span>
-            Sheet Music Attached (${pdfFiles.length} file${pdfFiles.length > 1 ? 's' : ''})
+            Sheet Music Available (${pdfFiles.length} file${pdfFiles.length > 1 ? 's' : ''})
           </h3>
-          <p style="margin-bottom: 15px; color: #0c4a6e;">The following PDF files are attached to this email:</p>
+          <p style="margin-bottom: 15px; color: #0c4a6e;">The following PDF files are available for download from the audition portal:</p>
 
           ${pdfFiles
           .map(
@@ -440,7 +442,7 @@ Messenger: ${this.responsible.messenger || 'No messenger provided'}`
               <span class="attachment-icon">📄</span>
               <div>
                 <strong>${pdf.title}</strong>
-                <br><small style="color: #64748b;">PDF attachment</small>
+                <br><small style="color: #64748b;">Available for download</small>
               </div>
             </div>
             <span class="attachment-badge">PDF</span>
@@ -449,10 +451,10 @@ Messenger: ${this.responsible.messenger || 'No messenger provided'}`
           .join('')}
 
           <p style="font-size: 14px; color: #475569; margin-top: 15px; font-style: italic;">
-            💡 <strong>Tip:</strong> If you don't see the attachments, they can also be downloaded from the audition portal.
+            💡 <strong>Note:</strong> All sheet music files can be downloaded directly from the audition portal using the link below.
           </p>
         </div>`
-        : `<div class="attachments-section">
+      : `<div class="attachments-section">
           <h3 style="margin-top: 0; color: #0369a1; display: flex; align-items: center;">
             <span style="margin-right: 10px;">📎</span>
             Sheet Music Information
@@ -472,12 +474,13 @@ Messenger: ${this.responsible.messenger || 'No messenger provided'}`
       htmlContent = this.getDefaultTemplate()
     }
 
-    // ✅ UTILISER LA NOUVELLE FONCTION DE REMPLACEMENT
+    // ✅ UTILISER LA NOUVELLE FONCTION DE REMPLACEMENT AVEC LE BON TOKEN
     const templateVariables = {
       URL: frontendUrl,
       NAME: contactName,
       PROJECT: projectName,
       REGISTRATION: auditionUploadUrl,
+      AUDITION_LINK: auditionUploadUrl,
       TO_CONTACT: toContactDetails,
       AUDITION_INSTRUCTIONS: auditionInstructions,
       ATTACHMENTS_SECTION: attachmentsSection,
@@ -489,7 +492,8 @@ Messenger: ${this.responsible.messenger || 'No messenger provided'}`
     console.log('📝 Sample values:', {
       NAME: contactName,
       PROJECT: projectName,
-      REGISTRATION: auditionUploadUrl.substring(0, 50) + '...',
+      AUDITION_LINK: auditionUploadUrl.substring(0, 50) + '...',
+      TOKEN_USED: this.audition.secure_token.substring(0, 8) + '...',
     })
 
     // ✅ DÉBOGAGE : Vérifier si les variables existent dans le template
@@ -508,76 +512,24 @@ Messenger: ${this.responsible.messenger || 'No messenger provided'}`
         ? 'Variables replaced successfully'
         : 'Variables NOT replaced'
     )
+    console.log('🔗 Final email contains token:', htmlContent.includes(this.audition.secure_token) ? '✅ YES' : '❌ NO')
     console.log('📧 Final HTML content length:', htmlContent.length)
 
-    // Configuration du message de base SANS LOGO
+    // ✅ MÊME FORMAT QUE CallsheetNotification
     this.message
       .to(this.contact.email)
       .from(`Melomania <${env.get('SMTP_USERNAME')}>`)
       .subject(
-        `${this.subject}${pdfFiles.length > 0 ? ` - ${pdfFiles.length} sheet music file(s) attached` : ''}`
+        `${this.subject}${pdfFiles.length > 0 ? ` - ${pdfFiles.length} sheet music file(s) available` : ''}`
       )
       .html(htmlContent)
 
-
-    // Attacher tous les PDFs en pièces jointes
-    let attachedCount = 0
-    let attachmentErrors: string[] = []
-
-    for (const pdfFile of pdfFiles) {
-      try {
-        const filePath = pdfFile.file.path
-
-        if (!filePath) {
-          attachmentErrors.push(`PDF "${pdfFile.title}": missing file path`)
-          continue
-        }
-
-        // Vérifier que le fichier existe physiquement
-        const fs = await import('node:fs/promises')
-        try {
-          await fs.access(filePath)
-        } catch (accessError) {
-          attachmentErrors.push(`PDF "${pdfFile.title}": file not found (${filePath})`)
-          continue
-        }
-
-        // Générer un nom de fichier propre pour la pièce jointe
-        const cleanFileName = `${pdfFile.title.replace(/[^a-zA-Z0-9\-_.]/g, '_')}.pdf`
-
-        // Attacher le fichier
-        this.message.attach(filePath, {
-          filename: cleanFileName,
-          contentType: 'application/pdf',
-          contentDisposition: 'attachment',
-        } as any)
-
-        attachedCount++
-        console.log(`📎 Attached PDF: "${pdfFile.title}" as "${cleanFileName}"`)
-      } catch (error) {
-        attachmentErrors.push(
-          `PDF "${pdfFile.title}": attachment error (${(error as Error).message})`
-        )
-        console.error(`❌ Error attaching PDF "${pdfFile.title}":`, error)
-      }
-    }
-
-    // Log du résultat des attachements
-    if (attachedCount > 0) {
-      console.log(
-        `✅ Successfully attached ${attachedCount}/${pdfFiles.length} PDFs to audition email`
-      )
-    }
-
-    if (attachmentErrors.length > 0) {
-      console.warn(`⚠️ PDF attachment errors:`, attachmentErrors)
-    }
-
-    // Si aucune pièce jointe n'a pu être ajoutée mais qu'il y en avait dans la base
-    if (pdfFiles.length > 0 && attachedCount === 0) {
-      console.error(`❌ Failed to attach any PDFs for audition ${this.audition.id}`)
-    }
-
-    console.log(`📧 Email preparation completed for ${this.contact.email}`)
+    // ⚠️ SUPPRESSION COMPLÈTE : Aucune pièce jointe n'est attachée
+    console.log(`📧 TEST MODE: Email prepared WITHOUT PDF attachments`)
+    console.log(`📧 To: ${this.contact.email}`)
+    console.log(`📧 From: Melomania <${env.get('SMTP_USERNAME')}>`)
+    console.log(`📧 Subject: ${this.subject}...`)
+    console.log(`🔑 Final verification - email contains token: ${this.audition.secure_token}`)
+    console.log(`📊 Email size: ${htmlContent.length} characters (no attachments)`)
   }
 }
