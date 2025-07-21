@@ -8,8 +8,8 @@ export const createRecruitmentValidator = vine.compile(
   vine.object({
     firstName: vine.string().trim(),
     lastName: vine.string().trim(),
-    sectionGroupId: vine.number(), // Corrected: Remove .notNullable()
-
+    // sectionGroupId: vine.number(), // Corrected: Remove .notNullable()
+    sectionId: vine.number().optional().nullable(),
     // --- NEW FIELD: projectId ---
     projectId: vine.number().optional().nullable(), // Allow projectId to be optional and nullable
     // --- END NEW FIELD ---
@@ -29,6 +29,7 @@ export const createRecruitmentValidator = vine.compile(
       'registered',
       'not available',
       'to follow up', // CHANGED from 'to be contacted'
+      'pending validation',
       'cancelled',
       'other',
     ]), // Corrected: Remove .notNullable()
@@ -40,11 +41,10 @@ export const updateRecruitmentValidator = vine.compile(
   vine.object({
     firstName: vine.string().trim().optional(),
     lastName: vine.string().trim().optional(),
-    sectionGroupId: vine.number().optional(),
+    // sectionGroupId: vine.number().optional(),
+    sectionId: vine.number().optional().nullable(),
 
-    // --- NEW FIELD: projectId ---
     projectId: vine.number().optional().nullable(), // Allow projectId to be optional and nullable for updates
-    // --- END NEW FIELD ---
 
     contactDate: vine
       .string()
@@ -63,6 +63,7 @@ export const updateRecruitmentValidator = vine.compile(
         'registered',
         'not available',
         'to follow up',
+        'pending validation',
         'cancelled',
         'other',
       ])
@@ -82,7 +83,7 @@ export const mergeRecruitmentsValidator = vine.compile(
     // --- NEW FIELD: projectId ---
     projectId: vine.number().optional().nullable(), // Allow projectId to be optional and nullable for merges
     // --- END NEW FIELD ---
-
+    sectionId: vine.number().optional().nullable(),
     contactDate: vine
       .string()
       .transform((val) => (val ? DateTime.fromISO(val) : null))
@@ -100,6 +101,7 @@ export const mergeRecruitmentsValidator = vine.compile(
         'to follow up', // CHANGED from 'to be contacted'
         'cancelled',
         'other',
+        'pending validation',
       ])
       .optional(),
     statusUpdatedAt: vine

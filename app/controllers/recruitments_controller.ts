@@ -10,8 +10,9 @@ import { DateTime } from 'luxon'
 import vine from '@vinejs/vine'
 import db from '@adonisjs/lucid/services/db'
 import User from '#models/user'
-import SectionGroup from '#models/section_group'
+// import SectionGroup from '#models/section_group'
 import Project from '#models/project'
+import Section from '#models/section'
 
 export const checkStatusValidator = vine.compile(
   vine.object({
@@ -113,7 +114,7 @@ export default class RecruitmentController {
     const filters = request.qs() // Get query string parameters
 
     const baseQuery = Recruitment.query()
-      .preload('sectionGroup', (query) => {
+      .preload('section', (query) => {
         query.select('id', 'name')
       })
       .preload('user', (query) => {
@@ -146,7 +147,7 @@ export default class RecruitmentController {
       'lastName',
       'comment',
       'status',
-      'sectionGroupId',
+      'sectionId',
       'contactedBy',
       'contactDate',
     ])
@@ -196,7 +197,7 @@ export default class RecruitmentController {
         console.log(`Applying filter: ${col} = ${filterValue}`) // Debug log
 
         switch (col) {
-          case 'sectionGroupId':
+          case 'sectionId':
           case 'contactedBy':
             // Cast to number for integer columns
             const numericValue = Number(filterValue)
@@ -255,6 +256,19 @@ export default class RecruitmentController {
   }
 
   /**
+   * Get a list of all sections for dropdowns.
+   */
+  async getSectionsForDropdown({ response }: HttpContext) {
+    try {
+      const sections = await Section.query().select('id', 'name').orderBy('name', 'asc')
+      return response.ok(sections)
+    } catch (error) {
+      console.error('Error fetching sections for dropdown:', error)
+      return response.internalServerError({ message: 'Failed to retrieve section list.' })
+    }
+  }
+
+  /**
    * Get a list of all users for dropdowns.
    */
   async getUsers({ response }: HttpContext) {
@@ -270,18 +284,18 @@ export default class RecruitmentController {
     }
   }
 
-  async getSectionGroups({ response }: HttpContext) {
-    try {
-      const sectionGroups = await SectionGroup.query().select('id', 'name').orderBy('name', 'asc')
-      return response.ok(sectionGroups)
-    } catch (error) {
-      console.error('Error fetching section groups:', error)
-      return response.internalServerError({
-        message: 'Failed to fetch section groups.',
-        error: error.message,
-      })
-    }
-  }
+  // async getSectionGroups({ response }: HttpContext) {
+  //   try {
+  //     const sectionGroups = await SectionGroup.query().select('id', 'name').orderBy('name', 'asc')
+  //     return response.ok(sectionGroups)
+  //   } catch (error) {
+  //     console.error('Error fetching section groups:', error)
+  //     return response.internalServerError({
+  //       message: 'Failed to fetch section groups.',
+  //       error: error.message,
+  //     })
+  //   }
+  // }
 
   // Get one recruitment by id with any relations if needed
   // async getOne({ params, response }: HttpContext) {
@@ -315,7 +329,7 @@ export default class RecruitmentController {
     try {
       return await Recruitment.query()
         .where('id', params.id)
-        .preload('sectionGroup', (query) => {
+        .preload('section', (query) => {
           query.select('id', 'name')
         })
         .preload('user', (query) => {
@@ -383,7 +397,7 @@ export default class RecruitmentController {
     const filters = request.qs() // Get query string parameters
 
     const baseQuery = Recruitment.query()
-      .preload('sectionGroup', (query) => {
+      .preload('section', (query) => {
         query.select('id', 'name')
       })
       .preload('user', (query) => {
@@ -424,7 +438,7 @@ export default class RecruitmentController {
           'status',
           'statusUpdatedAt',
           'comment',
-          'sectionGroup.name',
+          'section.name',
           'user.fullName',
           'project.name', // NEW: Include project name for display
         ],
@@ -733,6 +747,7 @@ export default class RecruitmentController {
       let contactDateForCreate: DateTime | null = null
       let contactedByForCreate: number | null = null
       let projectIdForCreate: number | null = null // NEW: Initialize projectId
+      let sectionIdForCreate: number | null = null
 
       if (finalStatus === 'not yet contacted') {
         contactDateForCreate = null
@@ -746,12 +761,14 @@ export default class RecruitmentController {
       // If payload.projectId is undefined, it will remain null. If it's a number, use it.
       // If it's explicitly null from frontend, it will be null.
       projectIdForCreate = payload.projectId ?? null
+      sectionIdForCreate = payload.sectionId ?? null
       // --- END NEW ---
 
       const recruitment = await Recruitment.create({
         firstName: payload.firstName,
         lastName: payload.lastName,
-        sectionGroupId: payload.sectionGroupId,
+        // sectionGroupId: payload.sectionGroupId,
+        sectionId: sectionIdForCreate,
         comment: payload.comment,
         status: finalStatus,
         contactDate: contactDateForCreate,
@@ -850,6 +867,7 @@ export default class RecruitmentController {
       let newContactDateValue: DateTime | null = recruitment.contactDate
       let newContactedByValue: number | null = recruitment.contactedBy
       let newProjectIdValue: number | null = recruitment.projectId // NEW: Initialize projectId
+      let newSectionIdValue: number | null = recruitment.sectionId
 
       const incomingStatus: RecruitmentStatus | undefined = updatePayload.status
       const oldStatus: RecruitmentStatus = recruitment.status
@@ -874,6 +892,7 @@ export default class RecruitmentController {
       // If projectId is provided in payload, use it. Otherwise, keep existing.
       // If payload.projectId is explicitly null, it will be set to null.
       newProjectIdValue = updatePayload.projectId ?? recruitment.projectId
+      newSectionIdValue = updatePayload.sectionId ?? recruitment.sectionId
       // --- END NEW ---
 
       recruitment.merge({
@@ -881,6 +900,7 @@ export default class RecruitmentController {
         contactDate: newContactDateValue,
         contactedBy: newContactedByValue,
         projectId: newProjectIdValue, // NEW: Assign projectId
+        sectionId: newSectionIdValue,
       })
       await recruitment.save()
 
@@ -985,7 +1005,7 @@ export default class RecruitmentController {
           return {
             first_name: original.firstName,
             last_name: original.lastName,
-            section_group_id: original.sectionGroupId,
+            section_id: original.sectionId,
             comment: original.comment,
 
             project_id: finalTargetProjectId,

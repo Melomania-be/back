@@ -4,8 +4,8 @@ import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import Project from '#models/project'
 
 import User from '#models/user'
-import SectionGroup from '#models/section_group'
-
+// import SectionGroup from '#models/section_group'
+import Section from '#models/section'
 // --- MODIFIED RecruitmentStatus TYPE HERE ---
 export type RecruitmentStatus =
   | 'not yet contacted' // ADDED: To match migration enum
@@ -17,6 +17,7 @@ export type RecruitmentStatus =
   | 'to follow up' // CHANGED: From 'to be contacted' to match migration
   | 'cancelled'
   | 'other'
+  | 'pending validation' // REMOVED: To match migration
 // | 'withdrawn'         // REMOVED: To match migration
 // --- END MODIFIED RecruitmentStatus TYPE ---
 
@@ -32,8 +33,11 @@ export default class Recruitment extends BaseModel {
   @column()
   declare lastName: string
 
-  @column({ columnName: 'section_group_id' }) // Explicitly map snake_case column
-  declare sectionGroupId: number
+  // @column({ columnName: 'section_group_id' }) // Explicitly map snake_case column
+  // declare sectionGroupId: number
+
+  @column({ columnName: 'section_id' }) // NEW: Maps to the section_id column in DB
+  declare sectionId: number | null
 
   // --- NEW COLUMN: projectId ---
   @column({ columnName: 'project_id' }) // Maps to the project_id column in DB
@@ -63,11 +67,18 @@ export default class Recruitment extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true, columnName: 'updated_at' }) // Explicitly map snake_case column
   declare updatedAt: DateTime
 
-  @belongsTo(() => SectionGroup, {
-    foreignKey: 'sectionGroupId',
-    localKey: 'id',
+  // @belongsTo(() => SectionGroup, {
+  //   foreignKey: 'sectionGroupId',
+  //   localKey: 'id',
+  // })
+  // declare sectionGroup: BelongsTo<typeof SectionGroup>
+
+  @belongsTo(() => Section, {
+    // NEW: Define belongsTo Section relation
+    foreignKey: 'sectionId', // The foreign key on this model (Recruitment)
+    localKey: 'id', // The primary key on the Section model
   })
-  declare sectionGroup: BelongsTo<typeof SectionGroup>
+  declare section: BelongsTo<typeof Section>
 
   @belongsTo(() => User, {
     foreignKey: 'contactedBy',

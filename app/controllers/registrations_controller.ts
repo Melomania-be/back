@@ -18,6 +18,7 @@ export type RecruitmentStatus =
   | 'participating'
   | 'registered'
   | 'not available'
+  | 'pending validation'
   | 'to follow up'
   | 'cancelled'
   | 'other'
@@ -193,25 +194,36 @@ export default class RegistrationsController {
   private async _createRecruitmentFromParticipant(contact: Contact, participant: Participant) {
     try {
       // 1. Determine the final section_group_id for the Recruitment record
-      let finalSectionGroupId: number
+      let finalSectionId: number | null = null
 
-      await participant.load('section', (sectionQuery) => {
-        sectionQuery.preload('section_groups')
-      })
+      // await participant.load('section', (sectionQuery) => {
+      //   sectionQuery.preload('section_groups')
+      // })
+      await participant.load('section')
 
-      if (
-        participant.section &&
-        participant.section.section_groups &&
-        participant.section.section_groups.length > 0
-      ) {
-        finalSectionGroupId = participant.section.section_groups[0].id
+      // if (
+      //   participant.section &&
+      //   participant.section.section_groups &&
+      //   participant.section.section_groups.length > 0
+      // ) {
+      //   finalSectionGroupId = participant.section.section_groups[0].id
+      // } else {
+      //   console.error(
+      //     `ERROR: Participant ${participant.id} (Section ID: ${participant.section_id}) could not be linked to a SectionGroup. Recruitment creation requires a valid sectionGroupId.`
+      //   )
+      //   throw new Error(
+      //     'Missing associated section group for recruitment creation. Cannot create record.'
+      //   )
+      // }
+
+      if (participant.section && participant.section.id) {
+        finalSectionId = participant.section.id // Get the ID of the specific Section
       } else {
-        console.error(
-          `ERROR: Participant ${participant.id} (Section ID: ${participant.section_id}) could not be linked to a SectionGroup. Recruitment creation requires a valid sectionGroupId.`
+        console.warn(
+          `LOG: Participant ${participant.section_id} (Section ID: ${participant.section_id}) could not be linked to a Section. Recruitment will be created with null sectionId.`
         )
-        throw new Error(
-          'Missing associated section group for recruitment creation. Cannot create record.'
-        )
+        // If sectionId is NOT NULL in recruitments, you'd throw an error here.
+        // Assuming it's nullable or you'll handle it.
       }
 
       // 2. Determine the system user for 'contactedBy'
@@ -222,7 +234,7 @@ export default class RegistrationsController {
       const newRecruitmentData = {
         firstName: contact.first_name,
         lastName: contact.last_name,
-        sectionGroupId: finalSectionGroupId,
+        sectionId: finalSectionId,
         projectId: participant.project_id,
         status: 'registered' as RecruitmentStatus,
         // --- FIX 2: Convert ISO string to DateTime object ---
