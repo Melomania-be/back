@@ -358,13 +358,17 @@ export default class ProjectsController {
     const project = await Project.query()
       .where('id', ctx.params.id)
       .preload('rehearsals', (query) => {
-        query.preload('participants', (participantQuery) => {
-          participantQuery.pivotColumns(['comment'])
+        query
+          .orderBy('start_date', 'asc')
+          .preload('participants', (participantQuery) => {
+            participantQuery.pivotColumns(['comment'])
         })
       })
       .preload('concerts', (query) => {
-        query.preload('participants', (participantQuery) => {
-          participantQuery.pivotColumns(['comment'])
+        query
+          .orderBy('start_date', 'asc')
+          .preload('participants', (participantQuery) => {
+            participantQuery.pivotColumns(['comment'])
         })
       })
       .preload('participants', (query) => {
