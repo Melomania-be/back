@@ -1,4 +1,5 @@
-// app/models/piece.ts (version mise à jour)
+// app/models/piece.ts - Version corrigée complète
+
 import { DateTime } from 'luxon'
 import { BaseModel, belongsTo, column, manyToMany, hasMany } from '@adonisjs/lucid/orm'
 import Composer from '#models/composer'
@@ -32,12 +33,18 @@ export default class Piece extends BaseModel {
   @column()
   declare folder_id: number | null
 
+  // ✅ CORRECTION DE LA RELATION : Utiliser le bon nom pour la relation
   @manyToMany(() => Project, {
     pivotTable: 'performed_ins',
     pivotTimestamps: true,
     pivotColumns: ['order', 'material_id', 'material_specified'],
+    // ✅ IMPORTANT : Spécifier explicitement les clés
+    localKey: 'id',
+    pivotForeignKey: 'piece_id',
+    relatedKey: 'id',
+    pivotRelatedForeignKey: 'project_id'
   })
-  declare sections: ManyToMany<typeof Project>
+  declare projects: ManyToMany<typeof Project> // ✅ Renommé de 'sections' vers 'projects'
 
   @belongsTo(() => TypeOfPiece, {
     foreignKey: 'type_of_piece_id',
@@ -59,7 +66,6 @@ export default class Piece extends BaseModel {
   })
   declare files: HasMany<typeof File>
 
-  // ✅ NOUVEAU : Relation avec les matériels
   @hasMany(() => Material, {
     foreignKey: 'piece_id',
   })
@@ -74,15 +80,42 @@ export default class Piece extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
+  // ✅ CORRECTION MAJEURE : Sérialisation complète des données pivot
   serializeExtras() {
     return {
-      pivot_order: this.$extras.pivot_order,
-      pivot_material_id: this.$extras.pivot_material_id,
-      pivot_material_specified: this.$extras.pivot_material_specified
+      pivot_order: this.$extras.pivot_order ?? null,
+      pivot_material_id: this.$extras.pivot_material_id ?? null,
+      pivot_material_specified: Boolean(this.$extras.pivot_material_specified ?? false)
     }
   }
 
-  // ✅ NOUVEAU : Méthode pour obtenir le matériel par défaut
+  // ✅ OVERRIDE complet de la méthode serialize
+  serialize(cherryPick?: any[], relations?: any) {
+    const serialized = super.serialize(cherryPick, relations)
+
+    // ✅ DEBUG : Logger les données extras
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🎵 PIECE ${this.id} SERIALIZE:`, {
+        name: this.name,
+        hasExtras: !!this.$extras,
+        extras: this.$extras,
+        pivot_material_id: this.$extras?.pivot_material_id,
+        pivot_material_specified: this.$extras?.pivot_material_specified,
+        pivot_order: this.$extras?.pivot_order
+      })
+    }
+
+    // ✅ Ajouter automatiquement les données pivot si elles existent
+    if (this.$extras) {
+      serialized.pivot_order = this.$extras.pivot_order ?? null
+      serialized.pivot_material_id = this.$extras.pivot_material_id ?? null
+      serialized.pivot_material_specified = Boolean(this.$extras.pivot_material_specified ?? false)
+    }
+
+    return serialized
+  }
+
+  // Méthode pour obtenir le matériel par défaut
   async getDefaultMaterial(): Promise<Material | null> {
     return await Material.query()
       .where('piece_id', this.id)
@@ -91,7 +124,7 @@ export default class Piece extends BaseModel {
       .first()
   }
 
-  // ✅ NOUVEAU : Méthode pour créer un matériel par défaut
+  // Méthode pour créer un matériel par défaut
   async createDefaultMaterial(name?: string): Promise<Material> {
     const materialName = name || `Matériel principal - ${this.name}`
 
@@ -102,5 +135,18 @@ export default class Piece extends BaseModel {
       is_default: true,
       is_active: true
     })
+  }
+
+  // ✅ NOUVELLE MÉTHODE : Debug pour vérifier les données pivot
+  debugPivotData() {
+    return {
+      id: this.id,
+      name: this.name,
+      hasExtras: !!this.$extras,
+      extrasKeys: this.$extras ? Object.keys(this.$extras) : [],
+      pivot_order: this.$extras?.pivot_order,
+      pivot_material_id: this.$extras?.pivot_material_id,
+      pivot_material_specified: this.$extras?.pivot_material_specified
+    }
   }
 }

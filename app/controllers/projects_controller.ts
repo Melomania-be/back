@@ -29,11 +29,22 @@ export default class ProjectsController {
   }
 
   // ✅ CORRECTION : Méthode getOne avec chargement synchronisé des fichiers
+  // app/controllers/projects_controller.ts - Méthode getOne corrigée
+
   async getOne({ params }: HttpContext) {
     const projectId = params.id
+    console.log(`🔍 PROJECT CONTROLLER - Loading project ${projectId}`)
 
     // ✅ AJOUT : Synchroniser les fichiers avant de charger le projet
     await this.syncProjectFiles(projectId)
+
+    // ✅ PREMIÈRE ÉTAPE : Vérifier les données brutes dans la table pivot
+    const pivotDataRaw = await db
+      .from('performed_ins')
+      .where('project_id', projectId)
+      .select('*')
+
+    console.log('📊 RAW PIVOT DATA from performed_ins:', pivotDataRaw)
 
     const data = await Project.query()
       .where('id', projectId)
@@ -45,7 +56,8 @@ export default class ProjectsController {
             subQuery.preload('files')
           })
           .preload('files')
-          .pivotColumns(['order'])
+          // ✅ FIX MAJEUR : Charger toutes les colonnes du pivot nécessaires
+          .pivotColumns(['order', 'material_id', 'material_specified'])
           .orderBy('order', 'asc')
       })
       .preload('participants')
@@ -62,8 +74,76 @@ export default class ProjectsController {
         query.preload('files')
       })
       .firstOrFail()
-    return data
+
+    console.log('📊 LOADED PROJECT WITH PIECES:', {
+      projectId: data.id,
+      piecesCount: data.pieces.length,
+      pieces: data.pieces.map(piece => ({
+        id: piece.id,
+        name: piece.name,
+        // ✅ DEBUG : Examiner les données $extras
+        extras: piece.$extras,
+        pivot_order: piece.$extras.pivot_order,
+        pivot_material_id: piece.$extras.pivot_material_id,
+        pivot_material_specified: piece.$extras.pivot_material_specified
+      }))
+    })
+
+    // ✅ AJOUT : S'assurer que les données du pivot sont correctement exposées
+    const serializedData = data.serialize()
+
+    console.log('📊 BEFORE ENRICHMENT:', {
+      pieces: serializedData.pieces?.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        hasExtras: !!p.$extras,
+        pivot_material_id: p.pivot_material_id,
+        pivot_material_specified: p.pivot_material_specified
+      }))
+    })
+
+    // ✅ CORRECTION : Enrichir les pièces avec les données pivot
+    if (serializedData.pieces) {
+      serializedData.pieces = serializedData.pieces.map((piece: any, index: number) => {
+        // ✅ Récupérer les données depuis l'objet original
+        const originalPiece = data.pieces[index]
+
+        return {
+          ...piece,
+          // ✅ Exposer les données pivot au niveau de la pièce
+          pivot_material_id: originalPiece?.$extras?.pivot_material_id || piece.pivot_material_id || null,
+          pivot_material_specified: originalPiece?.$extras?.pivot_material_specified || piece.pivot_material_specified || false,
+          pivot_order: originalPiece?.$extras?.pivot_order || piece.pivot_order || 0
+        }
+      })
+    }
+
+    console.log('📊 AFTER ENRICHMENT:', {
+      pieces: serializedData.pieces?.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        pivot_material_id: p.pivot_material_id,
+        pivot_material_specified: p.pivot_material_specified,
+        pivot_order: p.pivot_order
+      }))
+    })
+
+    console.log('📊 Project data loaded with materials:', {
+      projectId: data.id,
+      piecesCount: serializedData.pieces?.length || 0,
+      piecesWithMaterials: serializedData.pieces?.filter((p: any) => p.pivot_material_id).length || 0,
+      samplePiece: serializedData.pieces?.[0] ? {
+        id: serializedData.pieces[0].id,
+        name: serializedData.pieces[0].name,
+        pivot_material_id: serializedData.pieces[0].pivot_material_id,
+        pivot_material_specified: serializedData.pieces[0].pivot_material_specified
+      } : null
+    })
+
+    return serializedData
   }
+
+
 
   // ✅ CORRECTION : Méthode getDashboard avec synchronisation des fichiers
   async getDashboard({ params }: HttpContext) {

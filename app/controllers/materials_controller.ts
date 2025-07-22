@@ -115,19 +115,20 @@ export default class MaterialsController {
 
       console.log('✅ All assignments validated, processing...')
 
-      // Traiter chaque assignation
-      for (let i = 0; i < assignments.length; i++) {
-        const assignment = assignments[i]
+      // ✅ UTILISER UNE TRANSACTION POUR GARANTIR LA COHÉRENCE
+      await db.transaction(async (trx) => {
+        // Traiter chaque assignation
+        for (let i = 0; i < assignments.length; i++) {
+          const assignment = assignments[i]
 
-        console.log(`🔄 Processing assignment ${i}:`, {
-          projectId: assignment.projectId,
-          pieceId: assignment.pieceId,
-          materialId: assignment.materialId
-        })
+          console.log(`🔄 Processing assignment ${i}:`, {
+            projectId: assignment.projectId,
+            pieceId: assignment.pieceId,
+            materialId: assignment.materialId
+          })
 
-        try {
-          // Vérifier que la relation performed_ins existe
-          const existingRelation = await db
+          // ✅ Vérifier que la relation performed_ins existe
+          const existingRelation = await trx
             .from('performed_ins')
             .where('project_id', assignment.projectId)
             .where('piece_id', assignment.pieceId)
@@ -135,38 +136,33 @@ export default class MaterialsController {
 
           if (!existingRelation) {
             console.error(`❌ No performed_ins relation found for project ${assignment.projectId}, piece ${assignment.pieceId}`)
-            return ctx.response.status(404).json({
-              success: false,
-              error: `Relation projet-pièce non trouvée: projet ${assignment.projectId}, pièce ${assignment.pieceId}`
-            })
+            throw new Error(`Relation projet-pièce non trouvée: projet ${assignment.projectId}, pièce ${assignment.pieceId}`)
           }
 
           console.log(`✅ Found existing relation:`, existingRelation)
 
-          // Mettre à jour la relation
-          const updateResult = await db
+          // ✅ Mettre à jour la relation avec les nouvelles valeurs
+          const updateResult = await trx
             .from('performed_ins')
             .where('project_id', assignment.projectId)
             .where('piece_id', assignment.pieceId)
             .update({
               material_id: assignment.materialId,
               material_specified: assignment.materialId !== null,
+              updated_at: new Date()
             })
 
           console.log(`✅ Updated assignment ${i}, affected rows:`, updateResult)
 
-        } catch (assignmentError) {
-          console.error(`❌ Error processing assignment ${i}:`, assignmentError)
-          return ctx.response.status(500).json({
-            success: false,
-            error: `Erreur lors du traitement de l'assignation ${i}: ${assignmentError.message}`
-          })
+          if (updateResult === 0) {
+            console.warn(`⚠️ No rows affected for assignment ${i}`)
+          }
         }
-      }
+      })
 
       console.log('🔄 All assignments processed, updating material counts...')
 
-      // Mettre à jour les compteurs de projets pour tous les matériels affectés
+      // ✅ Mettre à jour les compteurs de projets pour tous les matériels affectés
       try {
         const materialIds = assignments
           .filter((a) => a.materialId)
@@ -179,8 +175,16 @@ export default class MaterialsController {
           try {
             const material = await Material.find(materialId)
             if (material) {
-              await material.updateProjectsCount()
-              console.log(`✅ Updated count for material ${materialId}`)
+              // ✅ Calculer le nombre de projets utilisant ce matériel
+              const projectCount = await db
+                .from('performed_ins')
+                .where('material_id', materialId)
+                .countDistinct('project_id as total')
+
+              material.projects_count = Number(projectCount[0].total)
+              await material.save()
+
+              console.log(`✅ Updated count for material ${materialId}: ${material.projects_count} projects`)
             } else {
               console.warn(`⚠️ Material ${materialId} not found for count update`)
             }
@@ -199,7 +203,18 @@ export default class MaterialsController {
       return ctx.response.json({
         success: true,
         message: 'Matériels assignés avec succès',
-        processedCount: assignments.length
+        processedCount: assignments.length,
+        // ✅ AJOUT : Informations de debug utiles
+        debug: {
+          timestamp: new Date().toISOString(),
+          assignments: assignments.map((a, i) => ({
+            index: i,
+            projectId: a.projectId,
+            pieceId: a.pieceId,
+            materialId: a.materialId,
+            materialSpecified: a.materialId !== null
+          }))
+        }
       })
 
     } catch (error) {
@@ -215,11 +230,13 @@ export default class MaterialsController {
         error: "Erreur lors de l'assignation des matériels",
         details: {
           message: error.message,
-          code: error.code
+          code: error.code,
+          timestamp: new Date().toISOString()
         }
       })
     }
   }
+
 
   // Upload de fichiers pour un matériel
   async uploadFiles(ctx: HttpContext) {
