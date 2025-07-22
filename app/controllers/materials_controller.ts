@@ -1,4 +1,4 @@
-// app/controllers/materials_controller.ts
+// app/controllers/materials_controller.ts - Version complète avec génération automatique de noms
 import { HttpContext } from '@adonisjs/core/http'
 import Material from '#models/material'
 import Piece from '#models/piece'
@@ -13,6 +13,39 @@ import { cuid } from '@adonisjs/core/helpers'
 import app from '@adonisjs/core/services/app'
 
 export default class MaterialsController {
+  // ✅ MÉTHODE UTILITAIRE : Générer un nom unique
+  async generateUniqueName(pieceId: number, baseName: string, excludeId?: number): Promise<string> {
+    let materialName = baseName
+    let counter = 1
+
+    while (true) {
+      const query = Material.query()
+        .where('piece_id', pieceId)
+        .where('name', materialName)
+
+      if (excludeId) {
+        query.where('id', '!=', excludeId)
+      }
+
+      const existing = await query.first()
+
+      if (!existing) {
+        return materialName
+      }
+
+      materialName = `${baseName} (${counter})`
+      counter++
+
+      // Sécurité : éviter une boucle infinie
+      if (counter > 100) {
+        materialName = `${baseName} (${Date.now()})`
+        break
+      }
+    }
+
+    return materialName
+  }
+
   // Obtenir tous les matériels d'une pièce
   async getByPiece(ctx: HttpContext) {
     const pieceId = ctx.params.pieceId
@@ -47,40 +80,143 @@ export default class MaterialsController {
   }
 
   async assignBulk(ctx: HttpContext) {
-    const { assignments } = ctx.request.body()
+    console.log('🔍 ASSIGN BULK - Start')
 
     try {
-      // Traiter chaque assignation
-      for (const assignment of assignments) {
-        await db
-          .from('performed_ins')
-          .where('project_id', assignment.projectId)
-          .where('piece_id', assignment.pieceId)
-          .update({
-            material_id: assignment.materialId,
-            material_specified: assignment.materialId !== null,
-          })
+      const { assignments } = ctx.request.body()
+
+      console.log('📊 Received assignments:', {
+        count: assignments?.length || 0,
+        assignments: assignments
+      })
+
+      // Vérification de base
+      if (!assignments || !Array.isArray(assignments)) {
+        console.error('❌ Invalid assignments format')
+        return ctx.response.status(400).json({
+          success: false,
+          error: 'Format des assignations invalide'
+        })
       }
 
-      // Mettre à jour les compteurs de projets pour tous les matériels affectés
-      const materialIds = assignments.filter((a) => a.materialId).map((a) => a.materialId)
+      // Validation de chaque assignment
+      for (let i = 0; i < assignments.length; i++) {
+        const assignment = assignments[i]
+        console.log(`🔍 Validating assignment ${i}:`, assignment)
 
-      for (const materialId of [...new Set(materialIds)]) {
-        const material = await Material.find(materialId)
-        if (material) {
-          await material.updateProjectsCount()
+        if (!assignment.projectId || !assignment.pieceId) {
+          console.error(`❌ Invalid assignment ${i}:`, assignment)
+          return ctx.response.status(400).json({
+            success: false,
+            error: `Assignation ${i} invalide: projectId et pieceId requis`
+          })
         }
       }
+
+      console.log('✅ All assignments validated, processing...')
+
+      // Traiter chaque assignation
+      for (let i = 0; i < assignments.length; i++) {
+        const assignment = assignments[i]
+
+        console.log(`🔄 Processing assignment ${i}:`, {
+          projectId: assignment.projectId,
+          pieceId: assignment.pieceId,
+          materialId: assignment.materialId
+        })
+
+        try {
+          // Vérifier que la relation performed_ins existe
+          const existingRelation = await db
+            .from('performed_ins')
+            .where('project_id', assignment.projectId)
+            .where('piece_id', assignment.pieceId)
+            .first()
+
+          if (!existingRelation) {
+            console.error(`❌ No performed_ins relation found for project ${assignment.projectId}, piece ${assignment.pieceId}`)
+            return ctx.response.status(404).json({
+              success: false,
+              error: `Relation projet-pièce non trouvée: projet ${assignment.projectId}, pièce ${assignment.pieceId}`
+            })
+          }
+
+          console.log(`✅ Found existing relation:`, existingRelation)
+
+          // Mettre à jour la relation
+          const updateResult = await db
+            .from('performed_ins')
+            .where('project_id', assignment.projectId)
+            .where('piece_id', assignment.pieceId)
+            .update({
+              material_id: assignment.materialId,
+              material_specified: assignment.materialId !== null,
+            })
+
+          console.log(`✅ Updated assignment ${i}, affected rows:`, updateResult)
+
+        } catch (assignmentError) {
+          console.error(`❌ Error processing assignment ${i}:`, assignmentError)
+          return ctx.response.status(500).json({
+            success: false,
+            error: `Erreur lors du traitement de l'assignation ${i}: ${assignmentError.message}`
+          })
+        }
+      }
+
+      console.log('🔄 All assignments processed, updating material counts...')
+
+      // Mettre à jour les compteurs de projets pour tous les matériels affectés
+      try {
+        const materialIds = assignments
+          .filter((a) => a.materialId)
+          .map((a) => a.materialId)
+
+        const uniqueMaterialIds = [...new Set(materialIds)]
+        console.log('📊 Updating counts for materials:', uniqueMaterialIds)
+
+        for (const materialId of uniqueMaterialIds) {
+          try {
+            const material = await Material.find(materialId)
+            if (material) {
+              await material.updateProjectsCount()
+              console.log(`✅ Updated count for material ${materialId}`)
+            } else {
+              console.warn(`⚠️ Material ${materialId} not found for count update`)
+            }
+          } catch (countError) {
+            console.error(`❌ Error updating count for material ${materialId}:`, countError)
+            // Ne pas arrêter le processus pour cette erreur
+          }
+        }
+      } catch (countUpdateError) {
+        console.error('❌ Error during count updates:', countUpdateError)
+        // Ne pas arrêter le processus pour cette erreur
+      }
+
+      console.log('✅ ASSIGN BULK - Success')
 
       return ctx.response.json({
         success: true,
         message: 'Matériels assignés avec succès',
+        processedCount: assignments.length
       })
+
     } catch (error) {
-      console.error('Error in bulk assign:', error)
+      console.error('💥 ASSIGN BULK - Fatal error:', error)
+      console.error('📋 Error details:', {
+        message: error.message,
+        stack: error.stack,
+        code: error.code
+      })
+
       return ctx.response.status(500).json({
         success: false,
         error: "Erreur lors de l'assignation des matériels",
+        details: {
+          message: error.message,
+          code: error.code
+        }
       })
     }
   }
@@ -141,120 +277,194 @@ export default class MaterialsController {
 
   // Créer un nouveau matériel
   async create(ctx: HttpContext) {
-    const data = await ctx.request.validateUsing(createMaterialValidator)
+    try {
+      const data = await ctx.request.validateUsing(createMaterialValidator)
 
-    // Vérifier que la pièce existe
-    const piece = await Piece.findOrFail(data.piece_id)
+      // Vérifier que la pièce existe
+      const piece = await Piece.findOrFail(data.piece_id)
 
-    // Si c'est le premier matériel, le marquer comme défaut
-    const existingMaterials = await Material.query()
-      .where('piece_id', data.piece_id)
-      .count('* as total')
-    const isFirstMaterial = Number(existingMaterials[0].$extras.total) === 0
+      // ✅ GÉNÉRATION AUTOMATIQUE D'UN NOM UNIQUE
+      const uniqueName = await this.generateUniqueName(data.piece_id, data.name)
 
-    const material = await Material.create({
-      ...data,
-      is_default: isFirstMaterial || data.is_default || false,
-      is_active: true,
-    })
-
-    // Si marqué comme défaut, s'assurer qu'il n'y en a qu'un seul
-    if (material.is_default) {
-      await Material.query()
+      // Si c'est le premier matériel, le marquer comme défaut
+      const existingMaterials = await Material.query()
         .where('piece_id', data.piece_id)
-        .where('id', '!=', material.id)
-        .update({ is_default: false })
+        .count('* as total')
+      const isFirstMaterial = Number(existingMaterials[0].$extras.total) === 0
+
+      const material = await Material.create({
+        ...data,
+        name: uniqueName, // ✅ Utiliser le nom unique généré
+        is_default: isFirstMaterial || data.is_default || false,
+        is_active: true,
+      })
+
+      // Si marqué comme défaut, s'assurer qu'il n'y en a qu'un seul
+      if (material.is_default) {
+        await Material.query()
+          .where('piece_id', data.piece_id)
+          .where('id', '!=', material.id)
+          .update({ is_default: false })
+      }
+
+      // Charger les relations
+      await material.load('piece')
+      await material.load('files')
+
+      // ✅ INFORMER L'UTILISATEUR SI LE NOM A ÉTÉ MODIFIÉ
+      const message = uniqueName !== data.name
+        ? `Matériel créé avec succès. Le nom a été ajusté en "${uniqueName}" car "${data.name}" existait déjà.`
+        : 'Matériel créé avec succès'
+
+      return ctx.response.json({
+        success: true,
+        material,
+        message,
+        nameChanged: uniqueName !== data.name,
+        originalName: data.name,
+        finalName: uniqueName
+      })
+    } catch (error) {
+      console.error('Error creating material:', error)
+
+      return ctx.response.status(500).json({
+        success: false,
+        error: 'Erreur lors de la création du matériel',
+        details: error.message
+      })
     }
-
-    // Charger les relations
-    await material.load('piece')
-    await material.load('files')
-
-    return ctx.response.json({
-      success: true,
-      material,
-      message: 'Matériel créé avec succès',
-    })
   }
 
   // Mettre à jour un matériel
   async update(ctx: HttpContext) {
-    const materialId = ctx.params.id
-    const data = await ctx.request.validateUsing(updateMaterialValidator)
+    try {
+      const materialId = ctx.params.id
+      const data = await ctx.request.validateUsing(updateMaterialValidator)
 
-    const material = await Material.findOrFail(materialId)
+      const material = await Material.findOrFail(materialId)
 
-    // Si on marque ce matériel comme défaut, désactiver les autres
-    if (data.is_default && !material.is_default) {
-      await Material.query()
-        .where('piece_id', material.piece_id)
-        .where('id', '!=', material.id)
-        .update({ is_default: false })
+      let finalName = data.name || material.name
+      let nameChanged = false
+
+      // ✅ GÉNÉRATION D'UN NOM UNIQUE SI NÉCESSAIRE
+      if (data.name && data.name !== material.name) {
+        const uniqueName = await this.generateUniqueName(material.piece_id, data.name, material.id)
+        finalName = uniqueName
+        nameChanged = uniqueName !== data.name
+      }
+
+      // Si on marque ce matériel comme défaut, désactiver les autres
+      if (data.is_default && !material.is_default) {
+        await Material.query()
+          .where('piece_id', material.piece_id)
+          .where('id', '!=', material.id)
+          .update({ is_default: false })
+      }
+
+      material.merge({
+        ...data,
+        name: finalName
+      })
+      await material.save()
+
+      await material.load('piece')
+      await material.load('files')
+
+      // ✅ INFORMER L'UTILISATEUR SI LE NOM A ÉTÉ MODIFIÉ
+      const message = nameChanged
+        ? `Matériel mis à jour avec succès. Le nom a été ajusté en "${finalName}" car "${data.name}" existait déjà.`
+        : 'Matériel mis à jour avec succès'
+
+      return ctx.response.json({
+        success: true,
+        material,
+        message,
+        nameChanged,
+        originalName: data.name,
+        finalName
+      })
+    } catch (error) {
+      console.error('Error updating material:', error)
+
+      return ctx.response.status(500).json({
+        success: false,
+        error: 'Erreur lors de la mise à jour du matériel',
+        details: error.message
+      })
     }
-
-    material.merge(data)
-    await material.save()
-
-    await material.load('piece')
-    await material.load('files')
-
-    return ctx.response.json({
-      success: true,
-      material,
-      message: 'Matériel mis à jour avec succès',
-    })
   }
 
   // Dupliquer un matériel
   async duplicate(ctx: HttpContext) {
-    const materialId = ctx.params.id
-    const { name, description } = ctx.request.body()
+    try {
+      const materialId = ctx.params.id
+      const { name, description, duplicateFiles = false } = ctx.request.body()
 
-    const originalMaterial = await Material.query()
-      .where('id', materialId)
-      .preload('files')
-      .firstOrFail()
+      const originalMaterial = await Material.query()
+        .where('id', materialId)
+        .preload('files')
+        .firstOrFail()
 
-    // Créer le nouveau matériel
-    const newMaterial = await Material.create({
-      piece_id: originalMaterial.piece_id,
-      name: name || `${originalMaterial.name} (copie)`,
-      description: description || `Copie de "${originalMaterial.name}"`,
-      edition: originalMaterial.edition,
-      editor: originalMaterial.editor,
-      notes: originalMaterial.notes,
-      is_default: false,
-      is_active: true,
-    })
+      const baseName = name || `${originalMaterial.name} (copie)`
 
-    // Dupliquer les fichiers si demandé
-    const { duplicateFiles = false } = ctx.request.body()
+      // ✅ GÉNÉRATION AUTOMATIQUE D'UN NOM UNIQUE
+      const uniqueName = await this.generateUniqueName(originalMaterial.piece_id, baseName)
 
-    if (duplicateFiles && originalMaterial.files.length > 0) {
-      for (const file of originalMaterial.files) {
-        await File.create({
-          name: file.name,
-          type: file.type,
-          path: file.path, // Attention : partage le même fichier physique
-          size: file.size,
-          material_id: newMaterial.id,
-          piece_id: originalMaterial.piece_id,
-          instrument_part: file.instrument_part,
-          part_order: file.part_order,
-          content: file.content,
-        })
+      // Créer le nouveau matériel
+      const newMaterial = await Material.create({
+        piece_id: originalMaterial.piece_id,
+        name: uniqueName,
+        description: description || `Copie de "${originalMaterial.name}"`,
+        edition: originalMaterial.edition,
+        editor: originalMaterial.editor,
+        notes: originalMaterial.notes,
+        is_default: false,
+        is_active: true,
+      })
+
+      // Dupliquer les fichiers si demandé
+      if (duplicateFiles && originalMaterial.files.length > 0) {
+        for (const file of originalMaterial.files) {
+          await File.create({
+            name: file.name,
+            type: file.type,
+            path: file.path,
+            size: file.size,
+            material_id: newMaterial.id,
+            piece_id: originalMaterial.piece_id,
+            instrument_part: file.instrument_part,
+            part_order: file.part_order,
+            content: file.content,
+          })
+        }
       }
+
+      await newMaterial.updateFilesCount()
+      await newMaterial.load('piece')
+      await newMaterial.load('files')
+
+      // ✅ INFORMER L'UTILISATEUR SI LE NOM A ÉTÉ MODIFIÉ
+      const message = uniqueName !== baseName
+        ? `Matériel dupliqué avec succès. Le nom a été ajusté en "${uniqueName}" car "${baseName}" existait déjà.`
+        : 'Matériel dupliqué avec succès'
+
+      return ctx.response.json({
+        success: true,
+        material: newMaterial,
+        message,
+        nameChanged: uniqueName !== baseName,
+        originalName: baseName,
+        finalName: uniqueName
+      })
+    } catch (error) {
+      console.error('Error duplicating material:', error)
+
+      return ctx.response.status(500).json({
+        success: false,
+        error: 'Erreur lors de la duplication du matériel',
+        details: error.message
+      })
     }
-
-    await newMaterial.updateFilesCount()
-    await newMaterial.load('piece')
-    await newMaterial.load('files')
-
-    return ctx.response.json({
-      success: true,
-      material: newMaterial,
-      message: 'Matériel dupliqué avec succès',
-    })
   }
 
   // Supprimer un matériel
@@ -368,5 +578,30 @@ export default class MaterialsController {
       .select('pieces.name as piece_name', 'composers.short_name as composer_name')
 
     return ctx.response.json(pieces)
+  }
+
+  // ✅ MÉTHODE BONUS : Suggérer un nom unique avant création (optionnel)
+  async suggestUniqueName(ctx: HttpContext) {
+    const { pieceId, name } = ctx.request.qs()
+
+    if (!pieceId || !name) {
+      return ctx.response.badRequest({
+        error: 'pieceId et name sont requis'
+      })
+    }
+
+    try {
+      const uniqueName = await this.generateUniqueName(Number(pieceId), name)
+
+      return ctx.response.json({
+        originalName: name,
+        suggestedName: uniqueName,
+        isUnique: uniqueName === name
+      })
+    } catch (error) {
+      return ctx.response.status(500).json({
+        error: 'Erreur lors de la génération du nom'
+      })
+    }
   }
 }

@@ -1,3 +1,4 @@
+// app/models/file.ts - Version corrigée
 import { DateTime } from 'luxon'
 import { BaseModel, column, manyToMany, belongsTo } from '@adonisjs/lucid/orm'
 import type { ManyToMany, BelongsTo } from '@adonisjs/lucid/types/relations'
@@ -24,7 +25,7 @@ export default class File extends BaseModel {
   @column()
   declare size: number | null
 
-  // ✅ NOUVELLES COLONNES ÉTRANGÈRES
+  // ✅ TOUTES LES COLONNES ÉTRANGÈRES
   @column()
   declare folder_id: number | null
 
@@ -34,7 +35,18 @@ export default class File extends BaseModel {
   @column()
   declare piece_id: number | null
 
-  // ✅ RELATIONS BELONGSTO POUR LES NOUVELLES COLONNES
+  // ✅ AJOUT : La colonne material_id manquante
+  @column()
+  declare material_id: number | null
+
+  // ✅ NOUVELLES COLONNES POUR LES MATÉRIELS
+  @column()
+  declare instrument_part: string | null
+
+  @column()
+  declare part_order: number
+
+  // ✅ RELATIONS BELONGSTO POUR TOUTES LES COLONNES
   @belongsTo(() => Folder, {
     foreignKey: 'folder_id',
   })
@@ -50,7 +62,13 @@ export default class File extends BaseModel {
   })
   declare piece: BelongsTo<typeof Piece>
 
-  // ✅ CORRECTION : Relation many-to-many avec nom différent pour éviter le conflit
+  // ✅ AJOUT : Relation avec Material (import lazy pour éviter les références circulaires)
+  @belongsTo(() => import('./material.js'), {
+    foreignKey: 'material_id',
+  })
+  declare material: BelongsTo<any>
+
+  // ✅ Relation many-to-many avec nom différent pour éviter le conflit
   @manyToMany(() => Folder, {
     pivotTable: 'contains',
     pivotForeignKey: 'file_id',
