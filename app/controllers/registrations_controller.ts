@@ -167,7 +167,7 @@ export default class RegistrationsController {
     //Puting the answer in the answer table if there is a form to fill
     if (data.answers.length === 0) {
       // --- NEW: Call recruitment creation here if no answers ---
-      await this._createRecruitmentFromParticipant(contact, participant)
+      await this._createRecruitmentFromParticipant(contact, participant, 'pending validation', null)
       // --- END NEW ---
       return ctx.response.json({ success: true, participant })
     }
@@ -182,7 +182,7 @@ export default class RegistrationsController {
       })
     )
     // --- NEW: Call recruitment creation here after answers are saved ---
-    await this._createRecruitmentFromParticipant(contact, participant)
+    await this._createRecruitmentFromParticipant(contact, participant, 'pending validation', null)
     // --- END NEW ---
     return ctx.response.json({ success: true, participant, answer })
   }
@@ -191,44 +191,103 @@ export default class RegistrationsController {
    * NEW PRIVATE METHOD: _createRecruitmentFromParticipant
    * Helper function to encapsulate the logic for creating a Recruitment record.
    */
-  private async _createRecruitmentFromParticipant(contact: Contact, participant: Participant) {
+  // private async _createRecruitmentFromParticipant(contact: Contact, participant: Participant, ) {
+  //   try {
+  //     // 1. Determine the final section_group_id for the Recruitment record
+  //     let finalSectionId: number | null = null
+
+  //     // await participant.load('section', (sectionQuery) => {
+  //     //   sectionQuery.preload('section_groups')
+  //     // })
+  //     await participant.load('section')
+
+  //     // if (
+  //     //   participant.section &&
+  //     //   participant.section.section_groups &&
+  //     //   participant.section.section_groups.length > 0
+  //     // ) {
+  //     //   finalSectionGroupId = participant.section.section_groups[0].id
+  //     // } else {
+  //     //   console.error(
+  //     //     `ERROR: Participant ${participant.id} (Section ID: ${participant.section_id}) could not be linked to a SectionGroup. Recruitment creation requires a valid sectionGroupId.`
+  //     //   )
+  //     //   throw new Error(
+  //     //     'Missing associated section group for recruitment creation. Cannot create record.'
+  //     //   )
+  //     // }
+
+  //     if (participant.section && participant.section.id) {
+  //       finalSectionId = participant.section.id // Get the ID of the specific Section
+  //     } else {
+  //       console.warn(
+  //         `LOG: Participant ${participant.section_id} (Section ID: ${participant.section_id}) could not be linked to a Section. Recruitment will be created with null sectionId.`
+  //       )
+  //       // If sectionId is NOT NULL in recruitments, you'd throw an error here.
+  //       // Assuming it's nullable or you'll handle it.
+  //     }
+
+  //     // 2. Determine the system user for 'contactedBy'
+  //     const SYSTEM_USER_ID = 1 // <<< IMPORTANT: Replace with an actual ID of a system user
+  //     let systemUserIdForRecruitment: number | null = SYSTEM_USER_ID
+
+  //     // 3. Construct the new Recruitment data object
+  //     const newRecruitmentData = {
+  //       firstName: contact.first_name,
+  //       lastName: contact.last_name,
+  //       sectionId: finalSectionId,
+  //       projectId: participant.project_id,
+  //       status: 'registered' as RecruitmentStatus,
+  //       // --- FIX 2: Convert ISO string to DateTime object ---
+  //       contactDate: DateTime.now().toUTC(), // Pass DateTime object directly
+  //       // --- END FIX 2 ---
+  //       contactedBy: systemUserIdForRecruitment,
+  //       comment: 'Automatically created from participant registration.',
+  //     }
+
+  //     // 4. Create the Recruitment record
+  //     const newRecruitment = await Recruitment.create(newRecruitmentData)
+  //     console.log(
+  //       `LOG: Successfully created new Recruitment record for ${newRecruitment.firstName} ${newRecruitment.lastName} (ID: ${newRecruitment.id})`
+  //     )
+  //   } catch (error) {
+  //     console.error(
+  //       'ERROR: Failed to automatically create Recruitment record during participant registration:',
+  //       error
+  //     )
+  //     throw error
+  //   }
+  // }
+
+  private async _createRecruitmentFromParticipant(
+    contact: Contact,
+    participant: Participant,
+    initialStatus: RecruitmentStatus, // NEW PARAMETER
+    initialContactedBy: number | null // NEW PARAMETER
+  ) {
     try {
-      // 1. Determine the final section_group_id for the Recruitment record
-      let finalSectionId: number | null = null
+      let finalSectionId: number
 
-      // await participant.load('section', (sectionQuery) => {
-      //   sectionQuery.preload('section_groups')
-      // })
-      await participant.load('section')
+      await participant.load('section', (sectionQuery) => {
+        sectionQuery.preload('section_groups')
+      })
 
-      // if (
-      //   participant.section &&
-      //   participant.section.section_groups &&
-      //   participant.section.section_groups.length > 0
-      // ) {
-      //   finalSectionGroupId = participant.section.section_groups[0].id
-      // } else {
-      //   console.error(
-      //     `ERROR: Participant ${participant.id} (Section ID: ${participant.section_id}) could not be linked to a SectionGroup. Recruitment creation requires a valid sectionGroupId.`
-      //   )
-      //   throw new Error(
-      //     'Missing associated section group for recruitment creation. Cannot create record.'
-      //   )
-      // }
-
-      if (participant.section && participant.section.id) {
-        finalSectionId = participant.section.id // Get the ID of the specific Section
+      if (
+        participant.section &&
+        participant.section.section_groups &&
+        participant.section.section_groups.length > 0
+      ) {
+        finalSectionId = participant.section.section_groups[0].id
       } else {
-        console.warn(
-          `LOG: Participant ${participant.section_id} (Section ID: ${participant.section_id}) could not be linked to a Section. Recruitment will be created with null sectionId.`
+        console.error(
+          `ERROR: Participant ${participant.id} (Section ID: ${participant.section_id}) could not be linked to a SectionGroup. Recruitment creation requires a valid sectionGroupId.`
         )
-        // If sectionId is NOT NULL in recruitments, you'd throw an error here.
-        // Assuming it's nullable or you'll handle it.
+        throw new Error(
+          'Missing associated section group for recruitment creation. Cannot create record.'
+        )
       }
 
-      // 2. Determine the system user for 'contactedBy'
-      const SYSTEM_USER_ID = 1 // <<< IMPORTANT: Replace with an actual ID of a system user
-      let systemUserIdForRecruitment: number | null = SYSTEM_USER_ID
+      // 2. contactedBy is now passed as a parameter
+      // No need for SYSTEM_USER_ID lookup here, as it's provided by the caller.
 
       // 3. Construct the new Recruitment data object
       const newRecruitmentData = {
@@ -236,18 +295,15 @@ export default class RegistrationsController {
         lastName: contact.last_name,
         sectionId: finalSectionId,
         projectId: participant.project_id,
-        status: 'registered' as RecruitmentStatus,
-        // --- FIX 2: Convert ISO string to DateTime object ---
-        contactDate: DateTime.now().toUTC(), // Pass DateTime object directly
-        // --- END FIX 2 ---
-        contactedBy: systemUserIdForRecruitment,
+        status: initialStatus, // Use the passed initialStatus
+        contactDate: DateTime.now().toUTC(),
+        contactedBy: initialContactedBy, // Use the passed initialContactedBy
         comment: 'Automatically created from participant registration.',
       }
 
-      // 4. Create the Recruitment record
       const newRecruitment = await Recruitment.create(newRecruitmentData)
       console.log(
-        `LOG: Successfully created new Recruitment record for ${newRecruitment.firstName} ${newRecruitment.lastName} (ID: ${newRecruitment.id})`
+        `LOG: Successfully created new Recruitment record for ${newRecruitment.firstName} ${newRecruitment.lastName} (ID: ${newRecruitment.id}) with status '${initialStatus}'`
       )
     } catch (error) {
       console.error(

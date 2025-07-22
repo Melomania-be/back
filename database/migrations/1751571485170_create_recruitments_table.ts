@@ -35,6 +35,7 @@ export default class extends BaseSchema {
           'registered',
           'not available',
           'to follow up',
+          'pending validation',
           'cancelled',
           'other',
         ])

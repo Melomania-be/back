@@ -3,6 +3,8 @@ import Contact from '#models/contact'
 import { simpleFilter, advancedFilter } from 'adonisjs-filters'
 import { createContactValidator, mergeContactsValidator } from '#validators/contact'
 import { HttpContext } from '@adonisjs/core/http'
+import Recruitment, { RecruitmentStatus } from '#models/recruitment' // NEW: Import Recruitment model and RecruitmentStatus
+import Participant from '#models/participant' // NEW: Import Participant model for robust lookup
 
 export default class ContactsController {
   async getAll(ctx: HttpContext) {
@@ -132,17 +134,66 @@ export default class ContactsController {
     return contact1
   }
 
+  // async createOrUpdate(ctx: HttpContext) {
+  //   console.log('createOrUpdate called')
+  //   console.log(ctx.request.all())
+
+  //   const data = await ctx.request.validateUsing(createContactValidator)
+
+  //   if (!data.id) {
+  //     return await Contact.create({ ...data, validated: true })
+  //   }
+
+  //   const contact = await Contact.updateOrCreate({ id: data.id }, { ...data, validated: true })
+
+  //   if (data.instruments) {
+  //     let toSync = Object.assign(
+  //       {},
+  //       ...data.instruments.map((instrument) => {
+  //         return {
+  //           [instrument.id]: {
+  //             proficiency_level: instrument.pivot_proficiency_level,
+  //           },
+  //         }
+  //       })
+  //     )
+
+  //     await contact.related('instruments').sync(toSync)
+  //   }
+
+  //   await contact.save()
+  //   return contact
+  // }
+
   async createOrUpdate(ctx: HttpContext) {
     console.log('createOrUpdate called')
     console.log(ctx.request.all())
 
     const data = await ctx.request.validateUsing(createContactValidator)
 
-    if (!data.id) {
-      return await Contact.create({ ...data, validated: true })
+    let contact: Contact // This will hold the Contact instance
+    let oldValidatedStatus: boolean = false // Capture old status
+
+    if (data.id) {
+      // It's an update operation
+      const foundContact = await Contact.find(data.id)
+      if (!foundContact) {
+        return ctx.response.notFound('Contact not found')
+      }
+      contact = foundContact // Assign the found contact to the 'contact' variable
+      oldValidatedStatus = contact.validated // Capture old status before merging
+    } else {
+      // It's a creation operation
+      contact = await Contact.create({ ...data, validated: true }) // Create new contact
+      // For new contacts, oldValidatedStatus remains false, which is correct
     }
 
-    const contact = await Contact.updateOrCreate({ id: data.id }, { ...data, validated: true })
+    // If it was an update operation (data.id existed), merge the new data.
+    // If it was a creation operation, the data is already set by `Contact.create()`.
+    if (data.id) {
+      contact.merge({ ...data, validated: true }) // Merge new data for existing contact
+    }
+    // No explicit `await contact.save()` here yet, as it's at the end.
 
     if (data.instruments) {
       let toSync = Object.assign(
@@ -155,11 +206,20 @@ export default class ContactsController {
           }
         })
       )
-
       await contact.related('instruments').sync(toSync)
     }
 
-    await contact.save()
+    await contact.save() // Save the contact changes (both for new and updated)
+
+    // --- NEW: Trigger Recruitment Status Update if 'validated' changes to true ---
+    if (!oldValidatedStatus && contact.validated) {
+      console.log(
+        `LOG: Contact ID ${contact.id} validated. Attempting to update associated Recruitment status.`
+      )
+      await this._updateAssociatedRecruitmentStatus(contact, 'registered')
+    }
+    // --- END NEW ---
+
     return contact
   }
 
@@ -220,5 +280,63 @@ export default class ContactsController {
       return response.status(200).send('contact unsubscribed')
     }
     return response.status(404).send('contact not found')
+  }
+
+  /**
+   * NEW PRIVATE METHOD: _updateAssociatedRecruitmentStatus
+   * Finds the Recruitment record(s) associated with a Contact and updates its status.
+   * This is now more robust by querying via Participant.
+   */
+  private async _updateAssociatedRecruitmentStatus(contact: Contact, newStatus: RecruitmentStatus) {
+    try {
+      // Find all Participant records associated with this Contact
+      const participants = await Participant.query()
+        .where('contact_id', contact.id)
+        .select('id', 'project_id', 'section_id') // Select necessary fields for lookup
+        .exec() // Execute the query
+
+      if (participants.length === 0) {
+        console.warn(
+          `LOG: No Participant records found for Contact ID ${contact.id}. No Recruitment status updated.`
+        )
+        return // Nothing to do if no participants are linked
+      }
+
+      let updatedRecruitmentsCount = 0
+
+      // Iterate through each participant to find their associated recruitment
+      for (const participant of participants) {
+        // Find the Recruitment record that matches this Contact's name AND this Participant's project
+        // This is still a name-based match, but now narrowed by project_id for better accuracy.
+        // A direct `contact_id` on Recruitment would be ideal, but we're working with current schema.
+        const recruitmentToUpdate = await Recruitment.query()
+          .where('firstName', contact.first_name)
+          .andWhere('lastName', contact.last_name)
+          .andWhere('projectId', participant.project_id) // Match by project ID
+          .where('status', 'pending validation' as RecruitmentStatus) // Only update if currently pending validation
+          .first() // Assuming one unique pending recruitment per name+project combination
+
+        if (recruitmentToUpdate) {
+          recruitmentToUpdate.status = newStatus
+          await recruitmentToUpdate.save()
+          updatedRecruitmentsCount++
+          console.log(
+            `LOG: Recruitment ID ${recruitmentToUpdate.id} status updated to '${newStatus}' due to Contact validation.`
+          )
+        } else {
+          console.warn(
+            `LOG: No 'pending validation' Recruitment found for Contact ID ${contact.id} (Participant ID: ${participant.id}, Project ID: ${participant.project_id}). Status not updated.`
+          )
+        }
+      }
+      console.log(
+        `LOG: Finished updating recruitments for Contact ID ${contact.id}. Total updated: ${updatedRecruitmentsCount}`
+      )
+    } catch (error) {
+      console.error(
+        'ERROR: Failed to update associated Recruitment status on Contact validation:',
+        error
+      )
+    }
   }
 }
