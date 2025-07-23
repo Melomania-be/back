@@ -44,7 +44,7 @@ export const materialFilesUploadValidator = vine.compile(
         })
       )
       .minLength(1)
-      .maxLength(20), // ✅ AJOUT : Limite raisonnable
+      .maxLength(10), // ✅ AJOUT : Limite raisonnable
     // ✅ SUPPRESSION : instrumentParts optionnel pour éviter les erreurs
     // instrumentParts: vine.array(vine.string()).optional()
   })
