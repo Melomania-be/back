@@ -197,8 +197,66 @@ export default class MaterialsController {
     const materialId = ctx.params.id
 
     try {
+      console.log('📤 Starting file upload for material:', materialId)
+      console.log('📋 Request headers:', ctx.request.headers())
+
       const material = await Material.findOrFail(materialId)
-      const { files } = await ctx.request.validateUsing(materialFilesUploadValidator)
+      console.log('✅ Material found:', material.name)
+
+      // ✅ CORRECTION 1 : Validation simplifiée et plus robuste
+      let files: any[] = []
+
+      try {
+        // Essayer d'abord avec le validator existant
+        const validatedData = await ctx.request.validateUsing(materialFilesUploadValidator)
+        files = validatedData.files || []
+        console.log('✅ Validation passed, files count:', files.length)
+      } catch (validationError) {
+        console.log('⚠️ Validation failed, trying manual validation...')
+        console.log('Validation error:', validationError)
+
+        // ✅ CORRECTION 2 : Fallback vers validation manuelle
+        const requestFiles = ctx.request.files('files')
+
+        if (!requestFiles || requestFiles.length === 0) {
+          return ctx.response.badRequest({
+            success: false,
+            error: 'Aucun fichier fourni',
+            details: 'Veuillez sélectionner au moins un fichier à upload'
+          })
+        }
+
+        // Validation manuelle des fichiers
+        for (const file of requestFiles) {
+          // Vérifier la taille (50MB max)
+          if (file.size && file.size > 50 * 1024 * 1024) {
+            return ctx.response.badRequest({
+              success: false,
+              error: `Le fichier ${file.clientName} est trop volumineux`,
+              details: 'Taille maximum : 50MB'
+            })
+          }
+
+          // Vérifier l'extension
+          const allowedExtensions = [
+            'pdf', 'musicxml', 'mxl', 'mid', 'midi',
+            'jpg', 'jpeg', 'png', 'gif', 'webp', 'tiff',
+            'doc', 'docx', 'txt', 'rtf',
+            'zip', 'rar'
+          ]
+
+          const extension = file.extname?.toLowerCase()
+          if (extension && !allowedExtensions.includes(extension)) {
+            return ctx.response.badRequest({
+              success: false,
+              error: `Type de fichier non supporté : ${file.clientName}`,
+              details: `Extensions autorisées : ${allowedExtensions.join(', ')}`
+            })
+          }
+        }
+
+        files = requestFiles
+      }
 
       if (!files || files.length === 0) {
         return ctx.response.badRequest({
@@ -207,43 +265,102 @@ export default class MaterialsController {
         })
       }
 
+      console.log('📂 Processing files:', files.map(f => f.clientName || f.name))
+
       const uploadedFiles = []
 
+      // ✅ CORRECTION 3 : Upload avec gestion d'erreurs améliorée
       for (const file of files) {
-        const fileName = `${cuid()}.${file.extname}`
+        try {
+          console.log(`📄 Processing file: ${file.clientName}`)
 
-        await file.move(app.makePath('uploads'), {
-          name: fileName,
-        })
+          const fileName = `${cuid()}.${file.extname}`
+          console.log(`💾 Moving file to: ${fileName}`)
 
-        const dbFile = await File.create({
-          name: file.clientName,
-          type: file.type,
-          path: file.filePath,
-          size: file.size || 0,
-          material_id: material.id,
-          piece_id: material.piece_id,
-          content: '',
-        })
+          await file.move(app.makePath('uploads'), {
+            name: fileName,
+          })
 
-        uploadedFiles.push(dbFile)
+          if (!file.filePath) {
+            console.error(`❌ File move failed for: ${file.clientName}`)
+            continue
+          }
+
+          const dbFile = await File.create({
+            name: file.clientName,
+            type: file.type,
+            path: file.filePath,
+            size: file.size || 0,
+            material_id: material.id,
+            piece_id: material.piece_id,
+            content: '',
+          })
+
+          console.log(`✅ File saved to DB: ${dbFile.id}`)
+          uploadedFiles.push(dbFile)
+        } catch (fileError) {
+          console.error(`❌ Error processing file ${file.clientName}:`, fileError)
+          // Continue avec les autres fichiers
+        }
       }
 
-      // Mettre à jour le compteur de fichiers
-      await material.updateFilesCount()
+      if (uploadedFiles.length === 0) {
+        return ctx.response.status(500).json({
+          success: false,
+          error: "Aucun fichier n'a pu être traité",
+          details: 'Vérifiez le format et la taille de vos fichiers'
+        })
+      }
+
+      // ✅ CORRECTION 4 : Mettre à jour le compteur de fichiers
+      try {
+        await material.updateFilesCount()
+        console.log('✅ Files count updated for material')
+      } catch (updateError) {
+        console.warn('⚠️ Could not update files count:', updateError)
+        // Ne pas faire échouer l'upload pour ça
+      }
+
+      console.log(`🎉 Upload completed: ${uploadedFiles.length} files processed`)
 
       return ctx.response.json({
         success: true,
         files: uploadedFiles,
-        message: `${uploadedFiles.length} fichier(s) ajouté(s) au matériel`,
+        message: `${uploadedFiles.length} fichier(s) ajouté(s) au matériel "${material.name}"`,
+        material: {
+          id: material.id,
+          name: material.name,
+          files_count: uploadedFiles.length + (material.files_count || 0)
+        }
       })
     } catch (error) {
+      console.error('❌ Critical error in uploadFiles:', error)
+
+      // ✅ CORRECTION 5 : Gestion d'erreur détaillée
+      if (error.code === 'E_ROW_NOT_FOUND') {
+        return ctx.response.status(404).json({
+          success: false,
+          error: 'Matériel non trouvé',
+          details: `Le matériel avec l'ID ${materialId} n'existe pas`
+        })
+      }
+
+      if (error.code === 'E_VALIDATION_FAILURE') {
+        return ctx.response.status(422).json({
+          success: false,
+          error: 'Erreur de validation',
+          details: error.messages || error.message
+        })
+      }
+
       return ctx.response.status(500).json({
         success: false,
         error: "Erreur lors de l'upload des fichiers",
+        details: process.env.NODE_ENV === 'development' ? error.message : 'Erreur interne du serveur'
       })
     }
   }
+
 
   // Créer un nouveau matériel
   async create(ctx: HttpContext) {

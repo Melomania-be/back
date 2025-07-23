@@ -38,14 +38,7 @@ export default class ProjectsController {
     // ✅ AJOUT : Synchroniser les fichiers avant de charger le projet
     await this.syncProjectFiles(projectId)
 
-    // ✅ PREMIÈRE ÉTAPE : Vérifier les données brutes dans la table pivot
-    const pivotDataRaw = await db
-      .from('performed_ins')
-      .where('project_id', projectId)
-      .select('*')
-
-    console.log('📊 RAW PIVOT DATA from performed_ins:', pivotDataRaw)
-
+    // ✅ CORRECTION MAJEURE : Charger TOUTES les colonnes pivot nécessaires
     const data = await Project.query()
       .where('id', projectId)
       .preload('concerts')
@@ -56,7 +49,7 @@ export default class ProjectsController {
             subQuery.preload('files')
           })
           .preload('files')
-          // ✅ FIX MAJEUR : Charger toutes les colonnes du pivot nécessaires
+          // ✅ FIX CRITIQUE : Charger toutes les colonnes pivot
           .pivotColumns(['order', 'material_id', 'material_specified'])
           .orderBy('order', 'asc')
       })
@@ -81,54 +74,32 @@ export default class ProjectsController {
       pieces: data.pieces.map(piece => ({
         id: piece.id,
         name: piece.name,
-        // ✅ DEBUG : Examiner les données $extras
-        extras: piece.$extras,
+        // ✅ Vérifier les données $extras
         pivot_order: piece.$extras.pivot_order,
         pivot_material_id: piece.$extras.pivot_material_id,
         pivot_material_specified: piece.$extras.pivot_material_specified
       }))
     })
 
-    // ✅ AJOUT : S'assurer que les données du pivot sont correctement exposées
+    // ✅ CORRECTION : Sérialiser en exposant explicitement les données pivot
     const serializedData = data.serialize()
 
-    console.log('📊 BEFORE ENRICHMENT:', {
-      pieces: serializedData.pieces?.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        hasExtras: !!p.$extras,
-        pivot_material_id: p.pivot_material_id,
-        pivot_material_specified: p.pivot_material_specified
-      }))
-    })
-
-    // ✅ CORRECTION : Enrichir les pièces avec les données pivot
+    // ✅ ENRICHISSEMENT : S'assurer que les données pivot sont exposées
     if (serializedData.pieces) {
       serializedData.pieces = serializedData.pieces.map((piece: any, index: number) => {
-        // ✅ Récupérer les données depuis l'objet original
         const originalPiece = data.pieces[index]
 
         return {
           ...piece,
           // ✅ Exposer les données pivot au niveau de la pièce
-          pivot_material_id: originalPiece?.$extras?.pivot_material_id || piece.pivot_material_id || null,
-          pivot_material_specified: originalPiece?.$extras?.pivot_material_specified || piece.pivot_material_specified || false,
-          pivot_order: originalPiece?.$extras?.pivot_order || piece.pivot_order || 0
+          pivot_material_id: originalPiece?.$extras?.pivot_material_id || null,
+          pivot_material_specified: Boolean(originalPiece?.$extras?.pivot_material_specified || false),
+          pivot_order: originalPiece?.$extras?.pivot_order || 0
         }
       })
     }
 
-    console.log('📊 AFTER ENRICHMENT:', {
-      pieces: serializedData.pieces?.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        pivot_material_id: p.pivot_material_id,
-        pivot_material_specified: p.pivot_material_specified,
-        pivot_order: p.pivot_order
-      }))
-    })
-
-    console.log('📊 Project data loaded with materials:', {
+    console.log('📊 Final data check:', {
       projectId: data.id,
       piecesCount: serializedData.pieces?.length || 0,
       piecesWithMaterials: serializedData.pieces?.filter((p: any) => p.pivot_material_id).length || 0,

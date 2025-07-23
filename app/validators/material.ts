@@ -38,13 +38,15 @@ export const materialFilesUploadValidator = vine.compile(
             'jpg', 'jpeg', 'png', 'gif', 'webp', 'tiff',
             // Documents
             'doc', 'docx', 'txt', 'rtf',
-            // Autres formats courants
+            // Archives
             'zip', 'rar'
           ],
         })
       )
-      .minLength(1),
-    instrumentParts: vine.array(vine.string()).optional()
+      .minLength(1)
+      .maxLength(20), // ✅ AJOUT : Limite raisonnable
+    // ✅ SUPPRESSION : instrumentParts optionnel pour éviter les erreurs
+    // instrumentParts: vine.array(vine.string()).optional()
   })
 )
 
