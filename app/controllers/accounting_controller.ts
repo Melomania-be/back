@@ -28,6 +28,8 @@ export default class AccountingsController {
         category_id: data.category_id,
         contact_id: data.contact_id,
         project_id: data.project.id,
+        is_individual_payment : data.is_individual_payment,
+        is_musician_fee : data.is_musician_fee,
       })
 
       await accounting.save()
@@ -40,6 +42,8 @@ export default class AccountingsController {
         category_id: data.category_id,
         contact_id: data.contact_id,
         project_id: data.project.id,
+        is_individual_payment : data.is_individual_payment,
+        is_musician_fee : data.is_musician_fee,
       })
     }
 
@@ -61,4 +65,21 @@ export default class AccountingsController {
       await accounting.delete()
       return response.send('Accounting deleted from the project')
     }
+
+  async getContactAccountingsproject(ctx : HttpContext){
+    const ProjectId = Number(ctx.params.id)
+    const data = await Accounting.query()
+      .where('project_id' , ProjectId)
+      .whereNotNull('contact_id')
+
+    return data
+  }
+
+  async getContactAccountings(ctx : HttpContext){
+    const ContactId = Number(ctx.params.contactId)
+    const data = await Accounting.query()
+      .where('contact_id' , ContactId) 
+
+    return data
+  }
 }
