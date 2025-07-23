@@ -1,4 +1,4 @@
-// app/validators/material.ts
+// app/validators/material.ts - Validateurs complets pour les matériels
 import vine from '@vinejs/vine'
 
 export const createMaterialValidator = vine.compile(
@@ -24,7 +24,6 @@ export const updateMaterialValidator = vine.compile(
     is_active: vine.boolean().optional()
   })
 )
-
 
 export const materialFilesUploadValidator = vine.compile(
   vine.object({
@@ -53,7 +52,19 @@ export const assignMaterialValidator = vine.compile(
   vine.object({
     projectId: vine.number(),
     pieceId: vine.number(),
-    materialId: vine.number()
+    materialId: vine.number().nullable()
+  })
+)
+
+export const assignBulkMaterialValidator = vine.compile(
+  vine.object({
+    assignments: vine.array(
+      vine.object({
+        projectId: vine.number(),
+        pieceId: vine.number(),
+        materialId: vine.number().nullable()
+      })
+    ).minLength(1)
   })
 )
 
@@ -62,5 +73,12 @@ export const duplicateMaterialValidator = vine.compile(
     name: vine.string().trim().minLength(1).maxLength(255),
     description: vine.string().trim().maxLength(1000).optional(),
     duplicateFiles: vine.boolean().optional()
+  })
+)
+
+export const suggestNameValidator = vine.compile(
+  vine.object({
+    pieceId: vine.number(),
+    name: vine.string().trim().minLength(1).maxLength(255)
   })
 )
