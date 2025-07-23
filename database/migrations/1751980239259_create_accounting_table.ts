@@ -12,6 +12,7 @@ export default class extends BaseSchema {
       table.string('name').notNullable()
       table.decimal('amount', 12, 2).notNullable()
       table.string('attachement').nullable()
+      table.boolean('is_individual_payment').defaultTo(false)
 
       table
         .integer('category_id')

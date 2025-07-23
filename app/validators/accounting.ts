@@ -14,6 +14,10 @@ export const createAccountingValidator = vine.compile(
     category_id: vine.number().optional(),
     contact_id: vine.number().optional(),
 
+    is_individual_payment : vine.boolean().optional(),
+    is_musician_fee : vine.boolean().optional(),
+
+
     project: vine.object({
       id: vine.number(),
     }),

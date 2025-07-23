@@ -53,4 +53,10 @@ export default class Accounting extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  @column()
+  declare is_individual_payment : boolean
+
+  @column()
+  declare is_musician_fee : boolean
 }

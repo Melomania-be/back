@@ -213,6 +213,7 @@ router.group(() => {
           router.get('/:id/management/accounting', [AccountingsController, 'getAll'])
           router.post('/:id/management/accounting', [AccountingsController, 'createOrUpdate'])
           router.delete('/:id/management/accounting/:accountingId', [AccountingsController, 'delete'])
+          router.get('/:id/management/accounting/participant', [AccountingsController, 'getContactAccountingsproject'])
 
           // ✅ ROUTES MATÉRIELS POUR PROJETS (SANS DUPLICATION)
           router.get('/:id/material-selections', [
@@ -552,6 +553,14 @@ router.group(() => {
         router.post('/expense_categories', [ExpenseCategoriesController, 'createOrUpdate'])
         router.delete('/expense_categories/:id', [ExpenseCategoriesController, 'delete'])
       })
+
+      // =============================================================================
+      // GESTION DES AUDITIONS
+      // =============================================================================
+      router.group(() => {
+        router.get('/accountings/:contactId' , [AccountingsController , 'getContactAccountings'])
+      })
+
     })
     .use(middleware.auth({ guards: ['api'] }))
     .use(middleware.routeLogger())
