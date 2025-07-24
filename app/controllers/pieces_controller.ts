@@ -6,7 +6,7 @@ import { simpleFilter } from 'adonisjs-filters'
 export default class PiecesController {
   async getAll(ctx: HttpContext) {
     let baseQuery = Piece.query()
-      .preload('sections')
+      .preload('projects')
       .preload('typeOfPiece')
       .preload('composer')
       .preload('folder')
