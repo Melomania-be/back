@@ -131,6 +131,39 @@ router.group(() => {
         })
         .prefix('/materials')
 
+      const PieceMaterialsController = () => import('#controllers/piece_materials_controller')
+
+      // Routes pour les pièces individuelles
+      router
+        .group(() => {
+          // Sélectionner/désélectionner un matériel pour une pièce
+          router.post('/:pieceId/select-material', [PieceMaterialsController, 'selectMaterial'])
+
+          // Obtenir le matériel sélectionné pour une pièce
+          router.get('/:pieceId/selected-material', [
+            PieceMaterialsController,
+            'getSelectedMaterial',
+          ])
+        })
+        .prefix('/pieces')
+
+      // Routes pour les projets
+      router
+        .group(() => {
+          // Obtenir toutes les sélections de matériels pour un projet
+          router.get('/:projectId/material-selections', [
+            PieceMaterialsController,
+            'getProjectMaterialSelections',
+          ])
+
+          // Synchroniser les sélections avec les callsheets
+          router.post('/:projectId/sync-material-selections', [
+            PieceMaterialsController,
+            'syncWithCallsheets',
+          ])
+        })
+        .prefix('/projects')
+
       // =============================================================================
       // FILESYSTEM ROUTES (DÉPLACÉES AU NIVEAU GLOBAL)
       // =============================================================================
