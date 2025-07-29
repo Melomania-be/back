@@ -2,7 +2,7 @@ import { DateTime } from 'luxon'
 import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import Project from '#models/project'
-
+import Contact from '#models/contact'
 import User from '#models/user'
 // import SectionGroup from '#models/section_group'
 import Section from '#models/section'
@@ -43,6 +43,14 @@ export default class Recruitment extends BaseModel {
   @column({ columnName: 'project_id' }) // Maps to the project_id column in DB
   declare projectId: number | null // IMPORTANT: It's nullable as per migration
   // --- END NEW COLUMN ---
+
+  // --- ADD THIS NEW COLUMN & RELATIONSHIP ---
+  @column({ columnName: 'contact_id' })
+  declare contactId: number | null // Matches the migration column
+
+  @belongsTo(() => Contact)
+  declare contact: BelongsTo<typeof Contact>
+  // --- END ADDED NEW COLUMN & RELATIONSHIP ---
 
   @column.date({ columnName: 'contact_date' }) // Explicitly map snake_case column
   declare contactDate: DateTime | null // ADDED: Can be null to match migration and 'not yet contacted'

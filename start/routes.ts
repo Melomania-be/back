@@ -30,6 +30,7 @@ const SectionsController = () => import('#controllers/sections_controller')
 const TemplateController = () => import('#controllers/template_controller')
 const DefaultTemplatesController = () => import('#controllers/default_templates_controller')
 const RecruitmentsController = () => import('#controllers/recruitments_controller')
+const RecruitmentAlertsController = () => import('#controllers/recruitment_alerts_controller') // NEW: Import the new controller
 
 router.group(() => {
   //open routes
@@ -71,6 +72,30 @@ router.group(() => {
         .use(middleware.auth({ guards: ['api'] }))
         .use(middleware.routeLogger())
 
+      router
+        .group(() => {
+          // ... (existing recruitment routes, project routes, etc.) ...
+
+          // --- NEW ROUTES FOR RECRUITMENT ALERTS ---
+          router
+            .get('recruitment-alerts', [RecruitmentAlertsController, 'getAll'])
+            .use(middleware.auth()) // Protected route to get alerts
+
+          router
+            .patch('recruitment-alerts/:id/resolve', [RecruitmentAlertsController, 'resolveAlert'])
+            .use(middleware.auth()) // Protected route to resolve an alert (approve as new)
+
+          router
+            .post('recruitment-alerts/:id/resolve-as-update', [
+              RecruitmentAlertsController,
+              'resolveAlertAsUpdate',
+            ])
+            .use(middleware.auth()) // Protected route to resolve an alert (update existing, delete new)
+          // --- END NEW ROUTES ---
+        })
+        .use(middleware.auth({ guards: ['api'] }))
+        .use(middleware.routeLogger())
+
       router.group(() => {
         // GET all recruitments with simple filtering
         // router.get('/recruitments', [RecruitmentsController, 'getAll'])
@@ -98,7 +123,7 @@ router.group(() => {
         ])
         // New Lookup Endpoints for dropdowns
         // router.get('/users', [RecruitmentsController, 'getUsers'])
-        router.get('/section-groups', [RecruitmentsController, 'getSectionGroups'])
+        // router.get('/section-groups', [RecruitmentsController, 'getSectionGroups'])
       })
 
       router.group(() => {

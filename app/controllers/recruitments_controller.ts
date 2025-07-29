@@ -194,7 +194,7 @@ export default class RecruitmentController {
 
       // Only apply filter if the value is provided (not undefined, null, or empty string after trim)
       if (filterValue !== undefined && filterValue !== null && String(filterValue).trim() !== '') {
-        console.log(`Applying filter: ${col} = ${filterValue}`) // Debug log
+        // console.log(`Applying filter: ${col} = ${filterValue}`) // Debug log
 
         switch (col) {
           case 'sectionId':
@@ -237,7 +237,7 @@ export default class RecruitmentController {
     }
 
     const results = await query
-    console.log('Filtered results:', results) // Debug log
+    // console.log('Filtered results:', results) // Debug log
     return results
   }
 
@@ -944,20 +944,20 @@ export default class RecruitmentController {
     const { recruitmentIds, targetProjectId } = request.body()
 
     // --- LOG 1: Incoming Request Data ---
-    console.log('LOG: copyRecruitmentsToProject - Received request data:', {
-      recruitmentIds,
-      targetProjectId,
-    })
+    // console.log('LOG: copyRecruitmentsToProject - Received request data:', {
+    //   recruitmentIds,
+    //   targetProjectId,
+    // })
 
     // 1. Validate Input: recruitmentIds
     if (!Array.isArray(recruitmentIds) || recruitmentIds.length === 0) {
-      console.log('LOG: Validation failed: recruitmentIds missing or empty.')
+      // console.log('LOG: Validation failed: recruitmentIds missing or empty.')
       return response.badRequest({
         message: 'recruitmentIds (array of numbers) is required and cannot be empty.',
       })
     }
     if (recruitmentIds.some((id) => typeof id !== 'number' || !Number.isInteger(id))) {
-      console.log('LOG: Validation failed: All recruitmentIds must be integers.')
+      // console.log('LOG: Validation failed: All recruitmentIds must be integers.')
       return response.badRequest({ message: 'All recruitmentIds must be integers.' })
     }
 
@@ -969,14 +969,14 @@ export default class RecruitmentController {
     } else {
       const numericTargetProjectId = Number(targetProjectId)
       if (isNaN(numericTargetProjectId) || !Number.isInteger(numericTargetProjectId)) {
-        console.log('LOG: Validation failed: Invalid targetProjectId.')
+        // console.log('LOG: Validation failed: Invalid targetProjectId.')
         return response.badRequest({
           message: 'Invalid targetProjectId provided. Must be an integer or null.',
         })
       }
       finalTargetProjectId = numericTargetProjectId
     }
-    console.log('LOG: Parsed finalTargetProjectId:', finalTargetProjectId)
+    // console.log('LOG: Parsed finalTargetProjectId:', finalTargetProjectId)
 
     try {
       let copiedCount = 0
@@ -987,13 +987,13 @@ export default class RecruitmentController {
           .whereIn('id', recruitmentIds)
 
         // --- LOG 2: Original Recruitments Fetched ---
-        console.log(
-          'LOG: Original recruitments fetched (IDs):',
-          originalRecruitments.map((r) => r.id)
-        )
+        // console.log(
+        //   'LOG: Original recruitments fetched (IDs):',
+        //   originalRecruitments.map((r) => r.id)
+        // )
 
         if (originalRecruitments.length === 0) {
-          console.log('LOG: No original recruitments found for provided IDs.')
+          // console.log('LOG: No original recruitments found for provided IDs.')
           throw new Error('No original recruitments found for the provided IDs.')
         }
 
@@ -1021,10 +1021,10 @@ export default class RecruitmentController {
         })
 
         // --- LOG 3: Data Prepared for Insertion ---
-        console.log(
-          'LOG: Data prepared for insertion (first 2 records):',
-          JSON.stringify(newRecruitmentsData.slice(0, 2), null, 2)
-        )
+        // console.log(
+        //   'LOG: Data prepared for insertion (first 2 records):',
+        //   JSON.stringify(newRecruitmentsData.slice(0, 2), null, 2)
+        // )
         if (newRecruitmentsData.length > 2) {
           console.log(`LOG: ...and ${newRecruitmentsData.length - 2} more records.`)
         }
@@ -1037,7 +1037,7 @@ export default class RecruitmentController {
           .returning('id')
 
         // --- LOG 4: Records Created ---
-        console.log('LOG: Successfully created records with IDs:', createdRecords)
+        // console.log('LOG: Successfully created records with IDs:', createdRecords)
 
         copiedCount = createdRecords.length
       })
