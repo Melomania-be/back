@@ -4,6 +4,7 @@ import type { ManyToMany, BelongsTo } from '@adonisjs/lucid/types/relations'
 import Folder from './folder.js'
 import Project from './project.js'
 import Piece from './piece.js'
+import Material from './material.js'
 
 export default class File extends BaseModel {
   @column({ isPrimary: true })
@@ -24,7 +25,6 @@ export default class File extends BaseModel {
   @column()
   declare size: number | null
 
-  // ✅ NOUVELLES COLONNES ÉTRANGÈRES
   @column()
   declare folder_id: number | null
 
@@ -34,7 +34,15 @@ export default class File extends BaseModel {
   @column()
   declare piece_id: number | null
 
-  // ✅ RELATIONS BELONGSTO POUR LES NOUVELLES COLONNES
+  @column()
+  declare material_id: number | null
+
+  @column()
+  declare instrument_part: string | null
+
+  @column()
+  declare part_order: number
+
   @belongsTo(() => Folder, {
     foreignKey: 'folder_id',
   })
@@ -50,7 +58,11 @@ export default class File extends BaseModel {
   })
   declare piece: BelongsTo<typeof Piece>
 
-  // ✅ CORRECTION : Relation many-to-many avec nom différent pour éviter le conflit
+  @belongsTo(() => Material, {
+    foreignKey: 'material_id',
+  })
+  declare material: BelongsTo<typeof Material>
+
   @manyToMany(() => Folder, {
     pivotTable: 'contains',
     pivotForeignKey: 'file_id',

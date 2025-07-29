@@ -59,7 +59,7 @@ export default class Project extends BaseModel {
   @manyToMany(() => Piece, {
     pivotTable: 'performed_ins',
     pivotTimestamps: true,
-    pivotColumns: ['order'],
+    pivotColumns: ['order', 'material_id', 'material_specified'],
   })
   declare pieces: ManyToMany<typeof Piece>
 

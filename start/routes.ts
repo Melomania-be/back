@@ -96,6 +96,74 @@ router.group(() => {
       // Sign out
       router.get('/sign_out', [UsersController, 'signOut'])
 
+      // ============================================================================
+      // GESTION DES MATÉRIELS
+      // ============================================================================
+      const MaterialsController = () => import('#controllers/materials_controller')
+
+      router
+        .group(() => {
+          // Matériels d'une pièce
+          router.get('/piece/:pieceId', [MaterialsController, 'getByPiece'])
+
+          // CRUD des matériels
+          router.get('/:id', [MaterialsController, 'getOne'])
+          router.post('/', [MaterialsController, 'create'])
+          router.put('/:id', [MaterialsController, 'update'])
+          router.delete('/:id', [MaterialsController, 'delete'])
+
+          // Actions spéciales
+          router.post('/:id/duplicate', [MaterialsController, 'duplicate'])
+          router.post('/:id/set-default', [MaterialsController, 'setAsDefault'])
+
+          // Assignment aux projets
+          router.post('/assign', [MaterialsController, 'assignToProject'])
+          router.post('/assign-bulk', [MaterialsController, 'assignBulk'])
+
+          // Matériels non spécifiés pour un projet
+          router.get('/project/:projectId/unspecified', [
+            MaterialsController,
+            'getUnspecifiedMaterials',
+          ])
+
+          // Upload de fichiers pour un matériel
+          router.post('/:id/files', [MaterialsController, 'uploadFiles'])
+        })
+        .prefix('/materials')
+
+      const PieceMaterialsController = () => import('#controllers/piece_materials_controller')
+
+      // Routes pour les pièces individuelles
+      router
+        .group(() => {
+          // Sélectionner/désélectionner un matériel pour une pièce
+          router.post('/:pieceId/select-material', [PieceMaterialsController, 'selectMaterial'])
+
+          // Obtenir le matériel sélectionné pour une pièce
+          router.get('/:pieceId/selected-material', [
+            PieceMaterialsController,
+            'getSelectedMaterial',
+          ])
+        })
+        .prefix('/pieces')
+
+      // Routes pour les projets
+      router
+        .group(() => {
+          // Obtenir toutes les sélections de matériels pour un projet
+          router.get('/:projectId/material-selections', [
+            PieceMaterialsController,
+            'getProjectMaterialSelections',
+          ])
+
+          // Synchroniser les sélections avec les callsheets
+          router.post('/:projectId/sync-material-selections', [
+            PieceMaterialsController,
+            'syncWithCallsheets',
+          ])
+        })
+        .prefix('/projects')
+
       // =============================================================================
       // FILESYSTEM ROUTES (DÉPLACÉES AU NIVEAU GLOBAL)
       // =============================================================================
@@ -144,7 +212,7 @@ router.group(() => {
             .group(() => {
               router.get('/', [ParticipantsController, 'getAll'])
               router.post('/', [ParticipantsController, 'createOrUpdate'])
-              router.get('/answers', [ParticipantsController , 'getParticipantsAnswers'])
+              router.get('/answers', [ParticipantsController, 'getParticipantsAnswers'])
               router.get('/:participantId', [ParticipantsController, 'getOne'])
               router.delete('/:participantId', [ParticipantsController, 'delete'])
 
@@ -169,7 +237,10 @@ router.group(() => {
               router.get('/section-pdfs', [AuditionsController, 'getProjectPdfs'])
               router.post('/bulk-send-pdfs', [AuditionsController, 'bulkSendPdfsToSection'])
               router.delete('/pdf/:pdfFileId', [AuditionsController, 'deleteAuditionPdf'])
-              router.delete('/section-pdfs/:pdfFileId', [AuditionsController, 'removePdfFromSection'])
+              router.delete('/section-pdfs/:pdfFileId', [
+                AuditionsController,
+                'removePdfFromSection',
+              ])
               router.get('/debug-files', [AuditionsController, 'debugFiles'])
             })
             .prefix('/:id/management/auditions')
@@ -335,10 +406,22 @@ router.group(() => {
           ])
           router.post('/sendAuditionRequest', [MailingsController, 'sendAuditionRequest'])
           router.post('/sendTemplateToList', [MailingsController, 'sendTemplateToList'])
-          router.post('/sendCallsheetNotification', [MailingsController, 'sendCallsheetNotification'])
-          router.post('/sendRecommendedNotification', [MailingsController, 'sendRecommendedNotification'])
-          router.post('/sendRecruitmentNotification', [MailingsController, 'sendRecruitmentNotification'])
-          router.post('/sendParticipationValidationNotification', [MailingsController, 'sendParticipationValidationNotification'])
+          router.post('/sendCallsheetNotification', [
+            MailingsController,
+            'sendCallsheetNotification',
+          ])
+          router.post('/sendRecommendedNotification', [
+            MailingsController,
+            'sendRecommendedNotification',
+          ])
+          router.post('/sendRecruitmentNotification', [
+            MailingsController,
+            'sendRecruitmentNotification',
+          ])
+          router.post('/sendParticipationValidationNotification', [
+            MailingsController,
+            'sendParticipationValidationNotification',
+          ])
           router.post('/sendMailToParticipants', [MailingsController, 'sendMailToParticipants'])
 
           router
