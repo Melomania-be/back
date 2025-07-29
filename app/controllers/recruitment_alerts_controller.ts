@@ -25,11 +25,11 @@ export default class RecruitmentAlertsController {
         // .preload('newRecruitment') // Preload the new recruitment details
         // .preload('similarToRecruitment') // Preload the similar existing recruitment details
         .preload('newRecruitment', (recruitmentQuery) => {
-          recruitmentQuery.preload('project')
+          recruitmentQuery.preload('project').preload('section')
         })
         // Preload similarToRecruitment and its nested project
         .preload('similarToRecruitment', (recruitmentQuery) => {
-          recruitmentQuery.preload('project')
+          recruitmentQuery.preload('project').preload('section')
         })
 
       // Apply filter for resolution status
