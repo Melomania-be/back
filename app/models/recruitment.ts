@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
+import { BaseModel, column, belongsTo, beforeCreate } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import Project from '#models/project'
 import Contact from '#models/contact'
@@ -101,4 +101,55 @@ export default class Recruitment extends BaseModel {
   })
   declare project: BelongsTo<typeof Project> // Access related Project
   // --- END NEW RELATIONSHIP ---
+
+  // @beforeCreate()
+  // static async checkDuplicateRecruitment(recruitment: Recruitment) {
+  //   // Only check for duplicates if firstName, lastName, and projectId are available
+  //   if (!recruitment.firstName || !recruitment.lastName || !recruitment.projectId) {
+  //     console.warn(
+  //       'WARN: Skipping duplicate check for Recruitment due to missing critical fields (firstName, lastName, or projectId).'
+  //     )
+  //     return // Do not block creation if essential fields are missing for the check
+  //   }
+
+  //   const existingRecruitment = await Recruitment.query()
+  //     .where('firstName', recruitment.firstName)
+  //     .andWhere('lastName', recruitment.lastName)
+  //     .andWhere('projectId', recruitment.projectId)
+  //     .first()
+
+  //   if (existingRecruitment) {
+  //     console.log(
+  //       `LOG: Duplicate Recruitment detected for ${recruitment.firstName} ${recruitment.lastName} in Project ID ${recruitment.projectId}.`
+  //     )
+  //     console.log('   New Recruitment (would be created):', {
+  //       firstName: recruitment.firstName,
+  //       lastName: recruitment.lastName,
+  //       projectId: recruitment.projectId,
+  //       sectionId: recruitment.sectionId,
+  //       status: recruitment.status,
+  //       // email: recruitment.email,
+  //       // phone: recruitment.phone,
+  //       comment: recruitment.comment,
+  //     })
+  //     console.log('   Existing Duplicate Found (details below):')
+  //     console.log('      ID:', existingRecruitment.id)
+  //     console.log('      Status:', existingRecruitment.status)
+  //     console.log('      Section ID:', existingRecruitment.sectionId)
+  //     console.log('      Comment:', existingRecruitment.comment)
+  //     console.log(
+  //       '      Contact Date:',
+  //       existingRecruitment.contactDate ? existingRecruitment.contactDate.toISODate() : 'N/A'
+  //     )
+  //     console.log('      Created At:', existingRecruitment.createdAt.toISO())
+  //     console.log('      Updated At:', existingRecruitment.updatedAt.toISO())
+  //     // console.log('      Email:', existingRecruitment.email);
+  //     // console.log('      Phone:', existingRecruitment.phone);
+
+  //     throw new Error(
+  //       'Duplicate recruitment record already exists for this person in this project.'
+  //     )
+  //   }
+  // }
+  // --- END ADDED beforeCreate Hook ---
 }
