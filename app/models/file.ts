@@ -1,10 +1,10 @@
-// app/models/file.ts - Version corrigée
 import { DateTime } from 'luxon'
 import { BaseModel, column, manyToMany, belongsTo } from '@adonisjs/lucid/orm'
 import type { ManyToMany, BelongsTo } from '@adonisjs/lucid/types/relations'
 import Folder from './folder.js'
 import Project from './project.js'
 import Piece from './piece.js'
+import Material from './material.js'
 
 export default class File extends BaseModel {
   @column({ isPrimary: true })
@@ -25,7 +25,6 @@ export default class File extends BaseModel {
   @column()
   declare size: number | null
 
-  // ✅ TOUTES LES COLONNES ÉTRANGÈRES
   @column()
   declare folder_id: number | null
 
@@ -35,18 +34,15 @@ export default class File extends BaseModel {
   @column()
   declare piece_id: number | null
 
-  // ✅ AJOUT : La colonne material_id manquante
   @column()
   declare material_id: number | null
 
-  // ✅ NOUVELLES COLONNES POUR LES MATÉRIELS
   @column()
   declare instrument_part: string | null
 
   @column()
   declare part_order: number
 
-  // ✅ RELATIONS BELONGSTO POUR TOUTES LES COLONNES
   @belongsTo(() => Folder, {
     foreignKey: 'folder_id',
   })
@@ -62,13 +58,11 @@ export default class File extends BaseModel {
   })
   declare piece: BelongsTo<typeof Piece>
 
-  // ✅ AJOUT : Relation avec Material (import lazy pour éviter les références circulaires)
-  @belongsTo(() => import('./material.js'), {
+  @belongsTo(() => Material, {
     foreignKey: 'material_id',
   })
-  declare material: BelongsTo<any>
+  declare material: BelongsTo<typeof Material>
 
-  // ✅ Relation many-to-many avec nom différent pour éviter le conflit
   @manyToMany(() => Folder, {
     pivotTable: 'contains',
     pivotForeignKey: 'file_id',

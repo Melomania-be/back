@@ -1,9 +1,9 @@
-// app/models/material.ts
 import { DateTime } from 'luxon'
 import { BaseModel, belongsTo, hasMany, column } from '@adonisjs/lucid/orm'
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import Piece from './piece.js'
 import File from './file.js'
+import db from '@adonisjs/lucid/services/db'
 
 export default class Material extends BaseModel {
   @column({ isPrimary: true })
@@ -55,23 +55,20 @@ export default class Material extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  // Méthode pour mettre à jour le compteur de fichiers
   async updateFilesCount() {
     const count = await File.query().where('material_id', this.id).count('* as total')
     this.files_count = Number(count[0].$extras.total)
     await this.save()
   }
 
-  // Méthode pour mettre à jour le compteur de projets
   async updateProjectsCount() {
-    const count = await this.related('piece')
-      .query()
-      .preload('sections', (query) => {
-        query.whereNotNull('pivot_material_id').where('pivot_material_id', this.id)
-      })
-      .first()
+    // Compter les projets qui utilisent ce matériel
+    const count = await db
+      .from('performed_ins')
+      .where('material_id', this.id)
+      .countDistinct('project_id as total')
 
-    this.projects_count = count?.sections?.length || 0
+    this.projects_count = Number(count[0].total)
     await this.save()
   }
 }

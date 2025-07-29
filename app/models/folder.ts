@@ -1,5 +1,3 @@
-// Dans app/models/folder.ts - Ajouter ces colonnes et relations
-
 import { DateTime } from 'luxon'
 import { BaseModel, column, hasMany, manyToMany, belongsTo } from '@adonisjs/lucid/orm'
 import Piece from './piece.js'
@@ -14,7 +12,6 @@ export default class Folder extends BaseModel {
   @column()
   declare name: string
 
-  // ✅ NOUVELLES COLONNES À AJOUTER
   @column()
   declare parent_id: number | null
 
@@ -27,7 +24,6 @@ export default class Folder extends BaseModel {
   @column()
   declare is_system_generated: boolean
 
-  // ✅ NOUVELLES RELATIONS À AJOUTER
   @belongsTo(() => Folder, {
     foreignKey: 'parent_id',
   })
@@ -48,7 +44,6 @@ export default class Folder extends BaseModel {
   })
   declare piece: BelongsTo<typeof Piece>
 
-  // Relations existantes modifiées
   @manyToMany(() => File, {
     pivotTable: 'contains',
     pivotForeignKey: 'folder_id',
