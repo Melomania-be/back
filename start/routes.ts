@@ -499,6 +499,8 @@ router.group(() => {
       // =============================================================================
       router.group(() => {
         router.get('/accountings/:contactId' , [AccountingsController , 'getContactAccountings'])
+        router.post('/accountings/attachment', [AccountingsController , 'uploadAttachment'])
+        router.get('/accountings/attachment/:attachmentName', [AccountingsController , 'downloadAttachment'])
       })
 
     })
