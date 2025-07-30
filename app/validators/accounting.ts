@@ -9,7 +9,7 @@ export const createAccountingValidator = vine.compile(
 
     bill_date: vine.date().optional(),
     payment_date: vine.date().optional(),
-    attachement: vine.string().optional(),
+    attachment: vine.string().optional(),
 
     category_id: vine.number().optional(),
     contact_id: vine.number().optional(),

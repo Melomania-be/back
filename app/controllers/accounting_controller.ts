@@ -1,7 +1,14 @@
 import Accounting from '#models/accounting'
 import { createAccountingValidator } from '#validators/accounting'
+import { cuid } from '@adonisjs/core/helpers'
 import { HttpContext } from '@adonisjs/core/http'
+import app from '@adonisjs/core/services/app'
 import { DateTime } from 'luxon'
+import path, { join } from 'path'
+import fs, { createReadStream } from 'fs'
+import * as fss from 'node:fs/promises' 
+import { extname } from 'node:path'
+
 
 export default class AccountingsController {
   async getAll(ctx: HttpContext) {
@@ -28,6 +35,7 @@ export default class AccountingsController {
         category_id: data.category_id,
         contact_id: data.contact_id,
         project_id: data.project.id,
+        attachment: data.attachment,
         is_individual_payment : data.is_individual_payment,
         is_musician_fee : data.is_musician_fee,
       })
@@ -42,6 +50,7 @@ export default class AccountingsController {
         category_id: data.category_id,
         contact_id: data.contact_id,
         project_id: data.project.id,
+        attachment: data.attachment,
         is_individual_payment : data.is_individual_payment,
         is_musician_fee : data.is_musician_fee,
       })
@@ -81,5 +90,47 @@ export default class AccountingsController {
       .where('contact_id' , ContactId) 
 
     return data
+  }
+
+  public async uploadAttachment({ request, response }: HttpContext) {
+    const file = request.file('file', {
+      size: '10mb',
+      extnames: ['jpg', 'jpeg', 'png', 'pdf'],
+    })
+
+    if (!file) {
+      return response.badRequest({ error: 'No file uploaded' })
+    }
+
+    const fileName = `${cuid()}.${file.extname}`
+    const targetDir = app.makePath('uploads/accountingsAttachments')
+
+    try {
+      await file.move(targetDir, {
+        name: fileName,
+      })
+
+      return response.ok({
+        fileName,
+        path: path.join('uploads/accountingsAttachments', fileName),
+      })
+    } catch (error) {
+      return response.internalServerError({
+        error: 'Failed to upload file',
+        details: (error as Error).message,
+      })
+    }
+  }
+
+  public async downloadAttachment({ params, response } : HttpContext) {
+    const filename = params.filename
+    // process.cwd() donne la racine du projet, peu importe le framework
+    const filePath = path.join(process.cwd(), 'uploads/accountingsAttachments', filename)
+
+    if (!fs.existsSync(filePath)) {
+      return response.status(404).send('Fichier introuvable')
+    }
+
+    return response.download(filePath, filename)
   }
 }
