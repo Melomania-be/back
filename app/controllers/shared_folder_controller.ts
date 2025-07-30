@@ -1,4 +1,4 @@
-// app/controllers/shared_folder_controller.ts - VERSION CORRIGÉE
+// app/controllers/shared_folder_controller.ts - UPDATED VERSION
 import { HttpContext } from '@adonisjs/core/http'
 import { cuid } from '@adonisjs/core/helpers'
 import SharedFolder from '#models/shared_folder'
@@ -7,7 +7,7 @@ import File from '#models/file'
 
 export default class SharedFolderController {
   /**
-   * Créer un lien de partage pour un dossier
+   * Create a share link for a folder
    */
   async createShare(ctx: HttpContext) {
     try {
@@ -61,7 +61,42 @@ export default class SharedFolderController {
   }
 
   /**
-   * Accéder à un dossier partagé via token - CORRECTION: Afficher exactement le dossier partagé
+   * NEW: Check share status for a folder
+   */
+  async getShareStatus(ctx: HttpContext) {
+    try {
+      const folderId = ctx.params.id
+
+      const sharedFolder = await SharedFolder.query()
+        .where('folder_id', folderId)
+        .where('is_active', true)
+        .first()
+
+      if (sharedFolder) {
+        return ctx.response.json({
+          isShared: true,
+          token: sharedFolder.token,
+          shareUrl: `/shared/folders/${sharedFolder.token}`,
+          createdAt: sharedFolder.createdAt,
+          viewCount: sharedFolder.view_count,
+          expiresAt: sharedFolder.expires_at
+        })
+      }
+
+      return ctx.response.json({
+        isShared: false
+      })
+
+    } catch (error) {
+      return ctx.response.status(500).json({
+        isShared: false,
+        error: 'Failed to check share status'
+      })
+    }
+  }
+
+  /**
+   * Access shared folder via token
    */
   async getSharedFolder(ctx: HttpContext) {
     try {
@@ -80,16 +115,15 @@ export default class SharedFolderController {
 
       if (!sharedFolder.isValid()) {
         return ctx.response.status(403).json({
-          error: 'Share link has expired or been deactivated'
+          error: 'This share link has been revoked or expired. Please contact the administrators for access.',
+          revoked: true
         })
       }
 
-      // CORRECTION: Charger le contenu du dossier exact qui a été partagé
       const folderContents = await this.loadFolderContentsRecursive(sharedFolder.folder.id)
 
       await sharedFolder.incrementViews()
 
-      // CORRECTION: Retourner exactement le dossier qui a été partagé, pas son parent
       const folderData = {
         id: sharedFolder.folder.id,
         name: sharedFolder.folder.name,
@@ -99,7 +133,6 @@ export default class SharedFolderController {
         createdAt: sharedFolder.folder.createdAt,
         updatedAt: sharedFolder.folder.updatedAt,
         children: folderContents,
-        // CORRECTION: Marquer ce dossier comme étant le dossier racine du partage
         isSharedRoot: true
       }
 
@@ -110,7 +143,6 @@ export default class SharedFolderController {
           viewCount: sharedFolder.view_count,
           createdAt: sharedFolder.createdAt,
           expiresAt: sharedFolder.expires_at,
-          // CORRECTION: Ajouter l'ID du dossier racine partagé
           sharedFolderId: sharedFolder.folder.id,
           sharedFolderName: sharedFolder.folder.name
         }
@@ -124,7 +156,7 @@ export default class SharedFolderController {
   }
 
   /**
-   * Charger les contenus d'un dossier de manière récursive
+   * Load folder contents recursively
    */
   private async loadFolderContentsRecursive(folderId: number): Promise<any[]> {
     try {
@@ -172,7 +204,7 @@ export default class SharedFolderController {
   }
 
   /**
-   * Accéder à un sous-dossier d'un partage - CORRECTION: Vérification améliorée
+   * Access subfolder of a shared folder
    */
   async getSharedSubfolder(ctx: HttpContext) {
     try {
@@ -185,8 +217,9 @@ export default class SharedFolderController {
         .first()
 
       if (!sharedFolder || !sharedFolder.isValid()) {
-        return ctx.response.status(404).json({
-          error: 'Invalid or expired share'
+        return ctx.response.status(403).json({
+          error: 'This share link has been revoked or expired. Please contact the administrators for access.',
+          revoked: true
         })
       }
 
@@ -198,7 +231,6 @@ export default class SharedFolderController {
         })
       }
 
-      // CORRECTION: Vérifier que le sous-dossier est bien dans l'arborescence du dossier partagé
       const isAuthorized = await this.isSubfolderAuthorized(sharedFolder.folder.id, subfolder.id)
       if (!isAuthorized) {
         return ctx.response.status(403).json({
@@ -217,9 +249,7 @@ export default class SharedFolderController {
         createdAt: subfolder.createdAt,
         updatedAt: subfolder.updatedAt,
         children: folderContents,
-        // CORRECTION: Indiquer que ce n'est PAS le dossier racine du partage
         isSharedRoot: false,
-        // CORRECTION: Ajouter des infos sur le dossier parent partagé
         sharedRootId: sharedFolder.folder.id,
         sharedRootName: sharedFolder.folder.name
       }
@@ -234,7 +264,7 @@ export default class SharedFolderController {
   }
 
   /**
-   * Télécharger un fichier d'un partage
+   * Download file from shared folder
    */
   async downloadSharedFile(ctx: HttpContext) {
     try {
@@ -247,8 +277,9 @@ export default class SharedFolderController {
         .first()
 
       if (!sharedFolder || !sharedFolder.isValid()) {
-        return ctx.response.status(404).json({
-          error: 'Invalid or expired share'
+        return ctx.response.status(403).json({
+          error: 'This share link has been revoked or expired. Please contact the administrators for access.',
+          revoked: true
         })
       }
 
@@ -289,7 +320,7 @@ export default class SharedFolderController {
   }
 
   /**
-   * Révoquer un partage
+   * Revoke a share link
    */
   async revokeShare(ctx: HttpContext) {
     try {
@@ -310,7 +341,7 @@ export default class SharedFolderController {
 
       return ctx.response.json({
         success: true,
-        message: 'Share revoked successfully'
+        message: 'Share link revoked successfully'
       })
 
     } catch (error) {
@@ -321,16 +352,14 @@ export default class SharedFolderController {
   }
 
   /**
-   * CORRECTION: Vérifier qu'un sous-dossier est autorisé dans le partage
+   * Check if subfolder is authorized in the share
    */
   private async isSubfolderAuthorized(sharedRootFolderId: number, targetFolderId: number): Promise<boolean> {
     try {
-      // Si c'est le même dossier, autorisé
       if (sharedRootFolderId === targetFolderId) {
         return true
       }
 
-      // Vérifier si le dossier cible est un descendant du dossier partagé
       return await this.isDescendantOf(targetFolderId, sharedRootFolderId)
     } catch (error) {
       return false
@@ -338,7 +367,7 @@ export default class SharedFolderController {
   }
 
   /**
-   * CORRECTION: Vérifier si un dossier est descendant d'un autre
+   * Check if folder is descendant of another
    */
   private async isDescendantOf(childFolderId: number, ancestorFolderId: number): Promise<boolean> {
     try {
@@ -348,17 +377,14 @@ export default class SharedFolderController {
         return false
       }
 
-      // Si pas de parent, on a atteint la racine sans trouver l'ancêtre
       if (!childFolder.parent_id) {
         return false
       }
 
-      // Si le parent est l'ancêtre recherché
       if (childFolder.parent_id === ancestorFolderId) {
         return true
       }
 
-      // Vérifier récursivement avec le parent
       return await this.isDescendantOf(childFolder.parent_id, ancestorFolderId)
     } catch (error) {
       return false
@@ -366,16 +392,14 @@ export default class SharedFolderController {
   }
 
   /**
-   * CORRECTION: Vérifier qu'un fichier est autorisé dans le partage
+   * Check if file is authorized in the share
    */
   private async isFileAuthorized(sharedRootFolderId: number, file: any): Promise<boolean> {
     try {
-      // Si le fichier est directement dans le dossier partagé
       if (file.folder_id === sharedRootFolderId) {
         return true
       }
 
-      // Si le fichier est dans un sous-dossier du dossier partagé
       if (file.folder_id) {
         return await this.isDescendantOf(file.folder_id, sharedRootFolderId)
       }

@@ -192,6 +192,7 @@ router.group(() => {
 
           // Gestion des partages de dossiers
           router.post('/folders/:id/share', [SharedFolderController, 'createShare'])
+          router.get('/folders/:id/share-status', [SharedFolderController, 'getShareStatus'])
           router.delete('/folders/:id/share', [SharedFolderController, 'revokeShare'])
 
           // Files
