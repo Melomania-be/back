@@ -91,6 +91,14 @@ router.group(() => {
               'resolveAlertAsUpdate',
             ])
             .use(middleware.auth()) // Protected route to resolve an alert (update existing, delete new)
+
+          router
+            .post('recruitment-alerts/:id/accept-new-delete-existing', [
+              RecruitmentAlertsController,
+              'resolveAsAcceptNewAndDeleteExisting', // Maps to resolveAsAcceptNewAndDeleteExisting method
+            ])
+            .use(middleware.auth()) // Protected route to accept new and delete existing
+
           // --- END NEW ROUTES ---
         })
         .use(middleware.auth({ guards: ['api'] }))
