@@ -34,20 +34,17 @@ export default class SharedFolder extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  // Helper method to check if share is still valid
   isValid(): boolean {
     if (!this.is_active) return false
     if (this.expires_at && this.expires_at < DateTime.now()) return false
     return true
   }
 
-  // Increment view count
   async incrementViews(): Promise<void> {
     this.view_count += 1
     await this.save()
   }
 
-  // Deactivate share
   async deactivate(): Promise<void> {
     this.is_active = false
     await this.save()

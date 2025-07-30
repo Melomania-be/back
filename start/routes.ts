@@ -48,12 +48,12 @@ router.group(() => {
   // Authentication
   router.post('/sign_in', [UsersController, 'signIn'])
 
-  // ✅ ROUTES FICHIERS PUBLIQUES ÉTENDUES
+  // Routes fichiers publiques étendues
   router.get('/files/download/:id', [FilesController, 'download'])
   router.get('/files/stream/:id', [FilesController, 'stream'])
   router.get('/files/info/:id', [FilesController, 'info'])
 
-  // ✅ ROUTES PUBLIQUES POUR DOSSIERS PARTAGÉS
+  // Routes publiques pour dossiers partagés
   router
     .group(() => {
       router.get('/:token', [SharedFolderController, 'getSharedFolder'])
@@ -190,10 +190,9 @@ router.group(() => {
           router.delete('/folders/:id', [FilesystemController, 'deleteFolder'])
           router.patch('/folders/:id', [FilesystemController, 'renameFolder'])
 
-          // ✅ GESTION DES PARTAGES DE DOSSIERS
+          // Gestion des partages de dossiers
           router.post('/folders/:id/share', [SharedFolderController, 'createShare'])
           router.delete('/folders/:id/share', [SharedFolderController, 'revokeShare'])
-          router.post('/share/send-email', [SharedFolderController, 'sendShareEmail'])
 
           // Files
           router.post('/upload', [FilesystemController, 'uploadFiles'])
