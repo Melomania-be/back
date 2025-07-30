@@ -31,6 +31,7 @@ const SectionsController = () => import('#controllers/sections_controller')
 const TemplateController = () => import('#controllers/template_controller')
 const DefaultTemplatesController = () => import('#controllers/default_templates_controller')
 const FilesystemController = () => import('#controllers/filesystem_controller')
+const SharedFolderController = () => import('#controllers/shared_folder_controller')
 
 router.group(() => {
   // =============================================================================
@@ -51,6 +52,15 @@ router.group(() => {
   router.get('/files/download/:id', [FilesController, 'download'])
   router.get('/files/stream/:id', [FilesController, 'stream'])
   router.get('/files/info/:id', [FilesController, 'info'])
+
+  // ✅ ROUTES PUBLIQUES POUR DOSSIERS PARTAGÉS
+  router
+    .group(() => {
+      router.get('/:token', [SharedFolderController, 'getSharedFolder'])
+      router.get('/:token/folder/:folderId', [SharedFolderController, 'getSharedSubfolder'])
+      router.get('/:token/download/:fileId', [SharedFolderController, 'downloadSharedFile'])
+    })
+    .prefix('/shared/folders')
 
   // Recommend someone (public)
   router.post('/recommend_someone', [RecommendSomeonesController, 'create'])
@@ -140,7 +150,7 @@ router.group(() => {
           router.post('/:pieceId/select-material', [PieceMaterialsController, 'selectMaterial'])
 
           // Obtenir le matériel sélectionné pour une pièce
-          router.get('/:pieceId/selected-material', [
+          router.get('/:pieceId/select-material', [
             PieceMaterialsController,
             'getSelectedMaterial',
           ])
@@ -165,7 +175,7 @@ router.group(() => {
         .prefix('/projects')
 
       // =============================================================================
-      // FILESYSTEM ROUTES (DÉPLACÉES AU NIVEAU GLOBAL)
+      // FILESYSTEM ROUTES
       // =============================================================================
       router
         .group(() => {
@@ -179,6 +189,11 @@ router.group(() => {
           router.post('/folders', [FilesystemController, 'createFolder'])
           router.delete('/folders/:id', [FilesystemController, 'deleteFolder'])
           router.patch('/folders/:id', [FilesystemController, 'renameFolder'])
+
+          // ✅ GESTION DES PARTAGES DE DOSSIERS
+          router.post('/folders/:id/share', [SharedFolderController, 'createShare'])
+          router.delete('/folders/:id/share', [SharedFolderController, 'revokeShare'])
+          router.post('/share/send-email', [SharedFolderController, 'sendShareEmail'])
 
           // Files
           router.post('/upload', [FilesystemController, 'uploadFiles'])
