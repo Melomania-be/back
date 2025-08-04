@@ -141,38 +141,18 @@ router.group(() => {
         })
         .prefix('/materials')
 
+      // ============================================================================
+      // GESTION DES PIÈCES ET SÉLECTIONS DE MATÉRIELS
+      // ============================================================================
       const PieceMaterialsController = () => import('#controllers/piece_materials_controller')
 
-      // Routes pour les pièces individuelles
+      // ✅ ROUTES POUR LES PIÈCES INDIVIDUELLES (SANS DUPLICATION)
       router
         .group(() => {
-          // Sélectionner/désélectionner un matériel pour une pièce
           router.post('/:pieceId/select-material', [PieceMaterialsController, 'selectMaterial'])
-
-          // Obtenir le matériel sélectionné pour une pièce
-          router.get('/:pieceId/select-material', [
-            PieceMaterialsController,
-            'getSelectedMaterial',
-          ])
+          router.get('/:pieceId/select-material', [PieceMaterialsController, 'getSelectedMaterial'])
         })
         .prefix('/pieces')
-
-      // Routes pour les projets
-      router
-        .group(() => {
-          // Obtenir toutes les sélections de matériels pour un projet
-          router.get('/:projectId/material-selections', [
-            PieceMaterialsController,
-            'getProjectMaterialSelections',
-          ])
-
-          // Synchroniser les sélections avec les callsheets
-          router.post('/:projectId/sync-material-selections', [
-            PieceMaterialsController,
-            'syncWithCallsheets',
-          ])
-        })
-        .prefix('/projects')
 
       // =============================================================================
       // FILESYSTEM ROUTES
@@ -219,6 +199,20 @@ router.group(() => {
           router.delete('/:id', [ProjectsController, 'delete'])
           router.get('/:id/management', [ProjectsController, 'getDashboard'])
           router.get('/:id/management/attendance', [ProjectsController, 'getAttendance'])
+
+          // ✅ ROUTES MATÉRIELS POUR PROJETS (SANS DUPLICATION)
+          router.get('/:id/material-selections', [
+            PieceMaterialsController,
+            'getProjectMaterialSelections',
+          ])
+          router.post('/:id/sync-material-selections', [
+            PieceMaterialsController,
+            'syncWithCallsheets',
+          ])
+          router.get('/:id/assigned-materials', [
+            MaterialsController,
+            'getProjectAssignedMaterials',
+          ])
 
           // =============================================================================
           // GESTION DES PARTICIPANTS
@@ -316,7 +310,7 @@ router.group(() => {
         .prefix('/composer')
 
       // =============================================================================
-      // GESTION DES PIÈCES
+      // GESTION DES PIÈCES (CRUD GÉNÉRAL)
       // =============================================================================
       router
         .group(() => {
