@@ -43,6 +43,89 @@ export default class MaterialsController {
     return materialName
   }
 
+  // ✅ NOUVEAU : Obtenir les matériels assignés pour un projet
+  async getProjectAssignedMaterials(ctx: HttpContext) {
+    try {
+      const projectId = ctx.params.projectId
+
+      const assignedMaterials = await db
+        .from('performed_ins')
+        .select([
+          'performed_ins.piece_id',
+          'performed_ins.material_id',
+          'performed_ins.material_specified',
+          'pieces.name as piece_name',
+          'materials.name as material_name',
+          'materials.description as material_description',
+          'composers.short_name as composer_name'
+        ])
+        .join('pieces', 'pieces.id', 'performed_ins.piece_id')
+        .leftJoin('materials', 'materials.id', 'performed_ins.material_id')
+        .leftJoin('composers', 'composers.id', 'pieces.composer_id')
+        .where('performed_ins.project_id', projectId)
+        .where('performed_ins.material_specified', true)
+        .whereNotNull('performed_ins.material_id')
+
+      return ctx.response.json(assignedMaterials)
+    } catch (error) {
+      return ctx.response.status(500).json({
+        error: 'Erreur lors de la récupération des matériels assignés',
+        details: error.message
+      })
+    }
+  }
+  // ✅ NOUVEAU : Synchroniser les sélections avec performed_ins
+  async syncMaterialSelections(ctx: HttpContext) {
+    try {
+      const projectId = ctx.params.projectId
+
+      // Récupérer toutes les pièces du projet
+      const projectPieces = await db
+        .from('performed_ins')
+        .select('piece_id')
+        .where('project_id', projectId)
+
+      let syncCount = 0
+
+      for (const projectPiece of projectPieces) {
+        // Récupérer la sélection de matériel pour cette pièce
+        const piece = await db
+          .from('pieces')
+          .select('selected_material_id')
+          .where('id', projectPiece.piece_id)
+          .first()
+
+        if (piece?.selected_material_id) {
+          // Mettre à jour performed_ins
+          await db
+            .from('performed_ins')
+            .where('project_id', projectId)
+            .where('piece_id', projectPiece.piece_id)
+            .update({
+              material_id: piece.selected_material_id,
+              material_specified: true,
+              updated_at: new Date()
+            })
+
+          syncCount++
+        }
+      }
+
+      return ctx.response.json({
+        success: true,
+        message: `${syncCount} matériels synchronisés avec succès`,
+        syncedCount: syncCount,
+        totalPieces: projectPieces.length
+      })
+
+    } catch (error) {
+      return ctx.response.status(500).json({
+        success: false,
+        error: 'Erreur lors de la synchronisation',
+        details: error.message
+      })
+    }
+  }
   async getByPiece(ctx: HttpContext) {
     const pieceId = ctx.params.pieceId
 

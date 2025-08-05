@@ -31,6 +31,7 @@ const SectionsController = () => import('#controllers/sections_controller')
 const TemplateController = () => import('#controllers/template_controller')
 const DefaultTemplatesController = () => import('#controllers/default_templates_controller')
 const FilesystemController = () => import('#controllers/filesystem_controller')
+const SharedFolderController = () => import('#controllers/shared_folder_controller')
 
 router.group(() => {
   // =============================================================================
@@ -47,10 +48,19 @@ router.group(() => {
   // Authentication
   router.post('/sign_in', [UsersController, 'signIn'])
 
-  // ✅ ROUTES FICHIERS PUBLIQUES ÉTENDUES
+  // Routes fichiers publiques étendues
   router.get('/files/download/:id', [FilesController, 'download'])
   router.get('/files/stream/:id', [FilesController, 'stream'])
   router.get('/files/info/:id', [FilesController, 'info'])
+
+  // Routes publiques pour dossiers partagés
+  router
+    .group(() => {
+      router.get('/:token', [SharedFolderController, 'getSharedFolder'])
+      router.get('/:token/folder/:folderId', [SharedFolderController, 'getSharedSubfolder'])
+      router.get('/:token/download/:fileId', [SharedFolderController, 'downloadSharedFile'])
+    })
+    .prefix('/shared/folders')
 
   // Recommend someone (public)
   router.post('/recommend_someone', [RecommendSomeonesController, 'create'])
@@ -131,41 +141,21 @@ router.group(() => {
         })
         .prefix('/materials')
 
+      // ============================================================================
+      // GESTION DES PIÈCES ET SÉLECTIONS DE MATÉRIELS
+      // ============================================================================
       const PieceMaterialsController = () => import('#controllers/piece_materials_controller')
 
-      // Routes pour les pièces individuelles
+      // ✅ ROUTES POUR LES PIÈCES INDIVIDUELLES (SANS DUPLICATION)
       router
         .group(() => {
-          // Sélectionner/désélectionner un matériel pour une pièce
           router.post('/:pieceId/select-material', [PieceMaterialsController, 'selectMaterial'])
-
-          // Obtenir le matériel sélectionné pour une pièce
-          router.get('/:pieceId/selected-material', [
-            PieceMaterialsController,
-            'getSelectedMaterial',
-          ])
+          router.get('/:pieceId/select-material', [PieceMaterialsController, 'getSelectedMaterial'])
         })
         .prefix('/pieces')
 
-      // Routes pour les projets
-      router
-        .group(() => {
-          // Obtenir toutes les sélections de matériels pour un projet
-          router.get('/:projectId/material-selections', [
-            PieceMaterialsController,
-            'getProjectMaterialSelections',
-          ])
-
-          // Synchroniser les sélections avec les callsheets
-          router.post('/:projectId/sync-material-selections', [
-            PieceMaterialsController,
-            'syncWithCallsheets',
-          ])
-        })
-        .prefix('/projects')
-
       // =============================================================================
-      // FILESYSTEM ROUTES (DÉPLACÉES AU NIVEAU GLOBAL)
+      // FILESYSTEM ROUTES
       // =============================================================================
       router
         .group(() => {
@@ -179,6 +169,11 @@ router.group(() => {
           router.post('/folders', [FilesystemController, 'createFolder'])
           router.delete('/folders/:id', [FilesystemController, 'deleteFolder'])
           router.patch('/folders/:id', [FilesystemController, 'renameFolder'])
+
+          // Gestion des partages de dossiers
+          router.post('/folders/:id/share', [SharedFolderController, 'createShare'])
+          router.get('/folders/:id/share-status', [SharedFolderController, 'getShareStatus'])
+          router.delete('/folders/:id/share', [SharedFolderController, 'revokeShare'])
 
           // Files
           router.post('/upload', [FilesystemController, 'uploadFiles'])
@@ -204,6 +199,20 @@ router.group(() => {
           router.delete('/:id', [ProjectsController, 'delete'])
           router.get('/:id/management', [ProjectsController, 'getDashboard'])
           router.get('/:id/management/attendance', [ProjectsController, 'getAttendance'])
+
+          // ✅ ROUTES MATÉRIELS POUR PROJETS (SANS DUPLICATION)
+          router.get('/:id/material-selections', [
+            PieceMaterialsController,
+            'getProjectMaterialSelections',
+          ])
+          router.post('/:id/sync-material-selections', [
+            PieceMaterialsController,
+            'syncWithCallsheets',
+          ])
+          router.get('/:id/assigned-materials', [
+            MaterialsController,
+            'getProjectAssignedMaterials',
+          ])
 
           // =============================================================================
           // GESTION DES PARTICIPANTS
@@ -301,7 +310,7 @@ router.group(() => {
         .prefix('/composer')
 
       // =============================================================================
-      // GESTION DES PIÈCES
+      // GESTION DES PIÈCES (CRUD GÉNÉRAL)
       // =============================================================================
       router
         .group(() => {
