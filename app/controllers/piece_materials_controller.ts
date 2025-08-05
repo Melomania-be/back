@@ -12,14 +12,12 @@ export default class PieceMaterialsController {
       const pieceId = params.pieceId
       const { materialId } = request.body()
 
-      console.log(`🎯 Backend: Selecting material ${materialId} for piece ${pieceId}`)
+      console.log(`Backend: Selecting material ${materialId} for piece ${pieceId}`)
 
       const piece = await Piece.findOrFail(pieceId)
 
       if (materialId === null) {
         await this.clearPieceSelection(pieceId)
-
-        // ✅ DISPATCH event pour synchronisation
         await this.notifyMaterialSelectionChange(pieceId, null)
 
         return response.status(200).json({
@@ -35,13 +33,10 @@ export default class PieceMaterialsController {
         .where('is_active', true)
         .firstOrFail()
 
-      // ✅ SAUVEGARDE PERSISTANTE dans la base de données
       await this.savePieceSelection(pieceId, materialId)
-
-      // ✅ DISPATCH event pour synchronisation
       await this.notifyMaterialSelectionChange(pieceId, materialId)
 
-      console.log(`✅ Backend: Material ${materialId} selected for piece ${pieceId}`)
+      console.log(`Backend: Material ${materialId} selected for piece ${pieceId}`)
 
       return response.status(200).json({
         success: true,
@@ -51,7 +46,7 @@ export default class PieceMaterialsController {
       })
 
     } catch (error) {
-      console.error('❌ Backend: Error selecting material:', error)
+      console.error('Backend: Error selecting material:', error)
       return response.status(500).json({
         success: false,
         error: 'Erreur lors de la sélection du matériel',
@@ -60,17 +55,15 @@ export default class PieceMaterialsController {
     }
   }
 
-  // ✅ CORRECTION CRITIQUE : Forcer la réponse JSON correcte
   async getSelectedMaterial({ params, response }: HttpContext) {
     try {
       const pieceId = params.pieceId
-      console.log(`🔍 Backend: Getting selected material for piece ${pieceId}`)
+      console.log(`Backend: Getting selected material for piece ${pieceId}`)
 
       const selection = await this.getPieceSelection(pieceId)
 
       if (!selection) {
-        console.log(`❌ Backend: No material selected for piece ${pieceId}`)
-        // ✅ FORCER une réponse JSON valide
+        console.log(`Backend: No material selected for piece ${pieceId}`)
         return response.status(200).json({
           materialId: null,
           material: null
@@ -83,17 +76,15 @@ export default class PieceMaterialsController {
         .preload('files')
         .first()
 
-      console.log(`✅ Backend: Found selected material ${selection.materialId} for piece ${pieceId}`)
+      console.log(`Backend: Found selected material ${selection.materialId} for piece ${pieceId}`)
 
-      // ✅ FORCER une réponse JSON valide avec tous les champs requis
       return response.status(200).json({
         materialId: selection.materialId,
         material: material ? material.serialize() : null
       })
 
     } catch (error) {
-      console.error('❌ Backend: Error getting selected material:', error)
-      // ✅ TOUJOURS retourner un JSON valide, même en cas d'erreur
+      console.error('Backend: Error getting selected material:', error)
       return response.status(200).json({
         materialId: null,
         material: null,
@@ -102,11 +93,9 @@ export default class PieceMaterialsController {
     }
   }
 
-  // ✅ CORRECTION : Gérer les erreurs de sync
   async syncWithCallsheets({ params, response }: HttpContext) {
     try {
-      // ✅ CORRECTION : Récupérer le bon paramètre (id au lieu de projectId)
-      const projectId = params.id; // ✅ Utiliser params.id car la route est /:id/sync-material-selections
+      const projectId = params.id;
 
       if (!projectId) {
         return response.status(400).json({
@@ -115,7 +104,6 @@ export default class PieceMaterialsController {
         });
       }
 
-      // Vérifier que le projet existe
       const projectExists = await db.from('projects').where('id', projectId).first()
       if (!projectExists) {
         return response.status(404).json({
@@ -124,7 +112,6 @@ export default class PieceMaterialsController {
         })
       }
 
-      // ✅ CORRECTION : Récupérer toutes les pièces du projet
       const projectPieces = await db
         .from('performed_ins')
         .select('piece_id')
@@ -135,7 +122,6 @@ export default class PieceMaterialsController {
 
       for (const projectPiece of projectPieces) {
         try {
-          // Récupérer la sélection de matériel pour cette pièce
           const piece = await db
             .from('pieces')
             .select('selected_material_id')
@@ -143,7 +129,6 @@ export default class PieceMaterialsController {
             .first()
 
           if (piece?.selected_material_id) {
-            // Mettre à jour performed_ins
             const updateResult = await db
               .from('performed_ins')
               .where('project_id', projectId)
@@ -154,7 +139,7 @@ export default class PieceMaterialsController {
                 updated_at: new Date()
               })
 
-            if (updateResult > 0) {
+            if (Array.isArray(updateResult) ? updateResult.length > 0 : updateResult > 0) {
               syncCount++
             }
           }
@@ -172,7 +157,7 @@ export default class PieceMaterialsController {
       })
 
     } catch (error) {
-      console.error('❌ Error in syncWithCallsheets:', error)
+      console.error('Error in syncWithCallsheets:', error)
       return response.status(500).json({
         success: false,
         error: 'Erreur lors de la synchronisation',
@@ -185,7 +170,7 @@ export default class PieceMaterialsController {
   async getProjectMaterialSelections({ params, response }: HttpContext) {
     try {
       const projectId = params.projectId
-      console.log(`🔍 Backend: Getting project material selections for ${projectId}`)
+      console.log(`Backend: Getting project material selections for ${projectId}`)
 
       const pieces = await Piece.query()
         .whereHas('projects', (projectQuery) => {
@@ -203,12 +188,12 @@ export default class PieceMaterialsController {
         }
       }
 
-      console.log(`✅ Backend: Found selections for ${Object.keys(selections).length} pieces`)
+      console.log(`Backend: Found selections for ${Object.keys(selections).length} pieces`)
 
       return response.status(200).json(selections)
 
     } catch (error) {
-      console.error('❌ Backend: Error getting project selections:', error)
+      console.error('Backend: Error getting project selections:', error)
       return response.status(500).json({
         error: 'Erreur lors de la récupération des sélections',
         details: error.message
@@ -216,10 +201,8 @@ export default class PieceMaterialsController {
     }
   }
 
-  // ✅ CORRECTION : Sauvegarder VRAIMENT dans la base de données
   private async savePieceSelection(pieceId: number, materialId: number) {
     try {
-      // Méthode 1 : Sauvegarder dans la table pieces
       const result = await db.from('pieces')
         .where('id', pieceId)
         .update({
@@ -227,18 +210,15 @@ export default class PieceMaterialsController {
           updated_at: new Date()
         })
 
-      console.log(`✅ Backend: Material ${materialId} saved for piece ${pieceId} (${result} rows affected)`)
-
-      // ✅ NOUVEAU : Aussi sauvegarder dans performed_ins si dans un projet
+      console.log(`Backend: Material ${materialId} saved for piece ${pieceId} (${result} rows affected)`)
       await this.syncWithPerformedIns(pieceId, materialId)
 
     } catch (error) {
-      console.error('❌ Backend: Error saving selection:', error)
+      console.error('Backend: Error saving selection:', error)
       throw error
     }
   }
 
-  // ✅ CORRECTION : Récupérer VRAIMENT depuis la base de données
   private async getPieceSelection(pieceId: number): Promise<{ materialId: number } | null> {
     try {
       const piece = await db.from('pieces')
@@ -247,14 +227,14 @@ export default class PieceMaterialsController {
         .first()
 
       if (piece?.selected_material_id) {
-        console.log(`✅ Backend: Material ${piece.selected_material_id} found for piece ${pieceId}`)
+        console.log(`Backend: Material ${piece.selected_material_id} found for piece ${pieceId}`)
         return { materialId: piece.selected_material_id }
       }
 
-      console.log(`⚠️ Backend: No material selected for piece ${pieceId}`)
+      console.log(`Backend: No material selected for piece ${pieceId}`)
       return null
     } catch (error) {
-      console.error('❌ Backend: Error getting selection:', error)
+      console.error('Backend: Error getting selection:', error)
       return null
     }
   }
@@ -268,21 +248,17 @@ export default class PieceMaterialsController {
           updated_at: new Date()
         })
 
-      console.log(`✅ Backend: Selection cleared for piece ${pieceId} (${result} rows affected)`)
-
-      // ✅ NOUVEAU : Aussi nettoyer performed_ins
+      console.log(`Backend: Selection cleared for piece ${pieceId} (${result} rows affected)`)
       await this.syncWithPerformedIns(pieceId, null)
 
     } catch (error) {
-      console.error('❌ Backend: Error clearing selection:', error)
+      console.error('Backend: Error clearing selection:', error)
       throw error
     }
   }
 
-  // ✅ NOUVEAU : Synchronisation avec performed_ins pour les projets
   private async syncWithPerformedIns(pieceId: number, materialId: number | null) {
     try {
-      // Trouver tous les projets qui utilisent cette pièce
       const projectPieces = await db.from('performed_ins')
         .where('piece_id', pieceId)
 
@@ -297,23 +273,17 @@ export default class PieceMaterialsController {
           })
       }
 
-      console.log(`✅ Backend: Synchronized with ${projectPieces.length} projects`)
+      console.log(`Backend: Synchronized with ${projectPieces.length} projects`)
     } catch (error) {
-      console.error('❌ Backend: Error sync performed_ins:', error)
+      console.error('Backend: Error sync performed_ins:', error)
     }
   }
 
-  // ✅ NOUVEAU : Notifier les changements pour synchronisation
   private async notifyMaterialSelectionChange(pieceId: number, materialId: number | null) {
     try {
-      // Ici vous pourriez implémenter WebSockets ou autres
-      // Pour l'instant, juste logger
-      console.log(`🔔 Backend: Material selection changed: piece ${pieceId} -> material ${materialId}`)
-
-      // Optionnel : Invalider les caches
-      // await this.invalidateRelatedCaches(pieceId)
+      console.log(`Backend: Material selection changed: piece ${pieceId} -> material ${materialId}`)
     } catch (error) {
-      console.error('❌ Backend: Error notification:', error)
+      console.error('Backend: Error notification:', error)
     }
   }
 }

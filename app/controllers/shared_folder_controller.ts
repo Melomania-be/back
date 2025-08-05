@@ -310,7 +310,7 @@ export default class SharedFolderController {
       ctx.response.header('Content-Disposition', `inline; filename="${file.name}"`)
       ctx.response.header('Cache-Control', 'public, max-age=3600')
 
-      return ctx.response.download(file.path, file.name)
+      return ctx.response.download(file.path)
 
     } catch (error) {
       return ctx.response.status(500).json({
