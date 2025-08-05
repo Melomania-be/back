@@ -105,8 +105,15 @@ export default class PieceMaterialsController {
   // ✅ CORRECTION : Gérer les erreurs de sync
   async syncWithCallsheets({ params, response }: HttpContext) {
     try {
-      const projectId = params.projectId
-      console.log(`🔄 Backend: Syncing material selections for project ${projectId}`)
+      // ✅ CORRECTION : Récupérer le bon paramètre (id au lieu de projectId)
+      const projectId = params.id; // ✅ Utiliser params.id car la route est /:id/sync-material-selections
+
+      if (!projectId) {
+        return response.status(400).json({
+          success: false,
+          error: 'Project ID is required'
+        });
+      }
 
       // Vérifier que le projet existe
       const projectExists = await db.from('projects').where('id', projectId).first()
@@ -117,65 +124,60 @@ export default class PieceMaterialsController {
         })
       }
 
-      // ✅ NOUVEAU : Synchroniser les sélections avec les callsheets
-      const pieces = await Piece.query()
-        .whereHas('projects', (projectQuery) => {
-          projectQuery.where('projects.id', projectId)
-        })
+      // ✅ CORRECTION : Récupérer toutes les pièces du projet
+      const projectPieces = await db
+        .from('performed_ins')
+        .select('piece_id')
+        .where('project_id', projectId)
 
       let syncCount = 0
       const errors = []
 
-      for (const piece of pieces) {
+      for (const projectPiece of projectPieces) {
         try {
-          const selection = await this.getPieceSelection(piece.id)
+          // Récupérer la sélection de matériel pour cette pièce
+          const piece = await db
+            .from('pieces')
+            .select('selected_material_id')
+            .where('id', projectPiece.piece_id)
+            .first()
 
-          if (selection?.materialId) {
-            // Vérifier que la relation performed_ins existe
-            const performedIn = await db.from('performed_ins')
+          if (piece?.selected_material_id) {
+            // Mettre à jour performed_ins
+            const updateResult = await db
+              .from('performed_ins')
               .where('project_id', projectId)
-              .where('piece_id', piece.id)
-              .first()
+              .where('piece_id', projectPiece.piece_id)
+              .update({
+                material_id: piece.selected_material_id,
+                material_specified: true,
+                updated_at: new Date()
+              })
 
-            if (performedIn) {
-              // Mettre à jour performed_ins
-              await db.from('performed_ins')
-                .where('project_id', projectId)
-                .where('piece_id', piece.id)
-                .update({
-                  material_id: selection.materialId,
-                  material_specified: true,
-                  updated_at: new Date()
-                })
-
+            if (updateResult > 0) {
               syncCount++
-              console.log(`✅ Synced material ${selection.materialId} for piece ${piece.id}`)
-            } else {
-              errors.push(`Piece ${piece.id} not found in project ${projectId}`)
             }
           }
         } catch (pieceError) {
-          console.error(`❌ Error syncing piece ${piece.id}:`, pieceError)
-          errors.push(`Error syncing piece ${piece.id}: ${pieceError.message}`)
+          errors.push(`Error syncing piece ${projectPiece.piece_id}: ${pieceError.message}`)
         }
       }
 
-      console.log(`✅ Backend: Synced ${syncCount} pieces, ${errors.length} errors`)
-
       return response.status(200).json({
         success: true,
-        message: 'Synchronisation avec les callsheets effectuée',
+        message: `Synchronisation effectuée: ${syncCount} pièces synchronisées`,
         syncedPieces: syncCount,
-        totalPieces: pieces.length,
-        errors: errors
+        totalPieces: projectPieces.length,
+        errors: errors.length > 0 ? errors : undefined
       })
 
     } catch (error) {
-      console.error('❌ Backend: Error in sync:', error)
+      console.error('❌ Error in syncWithCallsheets:', error)
       return response.status(500).json({
         success: false,
         error: 'Erreur lors de la synchronisation',
-        details: error.message
+        details: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       })
     }
   }
