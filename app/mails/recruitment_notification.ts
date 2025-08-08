@@ -1,8 +1,7 @@
+// app/mails/recruitment_notification.ts
 import env from '#start/env'
 import { BaseMail } from '@adonisjs/mail'
 import MailTemplate from '#models/mail_template'
-
-//demande générale de participation au projet => mail de recrutement
 
 export default class RecruitmentNotification extends BaseMail {
   contact: {
@@ -11,81 +10,65 @@ export default class RecruitmentNotification extends BaseMail {
     email: string
   }
 
-  registration: {
-    id: number | undefined
-    project_id: number | undefined
-  }
-
   project: {
+    id: number
     name: string
   }
 
-  toContact: Array<{
-    first_name: string
-    last_name: string
-    email: string
-    phone: string
-    messenger: string
-  }>
+  recruitmentContact: {
+    id: number
+  }
+
+  recommenderName?: string
 
   constructor(
     contact: { first_name: string; last_name: string; email: string },
-    registration: { id: number | undefined; project_id: number | undefined },
-    project: { name: string },
-    toContact: Array<{
-      first_name: string
-      last_name: string
-      email: string
-      phone: string
-      messenger: string
-    }>
+    project: { id: number; name: string },
+    recruitmentContact: { id: number },
+    recommenderName?: string
   ) {
     super()
-    this.from = env.get('SMTP_USERNAME')
-    this.project = project
-    this.subject = project.name + 'recruitment notification'
     this.contact = contact
-    this.registration = registration
-    this.toContact = toContact
+    this.project = project
+    this.recruitmentContact = recruitmentContact
+    this.recommenderName = recommenderName
   }
 
   async prepare() {
     const url = env.get('URL') || ''
+
+    // Utiliser un template spécifique ou un template par défaut
+    const templateName = this.recommenderName
+      ? 'recruitment_recommendation_notification.html'
+      : 'recruitment_notification.html'
+
     const template = await MailTemplate.query()
-      .where('name', 'recruitment_notification.html')
+      .where('name', templateName)
       .first()
 
     if (!template) {
-      throw new Error('Template callsheet_notification.html not found')
+      throw new Error(`Template ${templateName} not found`)
     }
 
     let htmlContent = template.content
-    let toContactDetails = ''
+      .replace(/\${NAME}/g, `${this.contact.first_name} ${this.contact.last_name}`)
+      .replace(/\${PROJECT}/g, this.project.name)
+      .replace(/\${URL}/g, url)
+      .replace(/\${REGISTRATION_URL}/g, `${url}/registration/${this.project.id}`)
+      .replace(/\${RECOMMENDATION_URL}/g, `${url}/projects/${this.project.id}/recommend`)
 
-    if (this.toContact.length <= 0) {
-      toContactDetails = `<br> No contact details available`
-    } else {
-      toContactDetails = this.toContact
-        .map((contact) => {
-          return `<br>${contact.first_name} ${contact.last_name}
-              <br> Email: ${contact.email}
-              <br> Phone: ${contact.phone}
-              <br> Messenger: ${contact.messenger}`
-        })
-        .join('<br><br>')
+    if (this.recommenderName) {
+      htmlContent = htmlContent.replace(/\${RECOMMENDER_NAME}/g, this.recommenderName)
     }
 
-    htmlContent = htmlContent
-      .replace(/\${URL}/g, url)
-      .replace(/\${NAME}/g, this.contact.first_name + ' ' + this.contact.last_name)
-      .replace(/\${PROJECT}/g, this.project.name)
-      .replace(/\${REGISTRATION}/g, url + '/registration/' + this.registration?.id?.toString())
-      .replace(/\${TO_CONTACT}/g, toContactDetails)
+    const subject = this.recommenderName
+      ? `${this.recommenderName} vous recommande pour le projet ${this.project.name}`
+      : `Invitation à participer au projet ${this.project.name}`
 
     this.message
       .to(this.contact.email)
       .from(`Melomania <${env.get('SMTP_USERNAME')}>`)
-      .subject('New Project by Melomania : ' + this.project.name)
+      .subject(subject)
       .html(htmlContent)
   }
 }
