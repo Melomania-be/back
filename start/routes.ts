@@ -243,8 +243,11 @@ router.group(() => {
               // Recherche de contacts
               router.post('/search-contacts', [RecruitmentController, 'searchContacts'])
 
-              // Envoi d'emails
+              // Envoi d'emails - ROUTE MANQUANTE AJOUTÉE
               router.post('/send-emails', [RecruitmentController, 'sendRecruitmentEmails'])
+
+              // Import depuis projet - ROUTE MANQUANTE AJOUTÉE
+              router.post('/import-project', [RecruitmentController, 'importFromProject'])
 
               // Recommandations
               router.get('/recommendations', [RecruitmentController, 'getRecommendations'])

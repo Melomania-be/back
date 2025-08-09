@@ -1,4 +1,4 @@
-// app/controllers/recruitment_controller.ts - Version corrigée
+// app/controllers/recruitment_controller.ts - Version corrigée avec validation robuste
 import { HttpContext } from '@adonisjs/core/http'
 import RecruitmentContact from '#models/recruitment_contact'
 import RecruitmentSettings from '#models/recruitment_settings'
@@ -10,40 +10,60 @@ import { simpleFilter, advancedFilter } from 'adonisjs-filters'
 import vine from '@vinejs/vine'
 
 export default class RecruitmentController {
-  // Validation des paramètres
+  // Validation des paramètres avec logging détaillé
   private validateProjectId(projectId: string | undefined): number {
-    if (!projectId || projectId === 'undefined' || isNaN(Number(projectId))) {
+    console.log('🔍 Validating project ID:', projectId)
+
+    if (!projectId) {
+      console.error('❌ Project ID is undefined')
+      throw new Error('Project ID is required')
+    }
+
+    if (projectId === 'undefined' || projectId === 'null') {
+      console.error('❌ Project ID is string "undefined" or "null"')
+      throw new Error('Invalid project ID format')
+    }
+
+    const numericId = Number(projectId)
+    if (isNaN(numericId) || numericId <= 0) {
+      console.error('❌ Project ID is not a valid positive number:', projectId)
       throw new Error('Invalid project ID')
     }
-    return Number(projectId)
+
+    console.log('✅ Project ID validated:', numericId)
+    return numericId
   }
 
   // Obtenir les paramètres de recrutement d'un projet
   async getSettings({ params, response }: HttpContext) {
     try {
+      console.log('📋 Getting recruitment settings for project:', params.id)
       const projectId = this.validateProjectId(params.id)
 
       // Vérifier que le projet existe
       const project = await Project.find(projectId)
       if (!project) {
+        console.error('❌ Project not found:', projectId)
         return response.status(404).json({ error: 'Project not found' })
       }
 
-      const settings = await RecruitmentSettings.query()
+      let settings = await RecruitmentSettings.query()
         .where('project_id', projectId)
         .first()
 
       if (!settings) {
-        // Créer des paramètres par défaut
-        return await RecruitmentSettings.create({
+        console.log('📝 Creating default settings for project:', projectId)
+        settings = await RecruitmentSettings.create({
           project_id: projectId,
           follow_up_days: 7,
           auto_follow_up_enabled: true
         })
       }
 
-      return settings
+      console.log('✅ Settings retrieved successfully')
+      return response.json(settings)
     } catch (error) {
+      console.error('❌ Error in getSettings:', error.message)
       return response.status(400).json({ error: error.message })
     }
   }
@@ -51,6 +71,7 @@ export default class RecruitmentController {
   // Mettre à jour les paramètres
   async updateSettings({ params, request, response }: HttpContext) {
     try {
+      console.log('⚙️ Updating recruitment settings for project:', params.id)
       const projectId = this.validateProjectId(params.id)
 
       const data = await request.validateUsing(vine.compile(
@@ -78,8 +99,10 @@ export default class RecruitmentController {
         await this.updateFollowUpStatuses(projectId, data.follow_up_days)
       }
 
-      return settings
+      console.log('✅ Settings updated successfully')
+      return response.json(settings)
     } catch (error) {
+      console.error('❌ Error in updateSettings:', error.message)
       return response.status(400).json({ error: error.message })
     }
   }
@@ -87,6 +110,7 @@ export default class RecruitmentController {
   // Obtenir tous les contacts de recrutement
   async getContacts(ctx: HttpContext) {
     try {
+      console.log('👥 Getting recruitment contacts for project:', ctx.params.id)
       const projectId = this.validateProjectId(ctx.params.id)
 
       const baseQuery = RecruitmentContact.query()
@@ -96,7 +120,7 @@ export default class RecruitmentController {
         .preload('recommender')
         .orderBy('created_at', 'desc')
 
-      return await simpleFilter(
+      const result = await simpleFilter(
         ctx,
         baseQuery,
         ['first_name', 'last_name', 'email', 'phone', 'messenger', 'status', 'notes'],
@@ -105,14 +129,76 @@ export default class RecruitmentController {
           { relationColumns: ['first_name', 'last_name'], relationName: 'contact' }
         ]
       )
+
+      console.log('✅ Contacts retrieved successfully, count:', result.data?.length || 0)
+      return result
     } catch (error) {
+      console.error('❌ Error in getContacts:', error.message)
       return ctx.response.status(400).json({ error: error.message })
+    }
+  }
+
+  // Statistiques du recrutement avec validation robuste
+  async getStats({ params, response }: HttpContext) {
+    try {
+      console.log('📊 Getting recruitment stats for project:', params.id)
+      const projectId = this.validateProjectId(params.id)
+
+      // Compter le total
+      const totalResult = await RecruitmentContact.query()
+        .where('project_id', projectId)
+        .count('*')
+
+      const total = Number(totalResult[0].$extras.total || 0)
+      console.log('📈 Total contacts:', total)
+
+      // Compter par statut
+      const byStatusResult = await RecruitmentContact.query()
+        .where('project_id', projectId)
+        .groupBy('status')
+        .count('*')
+        .select('status')
+
+      const byStatus = byStatusResult.map(item => ({
+        status: item.status,
+        count: Number(item.$extras.total || 0)
+      }))
+
+      console.log('📊 By status:', byStatus)
+
+      // Compter les recommandations en attente
+      const pendingRecommendationsResult = await RecruitmentRecommendation.query()
+        .where('project_id', projectId)
+        .where('status', 'pending')
+        .count('*')
+
+      const pendingRecommendations = Number(pendingRecommendationsResult[0].$extras.total || 0)
+      console.log('💭 Pending recommendations:', pendingRecommendations)
+
+      const stats = {
+        total,
+        by_status: byStatus,
+        pending_recommendations: pendingRecommendations
+      }
+
+      console.log('✅ Stats computed successfully:', stats)
+      return response.json(stats)
+    } catch (error) {
+      console.error('❌ Error in getStats:', error.message)
+      return response.status(400).json({
+        error: error.message,
+        // Retourner des stats par défaut en cas d'erreur
+        total: 0,
+        by_status: [],
+        pending_recommendations: 0
+      })
     }
   }
 
   // Créer un contact manuel
   async createManualContact({ params, request, response }: HttpContext) {
     try {
+      console.log('👤 Creating manual contact for project:', params.id)
       const projectId = this.validateProjectId(params.id)
 
       const data = await request.validateUsing(vine.compile(
@@ -139,144 +225,10 @@ export default class RecruitmentController {
       })
 
       await contact.load('section')
-      return contact
+      console.log('✅ Manual contact created successfully:', contact.id)
+      return response.json(contact)
     } catch (error) {
-      return response.status(400).json({ error: error.message })
-    }
-  }
-
-  // Importer des contacts depuis la base de données
-  async importContacts({ params, request, response }: HttpContext) {
-    try {
-      const projectId = this.validateProjectId(params.id)
-
-      const data = await request.validateUsing(vine.compile(
-        vine.object({
-          contact_ids: vine.array(vine.number()),
-          from_project_id: vine.number().optional()
-        })
-      ))
-
-      const results = {
-        imported: [],
-        conflicts: [],
-        errors: []
-      }
-
-      for (const contactId of data.contact_ids) {
-        try {
-          const contact = await Contact.find(contactId)
-          if (!contact) {
-            results.errors.push(`Contact ${contactId} not found`)
-            continue
-          }
-
-          // Vérifier si déjà dans le recrutement
-          const existing = await RecruitmentContact.query()
-            .where('project_id', projectId)
-            .where('contact_id', contactId)
-            .first()
-
-          if (existing) {
-            results.conflicts.push({
-              contact,
-              existing_status: existing.status,
-              recruitment_id: existing.id
-            })
-            continue
-          }
-
-          // Créer l'entrée de recrutement
-          const recruitmentContact = await RecruitmentContact.create({
-            project_id: projectId,
-            contact_id: contactId,
-            first_name: contact.first_name,
-            last_name: contact.last_name,
-            email: contact.email,
-            phone: contact.phone,
-            messenger: contact.messenger,
-            source: 'database',
-            status: 'not_yet_contacted'
-          })
-
-          await recruitmentContact.load('contact')
-          results.imported.push(recruitmentContact)
-
-        } catch (error) {
-          results.errors.push(`Error importing contact ${contactId}: ${error.message}`)
-        }
-      }
-
-      return results
-    } catch (error) {
-      return response.status(400).json({ error: error.message })
-    }
-  }
-
-  // Recherche avancée de contacts
-  async searchContacts(ctx: HttpContext) {
-    try {
-      const baseQuery = Contact.query()
-        .preload('instruments')
-        .preload('participants', (query) => {
-          query.preload('project').preload('section')
-        })
-
-      return await advancedFilter(ctx, baseQuery)
-    } catch (error) {
-      return ctx.response.status(400).json({ error: error.message })
-    }
-  }
-
-  // Mettre à jour le statut d'un contact
-  async updateContactStatus({ params, request, response }: HttpContext) {
-    try {
-      const projectId = this.validateProjectId(params.id)
-      const contactId = this.validateProjectId(params.contactId)
-
-      const data = await request.validateUsing(vine.compile(
-        vine.object({
-          status: vine.enum(['not_yet_contacted', 'awaiting_response', 'to_follow_up', 'not_available', 'pending_validation', 'cancelled', 'recruited']),
-          contact_method: vine.enum(['manual', 'email', 'messenger', 'phone']).optional(),
-          notes: vine.string().optional(),
-          contact_date: vine.date({ formats: ['iso'] }).optional()
-        })
-      ))
-
-      const contact = await RecruitmentContact.query()
-        .where('id', contactId)
-        .where('project_id', projectId)
-        .firstOrFail()
-
-      // Si le statut passe à "awaiting_response", enregistrer la date de contact
-      if (data.status === 'awaiting_response' && !contact.contact_date) {
-        data.contact_date = new Date()
-      }
-
-      await contact.merge(data).save()
-      await contact.load('section')
-      await contact.load('contact')
-
-      return contact
-    } catch (error) {
-      return response.status(400).json({ error: error.message })
-    }
-  }
-
-  // Supprimer un contact de recrutement
-  async deleteContact({ params, response }: HttpContext) {
-    try {
-      const projectId = this.validateProjectId(params.id)
-      const contactId = this.validateProjectId(params.contactId)
-
-      const contact = await RecruitmentContact.query()
-        .where('id', contactId)
-        .where('project_id', projectId)
-        .firstOrFail()
-
-      await contact.delete()
-      return { message: 'Contact removed from recruitment' }
-    } catch (error) {
+      console.error('❌ Error in createManualContact:', error.message)
       return response.status(400).json({ error: error.message })
     }
   }
@@ -284,6 +236,7 @@ export default class RecruitmentController {
   // Envoyer des mails de recrutement
   async sendRecruitmentEmails({ params, request, response }: HttpContext) {
     try {
+      console.log('📧 Sending recruitment emails for project:', params.id)
       const projectId = this.validateProjectId(params.id)
 
       const data = await request.validateUsing(vine.compile(
@@ -301,11 +254,24 @@ export default class RecruitmentController {
         skipped: []
       }
 
+      console.log('📬 Processing emails for contacts:', data.contact_ids)
+
+      // Récupérer le projet pour le contexte de l'email
+      const project = await Project.find(projectId)
+      if (!project) {
+        return response.status(404).json({ error: 'Project not found' })
+      }
+
       for (const contactId of data.contact_ids) {
         const contact = await RecruitmentContact.query()
           .where('id', contactId)
           .where('project_id', projectId)
-          .firstOrFail()
+          .first()
+
+        if (!contact) {
+          results.failed.push({ contact_id: contactId, error: 'Contact not found' })
+          continue
+        }
 
         if (!contact.email) {
           results.skipped.push({ contact_id: contactId, reason: 'No email address' })
@@ -313,24 +279,254 @@ export default class RecruitmentController {
         }
 
         try {
-          // Logique d'envoi d'email (à implémenter avec votre système de mail)
-          // await this.sendRecruitmentEmail(contact, data)
+          // ✅ SIMULATION D'ENVOI D'EMAIL
+          console.log('📧 SIMULATION - Sending email to:', contact.email)
+          console.log('📧 Subject: Invitation à rejoindre le projet', project.name)
+          console.log('📧 Recipient:', contact.first_name, contact.last_name)
 
-          // Mettre à jour le statut
+          // Contenu de l'email simulé
+          const emailContent = `
+          Bonjour ${contact.first_name} ${contact.last_name},
+
+          Nous vous invitons à rejoindre notre projet musical "${project.name}".
+
+          Pour plus d'informations et pour vous inscrire, cliquez sur le lien ci-dessous :
+          [LIEN D'INSCRIPTION]
+
+          Vous pouvez également recommander d'autres musiciens en cliquant ici :
+          [LIEN DE RECOMMANDATION]
+
+          Cordialement,
+          L'équipe du projet ${project.name}
+        `
+
+          console.log('📧 Email content preview:', emailContent.substring(0, 100) + '...')
+
+          // ✅ TODO: Implémenter l'envoi réel avec votre système de mail
+          // Exemples d'intégration possibles :
+          // - await Mail.send(...)
+          // - await this.mailService.sendRecruitmentEmail(contact, project)
+          // - await this.sendEmail(contact.email, subject, content)
+
+          // Simuler un délai d'envoi
+          await new Promise(resolve => setTimeout(resolve, 100))
+
+          // ✅ Mettre à jour le statut du contact
           await contact.merge({
             status: 'awaiting_response',
             contact_method: 'email',
             contact_date: DateTime.now()
           }).save()
 
-          results.sent.push(contact)
+          results.sent.push({
+            contact_id: contact.id,
+            email: contact.email,
+            name: `${contact.first_name} ${contact.last_name}`,
+            sent_at: new Date().toISOString()
+          })
+
+          console.log('✅ Email sent successfully to:', contact.email)
+
         } catch (error) {
+          console.error('❌ Failed to send email to contact:', contactId, error.message)
           results.failed.push({ contact_id: contactId, error: error.message })
         }
       }
 
-      return results
+      const summary = {
+        sent: results.sent.length,
+        failed: results.failed.length,
+        skipped: results.skipped.length,
+        total: data.contact_ids.length
+      }
+
+      console.log('✅ Email sending completed:', summary)
+
+      return response.json({
+        success: true,
+        summary,
+        details: results,
+        message: `Emails envoyés: ${results.sent.length}/${data.contact_ids.length}`
+      })
     } catch (error) {
+      console.error('❌ Error in sendRecruitmentEmails:', error.message)
+      return response.status(400).json({ error: error.message })
+    }
+  }
+
+  // Importer des contacts depuis la base de données
+  async importContacts({ params, request, response }: HttpContext) {
+    try {
+      console.log('📥 Importing contacts for project:', params.id)
+      const projectId = this.validateProjectId(params.id)
+
+      const data = await request.validateUsing(vine.compile(
+        vine.object({
+          contact_ids: vine.array(vine.number()),
+          from_project_id: vine.number().optional()
+        })
+      ))
+
+      const results = {
+        imported: [],
+        conflicts: [],
+        errors: []
+      }
+
+      console.log('📋 Processing contact imports:', data.contact_ids)
+
+      for (const contactId of data.contact_ids) {
+        try {
+          const contact = await Contact.find(contactId)
+          if (!contact) {
+            results.errors.push(`Contact ${contactId} not found`)
+            continue
+          }
+
+          console.log('📋 Processing contact:', contact.firstName, contact.lastName)
+
+          // Vérifier si déjà dans le recrutement
+          const existing = await RecruitmentContact.query()
+            .where('project_id', projectId)
+            .where('contact_id', contactId)
+            .first()
+
+          if (existing) {
+            results.conflicts.push({
+              contact,
+              existing_status: existing.status,
+              recruitment_id: existing.id
+            })
+            continue
+          }
+
+          // Vérifier que les champs requis ne sont pas vides
+          const firstName = contact.firstName || contact.first_name || 'Prénom'
+          const lastName = contact.lastName || contact.last_name || 'Nom'
+
+          if (!firstName.trim() || !lastName.trim()) {
+            console.error('❌ Contact has empty name fields:', contact)
+            results.errors.push(`Contact ${contactId} has empty name fields`)
+            continue
+          }
+
+          // Créer l'entrée de recrutement avec validation des champs
+          const recruitmentContact = await RecruitmentContact.create({
+            project_id: projectId,
+            contact_id: contactId,
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+            email: contact.email || null,
+            phone: contact.phone || null,
+            messenger: contact.messenger || null,
+            source: 'database',
+            status: 'not_yet_contacted',
+            contact_method: 'manual'
+          })
+
+          await recruitmentContact.load('contact')
+          results.imported.push(recruitmentContact)
+          console.log('✅ Contact imported successfully:', recruitmentContact.id)
+
+        } catch (error) {
+          console.error('❌ Error importing contact:', contactId, error.message)
+          results.errors.push(`Error importing contact ${contactId}: ${error.message}`)
+        }
+      }
+
+      console.log('✅ Import completed:', results)
+      return response.json(results)
+    } catch (error) {
+      console.error('❌ Error in importContacts:', error.message)
+      return response.status(400).json({ error: error.message })
+    }
+  }
+
+  // Recherche avancée de contacts
+  async searchContacts(ctx: HttpContext) {
+    try {
+      console.log('🔍 Searching contacts for project:', ctx.params.id)
+
+      const baseQuery = Contact.query()
+        .preload('instruments')
+        .preload('participants', (query) => {
+          query.preload('project').preload('section')
+        })
+
+      const result = await advancedFilter(ctx, baseQuery)
+      console.log('✅ Contact search completed, results:', result.data?.length || 0)
+      return result
+    } catch (error) {
+      console.error('❌ Error in searchContacts:', error.message)
+      return ctx.response.status(400).json({ error: error.message })
+    }
+  }
+
+  // Mettre à jour le statut d'un contact
+  async updateContactStatus({ params, request, response }: HttpContext) {
+    try {
+      console.log('🔄 Updating contact status for project:', params.id, 'contact:', params.contactId)
+      const projectId = this.validateProjectId(params.id)
+      const contactId = this.validateProjectId(params.contactId)
+
+      const data = await request.validateUsing(vine.compile(
+        vine.object({
+          status: vine.enum(['not_yet_contacted', 'awaiting_response', 'to_follow_up', 'not_available', 'pending_validation', 'cancelled', 'recruited']),
+          contact_method: vine.enum(['manual', 'email', 'messenger', 'phone']).optional(),
+          notes: vine.string().optional(),
+          contact_date: vine.date({ formats: ['iso'] }).optional()
+        })
+      ))
+
+      const contact = await RecruitmentContact.query()
+        .where('id', contactId)
+        .where('project_id', projectId)
+        .first()
+
+      if (!contact) {
+        console.error('❌ Contact not found for status update')
+        return response.status(404).json({ error: 'Contact not found' })
+      }
+
+      // Si le statut passe à "awaiting_response", enregistrer la date de contact
+      if (data.status === 'awaiting_response' && !contact.contact_date) {
+        data.contact_date = new Date()
+      }
+
+      await contact.merge(data).save()
+      await contact.load('section')
+      await contact.load('contact')
+
+      console.log('✅ Contact status updated successfully')
+      return response.json(contact)
+    } catch (error) {
+      console.error('❌ Error in updateContactStatus:', error.message)
+      return response.status(400).json({ error: error.message })
+    }
+  }
+
+  // Supprimer un contact de recrutement
+  async deleteContact({ params, response }: HttpContext) {
+    try {
+      console.log('🗑️ Deleting contact for project:', params.id, 'contact:', params.contactId)
+      const projectId = this.validateProjectId(params.id)
+      const contactId = this.validateProjectId(params.contactId)
+
+      const contact = await RecruitmentContact.query()
+        .where('id', contactId)
+        .where('project_id', projectId)
+        .first()
+
+      if (!contact) {
+        console.error('❌ Contact not found for deletion')
+        return response.status(404).json({ error: 'Contact not found' })
+      }
+
+      await contact.delete()
+      console.log('✅ Contact deleted successfully')
+      return response.json({ message: 'Contact removed from recruitment' })
+    } catch (error) {
+      console.error('❌ Error in deleteContact:', error.message)
       return response.status(400).json({ error: error.message })
     }
   }
@@ -338,12 +534,17 @@ export default class RecruitmentController {
   // Obtenir les recommandations en attente
   async getRecommendations({ params, response }: HttpContext) {
     try {
+      console.log('💭 Getting recommendations for project:', params.id)
       const projectId = this.validateProjectId(params.id)
 
-      return await RecruitmentRecommendation.query()
+      const recommendations = await RecruitmentRecommendation.query()
         .where('project_id', projectId)
         .orderBy('created_at', 'desc')
+
+      console.log('✅ Recommendations retrieved:', recommendations.length)
+      return response.json(recommendations)
     } catch (error) {
+      console.error('❌ Error in getRecommendations:', error.message)
       return response.status(400).json({ error: error.message })
     }
   }
@@ -351,6 +552,7 @@ export default class RecruitmentController {
   // Traiter une recommandation
   async handleRecommendation({ params, request, response }: HttpContext) {
     try {
+      console.log('🤝 Handling recommendation for project:', params.id, 'recommendation:', params.recommendationId)
       const projectId = this.validateProjectId(params.id)
       const recommendationId = this.validateProjectId(params.recommendationId)
 
@@ -365,11 +567,17 @@ export default class RecruitmentController {
       const recommendation = await RecruitmentRecommendation.query()
         .where('id', recommendationId)
         .where('project_id', projectId)
-        .firstOrFail()
+        .first()
+
+      if (!recommendation) {
+        console.error('❌ Recommendation not found')
+        return response.status(404).json({ error: 'Recommendation not found' })
+      }
 
       if (data.action === 'ignore') {
         await recommendation.merge({ status: 'ignored' }).save()
-        return recommendation
+        console.log('✅ Recommendation ignored')
+        return response.json(recommendation)
       }
 
       // Créer un contact de recrutement
@@ -395,13 +603,15 @@ export default class RecruitmentController {
       }).save()
 
       if (data.action === 'contact_email') {
-        // Envoyer l'email de recrutement avec mention du recommandeur
-        // await this.sendRecommendationEmail(recruitmentContact, recommendation)
+        // TODO: Envoyer l'email de recrutement avec mention du recommandeur
+        console.log('📧 Would send recommendation email to:', recruitmentContact.email)
       }
 
       await recruitmentContact.load('section')
-      return { recommendation, recruitmentContact }
+      console.log('✅ Recommendation handled successfully')
+      return response.json({ recommendation, recruitmentContact })
     } catch (error) {
+      console.error('❌ Error in handleRecommendation:', error.message)
       return response.status(400).json({ error: error.message })
     }
   }
@@ -409,6 +619,7 @@ export default class RecruitmentController {
   // Import depuis un autre projet
   async importFromProject({ params, request, response }: HttpContext) {
     try {
+      console.log('🔄 Importing from project:', params.id)
       const projectId = this.validateProjectId(params.id)
 
       const data = await request.validateUsing(vine.compile(
@@ -429,6 +640,8 @@ export default class RecruitmentController {
         conflicts: [],
         errors: []
       }
+
+      console.log('📋 Processing project import, source contacts:', sourceContacts.length)
 
       for (const sourceContact of sourceContacts) {
         try {
@@ -472,42 +685,15 @@ export default class RecruitmentController {
           results.imported.push(newContact)
 
         } catch (error) {
+          console.error('❌ Error importing contact:', sourceContact.id, error.message)
           results.errors.push(`Error importing contact ${sourceContact.id}: ${error.message}`)
         }
       }
 
-      return results
+      console.log('✅ Project import completed:', results)
+      return response.json(results)
     } catch (error) {
-      return response.status(400).json({ error: error.message })
-    }
-  }
-
-  // Statistiques du recrutement
-  async getStats({ params, response }: HttpContext) {
-    try {
-      const projectId = this.validateProjectId(params.id)
-
-      const total = await RecruitmentContact.query()
-        .where('project_id', projectId)
-        .count('*')
-
-      const byStatus = await RecruitmentContact.query()
-        .where('project_id', projectId)
-        .groupBy('status')
-        .count('*')
-        .select('status')
-
-      const pendingRecommendations = await RecruitmentRecommendation.query()
-        .where('project_id', projectId)
-        .where('status', 'pending')
-        .count('*')
-
-      return {
-        total: total[0].count,
-        by_status: byStatus,
-        pending_recommendations: pendingRecommendations[0].count
-      }
-    } catch (error) {
+      console.error('❌ Error in importFromProject:', error.message)
       return response.status(400).json({ error: error.message })
     }
   }

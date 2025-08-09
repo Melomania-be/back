@@ -1,4 +1,4 @@
-// app/models/recruitment_contact.ts
+// app/models/recruitment_contact.ts - Version corrigée
 import { DateTime } from 'luxon'
 import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
