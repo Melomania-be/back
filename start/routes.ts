@@ -232,21 +232,24 @@ router.group(() => {
               router.get('/settings', [RecruitmentController, 'getSettings'])
               router.put('/settings', [RecruitmentController, 'updateSettings'])
 
-              // Contacts de recrutement
+              // Contacts de recrutement - Routes principales
               router.get('/contacts', [RecruitmentController, 'getContacts'])
+              router.get('/', [RecruitmentController, 'getContacts']) // Alias pour la liste principale
               router.post('/contacts/manual', [RecruitmentController, 'createManualContact'])
+              router.post('/contacts', [RecruitmentController, 'createManualContact']) // Route principale pour création
               router.post('/contacts/import', [RecruitmentController, 'importContacts'])
-              router.post('/contacts/import-project', [RecruitmentController, 'importFromProject'])
               router.put('/contacts/:contactId/status', [RecruitmentController, 'updateContactStatus'])
+              router.put('/contacts/:contactId', [RecruitmentController, 'updateContactStatus']) // Alias
               router.delete('/contacts/:contactId', [RecruitmentController, 'deleteContact'])
 
               // Recherche de contacts
               router.post('/search-contacts', [RecruitmentController, 'searchContacts'])
 
-              // Envoi d'emails - ROUTE MANQUANTE AJOUTÉE
+              // Envoi d'emails
               router.post('/send-emails', [RecruitmentController, 'sendRecruitmentEmails'])
 
-              // Import depuis projet - ROUTE MANQUANTE AJOUTÉE
+              // Import depuis projet
+              router.get('/import-project', [RecruitmentController, 'getAvailableProjects'])
               router.post('/import-project', [RecruitmentController, 'importFromProject'])
 
               // Recommandations

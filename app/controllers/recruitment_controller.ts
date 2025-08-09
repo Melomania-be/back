@@ -1,4 +1,4 @@
-// app/controllers/recruitment_controller.ts - Version corrigée avec validation robuste
+// app/controllers/recruitment_controller.ts - Version complète corrigée
 import { HttpContext } from '@adonisjs/core/http'
 import RecruitmentContact from '#models/recruitment_contact'
 import RecruitmentSettings from '#models/recruitment_settings'
@@ -60,8 +60,8 @@ export default class RecruitmentController {
         })
       }
 
-      console.log('✅ Settings retrieved successfully')
-      return response.json(settings)
+      console.log('✅ Settings retrieved successfully:', settings.serialize())
+      return response.json(settings.serialize())
     } catch (error) {
       console.error('❌ Error in getSettings:', error.message)
       return response.status(400).json({ error: error.message })
@@ -100,7 +100,7 @@ export default class RecruitmentController {
       }
 
       console.log('✅ Settings updated successfully')
-      return response.json(settings)
+      return response.json(settings.serialize())
     } catch (error) {
       console.error('❌ Error in updateSettings:', error.message)
       return response.status(400).json({ error: error.message })
@@ -144,36 +144,37 @@ export default class RecruitmentController {
       console.log('📊 Getting recruitment stats for project:', params.id)
       const projectId = this.validateProjectId(params.id)
 
-      // Compter le total
+      // Requête directe avec agrégation pour les statistiques par statut
+      const statsResults = await RecruitmentContact.query()
+        .where('project_id', projectId)
+        .select('status')
+        .count('* as total')
+        .groupBy('status')
+
+      console.log('📊 Raw stats from DB:', statsResults)
+
+      // Compter le total directement
       const totalResult = await RecruitmentContact.query()
         .where('project_id', projectId)
-        .count('*')
+        .count('* as total')
+        .first()
 
-      const total = Number(totalResult[0].$extras.total || 0)
-      console.log('📈 Total contacts:', total)
+      const total = Number(totalResult?.$extras.total || 0)
 
-      // Compter par statut
-      const byStatusResult = await RecruitmentContact.query()
-        .where('project_id', projectId)
-        .groupBy('status')
-        .count('*')
-        .select('status')
-
-      const byStatus = byStatusResult.map(item => ({
-        status: item.status,
-        count: Number(item.$extras.total || 0)
+      // Mapper les résultats correctement
+      const byStatus = statsResults.map(result => ({
+        status: result.status,
+        count: Number(result.$extras.total || 0)
       }))
-
-      console.log('📊 By status:', byStatus)
 
       // Compter les recommandations en attente
       const pendingRecommendationsResult = await RecruitmentRecommendation.query()
         .where('project_id', projectId)
         .where('status', 'pending')
-        .count('*')
+        .count('* as total')
+        .first()
 
-      const pendingRecommendations = Number(pendingRecommendationsResult[0].$extras.total || 0)
-      console.log('💭 Pending recommendations:', pendingRecommendations)
+      const pendingRecommendations = Number(pendingRecommendationsResult?.$extras.total || 0)
 
       const stats = {
         total,
@@ -181,7 +182,7 @@ export default class RecruitmentController {
         pending_recommendations: pendingRecommendations
       }
 
-      console.log('✅ Stats computed successfully:', stats)
+      console.log('✅ Final stats computed:', stats)
       return response.json(stats)
     } catch (error) {
       console.error('❌ Error in getStats:', error.message)
@@ -489,11 +490,12 @@ export default class RecruitmentController {
       }
 
       // Si le statut passe à "awaiting_response", enregistrer la date de contact
+      const updateData = { ...data }
       if (data.status === 'awaiting_response' && !contact.contact_date) {
-        data.contact_date = new Date()
+        updateData.contact_date = new Date()
       }
 
-      await contact.merge(data).save()
+      await contact.merge(updateData).save()
       await contact.load('section')
       await contact.load('contact')
 
@@ -616,6 +618,25 @@ export default class RecruitmentController {
     }
   }
 
+  // Obtenir les projets disponibles pour l'import
+  async getAvailableProjects({ params, response }: HttpContext) {
+    try {
+      console.log('📋 Getting available projects for import, excluding:', params.id)
+      const currentProjectId = this.validateProjectId(params.id)
+
+      const projects = await Project.query()
+        .where('id', '!=', currentProjectId)
+        .select('id', 'name', 'created_at', 'updated_at')
+        .orderBy('created_at', 'desc')
+
+      console.log('✅ Available projects retrieved:', projects.length)
+      return response.json(projects)
+    } catch (error) {
+      console.error('❌ Error in getAvailableProjects:', error.message)
+      return response.status(400).json({ error: error.message })
+    }
+  }
+
   // Import depuis un autre projet
   async importFromProject({ params, request, response }: HttpContext) {
     try {
@@ -718,15 +739,21 @@ export default class RecruitmentController {
   }
 
   private async updateFollowUpStatuses(projectId: number, followUpDays: number) {
+    console.log('🔄 Updating follow-up statuses for project:', projectId, 'with', followUpDays, 'days')
+
     const contactsToUpdate = await RecruitmentContact.query()
       .where('project_id', projectId)
       .where('status', 'awaiting_response')
       .whereNotNull('contact_date')
 
+    let updatedCount = 0
     for (const contact of contactsToUpdate) {
       if (contact.shouldFollowUp(followUpDays)) {
         await contact.merge({ status: 'to_follow_up' }).save()
+        updatedCount++
       }
     }
+
+    console.log('✅ Updated', updatedCount, 'contacts to follow-up status')
   }
 }

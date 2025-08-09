@@ -1,4 +1,4 @@
-// app/models/recruitment_contact.ts - Version corrigée
+// app/models/recruitment_contact.ts - Version complète corrigée
 import { DateTime } from 'luxon'
 import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
@@ -98,7 +98,7 @@ export default class RecruitmentContact extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  // Méthodes utilitaires
+  // Méthodes utilitaires avec validation robuste
   shouldFollowUp(followUpDays: number): boolean {
     if (this.status !== 'awaiting_response' || !this.contact_date) {
       return false
@@ -109,10 +109,82 @@ export default class RecruitmentContact extends BaseModel {
   }
 
   get displayName(): string {
-    return `${this.first_name} ${this.last_name}`
+    return `${this.first_name || ''} ${this.last_name || ''}`.trim()
   }
 
   get primaryContact(): string {
     return this.email || this.messenger || this.phone || 'Aucun contact'
+  }
+
+  // Méthode pour la sérialisation propre
+  serialize() {
+    const baseData = super.serialize()
+
+    return {
+      ...baseData,
+      // S'assurer que les dates sont bien formatées
+      contact_date: this.contact_date ? this.contact_date.toFormat('dd/MM/yyyy HH:mm') : null,
+      contact_date_iso: this.contact_date ? this.contact_date.toISO() : null,
+      created_at: this.createdAt ? this.createdAt.toFormat('dd/MM/yyyy HH:mm') : null,
+      created_at_iso: this.createdAt ? this.createdAt.toISO() : null,
+      updated_at: this.updatedAt ? this.updatedAt.toFormat('dd/MM/yyyy HH:mm') : null,
+      updated_at_iso: this.updatedAt ? this.updatedAt.toISO() : null,
+      // Informations calculées
+      display_name: this.displayName,
+      primary_contact: this.primaryContact,
+      // Relations
+      section: this.section ? this.section.serialize() : null,
+      contact: this.contact ? this.contact.serialize() : null,
+      recommender: this.recommender ? this.recommender.serialize() : null
+    }
+  }
+
+  // Méthode pour obtenir les jours depuis le contact
+  getDaysSinceContact(): number | null {
+    if (!this.contact_date) return null
+    return Math.floor(DateTime.now().diff(this.contact_date, 'days').days)
+  }
+
+  // Méthode pour vérifier si le contact doit être relancé
+  needsFollowUp(followUpDays: number): boolean {
+    return this.shouldFollowUp(followUpDays)
+  }
+
+  // Méthode pour obtenir le statut avec badge
+  getStatusBadge(): { label: string; color: string; icon: string } {
+    const statusConfig = {
+      'not_yet_contacted': { label: 'Pas encore contacté', color: 'gray', icon: 'AlertCircle' },
+      'awaiting_response': { label: 'En attente de réponse', color: 'blue', icon: 'Clock' },
+      'to_follow_up': { label: 'À relancer', color: 'yellow', icon: 'AlertTriangle' },
+      'not_available': { label: 'Non disponible', color: 'red', icon: 'XCircle' },
+      'pending_validation': { label: 'En validation', color: 'purple', icon: 'Clock' },
+      'cancelled': { label: 'Annulé', color: 'gray', icon: 'XCircle' },
+      'recruited': { label: 'Recruté', color: 'green', icon: 'CheckCircle' }
+    }
+
+    return statusConfig[this.status] || statusConfig['not_yet_contacted']
+  }
+
+  // Méthode statique pour obtenir tous les statuts disponibles
+  static getAvailableStatuses(): Array<{ value: RecruitmentStatus; label: string }> {
+    return [
+      { value: 'not_yet_contacted', label: 'Pas encore contacté' },
+      { value: 'awaiting_response', label: 'En attente de réponse' },
+      { value: 'to_follow_up', label: 'À relancer' },
+      { value: 'not_available', label: 'Non disponible' },
+      { value: 'pending_validation', label: 'En validation' },
+      { value: 'cancelled', label: 'Annulé' },
+      { value: 'recruited', label: 'Recruté' }
+    ]
+  }
+
+  // Méthode statique pour obtenir tous les moyens de contact
+  static getAvailableContactMethods(): Array<{ value: ContactMethod; label: string }> {
+    return [
+      { value: 'manual', label: 'Manuel' },
+      { value: 'email', label: 'Email' },
+      { value: 'messenger', label: 'Messenger' },
+      { value: 'phone', label: 'Téléphone' }
+    ]
   }
 }
