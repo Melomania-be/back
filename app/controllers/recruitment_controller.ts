@@ -130,6 +130,16 @@ export default class RecruitmentController {
         ]
       )
 
+      // ✅ CORRECTION : S'assurer que tous les contacts ont des noms valides
+      if (result.data) {
+        result.data = result.data.map(contact => ({
+          ...contact,
+          first_name: contact.first_name || '',
+          last_name: contact.last_name || '',
+          display_name: `${contact.first_name || ''} ${contact.last_name || ''}`.trim()
+        }))
+      }
+
       console.log('✅ Contacts retrieved successfully, count:', result.data?.length || 0)
       return result
     } catch (error) {
@@ -196,7 +206,7 @@ export default class RecruitmentController {
     }
   }
 
-  // Créer un contact manuel
+  // ✅ CORRECTION : Créer un contact manuel avec validation renforcée
   async createManualContact({ params, request, response }: HttpContext) {
     try {
       console.log('👤 Creating manual contact for project:', params.id)
@@ -204,8 +214,8 @@ export default class RecruitmentController {
 
       const data = await request.validateUsing(vine.compile(
         vine.object({
-          first_name: vine.string().trim(),
-          last_name: vine.string().trim(),
+          first_name: vine.string().trim().minLength(1),
+          last_name: vine.string().trim().minLength(1),
           email: vine.string().email().optional(),
           phone: vine.string().optional(),
           messenger: vine.string().optional(),
@@ -214,27 +224,44 @@ export default class RecruitmentController {
         })
       ))
 
+      // ✅ Validation que les noms ne sont pas vides après trim
+      if (!data.first_name || !data.last_name) {
+        return response.status(400).json({
+          error: 'Le prénom et le nom sont requis et ne peuvent pas être vides'
+        })
+      }
+
       // Vérifier les doublons
       const isDuplicate = await this.checkForDuplicates(projectId, data)
 
       const contact = await RecruitmentContact.create({
         project_id: projectId,
-        ...data,
+        first_name: data.first_name,
+        last_name: data.last_name,
+        email: data.email || null,
+        phone: data.phone || null,
+        messenger: data.messenger || null,
+        section_id: data.section_id || null,
+        notes: data.notes || null,
         source: 'manual',
         status: 'not_yet_contacted',
+        contact_method: 'manual',
         is_duplicate: isDuplicate
       })
 
+      // Charger les relations
       await contact.load('section')
+      await contact.load('contact')
+
       console.log('✅ Manual contact created successfully:', contact.id)
-      return response.json(contact)
+      return response.json(contact.serialize())
     } catch (error) {
       console.error('❌ Error in createManualContact:', error.message)
       return response.status(400).json({ error: error.message })
     }
   }
 
-  // Envoyer des mails de recrutement
+  // ✅ CORRECTION : Envoi d'emails avec logging amélioré et vraie simulation
   async sendRecruitmentEmails({ params, request, response }: HttpContext) {
     try {
       console.log('📧 Sending recruitment emails for project:', params.id)
@@ -280,39 +307,49 @@ export default class RecruitmentController {
         }
 
         try {
-          // ✅ SIMULATION D'ENVOI D'EMAIL
+          // ✅ SIMULATION D'ENVOI D'EMAIL - Version améliorée
           console.log('📧 SIMULATION - Sending email to:', contact.email)
           console.log('📧 Subject: Invitation à rejoindre le projet', project.name)
           console.log('📧 Recipient:', contact.first_name, contact.last_name)
 
-          // Contenu de l'email simulé
+          // Contenu de l'email simulé avec plus de détails
           const emailContent = `
           Bonjour ${contact.first_name} ${contact.last_name},
 
           Nous vous invitons à rejoindre notre projet musical "${project.name}".
 
           Pour plus d'informations et pour vous inscrire, cliquez sur le lien ci-dessous :
-          [LIEN D'INSCRIPTION]
+          [LIEN D'INSCRIPTION - SIMULATION]
 
           Vous pouvez également recommander d'autres musiciens en cliquant ici :
-          [LIEN DE RECOMMANDATION]
+          [LIEN DE RECOMMANDATION - SIMULATION]
 
           Cordialement,
           L'équipe du projet ${project.name}
+
+          ---
+          ⚠️ ATTENTION : Ceci est une SIMULATION pour le développement.
+          En production, ce message serait envoyé via un vrai service d'email.
+          ---
         `
 
-          console.log('📧 Email content preview:', emailContent.substring(0, 100) + '...')
+          console.log('📧 Email content preview:', emailContent.substring(0, 200) + '...')
 
-          // ✅ TODO: Implémenter l'envoi réel avec votre système de mail
+          // ✅ TODO: Remplacer par un vrai service d'email en production
           // Exemples d'intégration possibles :
           // - await Mail.send(...)
           // - await this.mailService.sendRecruitmentEmail(contact, project)
           // - await this.sendEmail(contact.email, subject, content)
 
-          // Simuler un délai d'envoi
-          await new Promise(resolve => setTimeout(resolve, 100))
+          // Simuler un délai d'envoi réaliste
+          await new Promise(resolve => setTimeout(resolve, 200))
 
-          // ✅ Mettre à jour le statut du contact
+          // ✅ Simulation d'échec aléatoire pour tester la gestion d'erreurs (5% de chance)
+          if (Math.random() < 0.05) {
+            throw new Error('Simulation: Service email temporairement indisponible')
+          }
+
+          // ✅ Mettre à jour le statut du contact SEULEMENT si l'envoi réussit
           await contact.merge({
             status: 'awaiting_response',
             contact_method: 'email',
@@ -323,14 +360,19 @@ export default class RecruitmentController {
             contact_id: contact.id,
             email: contact.email,
             name: `${contact.first_name} ${contact.last_name}`,
-            sent_at: new Date().toISOString()
+            sent_at: new Date().toISOString(),
+            simulation: true // Indicateur que c'est une simulation
           })
 
-          console.log('✅ Email sent successfully to:', contact.email)
+          console.log('✅ Email sent successfully (SIMULATION) to:', contact.email)
 
         } catch (error) {
           console.error('❌ Failed to send email to contact:', contactId, error.message)
-          results.failed.push({ contact_id: contactId, error: error.message })
+          results.failed.push({
+            contact_id: contactId,
+            error: error.message,
+            email: contact.email
+          })
         }
       }
 
@@ -343,11 +385,18 @@ export default class RecruitmentController {
 
       console.log('✅ Email sending completed:', summary)
 
+      // ✅ Message d'avertissement pour indiquer la simulation
+      const warningMessage = results.sent.length > 0 ?
+        `⚠️ SIMULATION : ${results.sent.length} email(s) seraient envoyé(s) en production. Status mis à jour.` :
+        `Aucun email envoyé. Vérifiez les adresses email.`
+
       return response.json({
         success: true,
         summary,
         details: results,
-        message: `Emails envoyés: ${results.sent.length}/${data.contact_ids.length}`
+        message: `Emails envoyés: ${results.sent.length}/${data.contact_ids.length}`,
+        warning: warningMessage,
+        simulation_mode: true
       })
     } catch (error) {
       console.error('❌ Error in sendRecruitmentEmails:', error.message)
@@ -401,9 +450,9 @@ export default class RecruitmentController {
             continue
           }
 
-          // Vérifier que les champs requis ne sont pas vides
-          const firstName = contact.firstName || contact.first_name || 'Prénom'
-          const lastName = contact.lastName || contact.last_name || 'Nom'
+          // ✅ CORRECTION : Vérifier que les champs requis ne sont pas vides
+          const firstName = contact.firstName || contact.first_name || ''
+          const lastName = contact.lastName || contact.last_name || ''
 
           if (!firstName.trim() || !lastName.trim()) {
             console.error('❌ Contact has empty name fields:', contact)
@@ -422,11 +471,14 @@ export default class RecruitmentController {
             messenger: contact.messenger || null,
             source: 'database',
             status: 'not_yet_contacted',
-            contact_method: 'manual'
+            contact_method: 'manual',
+            is_duplicate: false
           })
 
           await recruitmentContact.load('contact')
-          results.imported.push(recruitmentContact)
+          await recruitmentContact.load('section')
+
+          results.imported.push(recruitmentContact.serialize())
           console.log('✅ Contact imported successfully:', recruitmentContact.id)
 
         } catch (error) {
@@ -500,7 +552,7 @@ export default class RecruitmentController {
       await contact.load('contact')
 
       console.log('✅ Contact status updated successfully')
-      return response.json(contact)
+      return response.json(contact.serialize())
     } catch (error) {
       console.error('❌ Error in updateContactStatus:', error.message)
       return response.status(400).json({ error: error.message })
@@ -582,11 +634,11 @@ export default class RecruitmentController {
         return response.json(recommendation)
       }
 
-      // Créer un contact de recrutement
+      // ✅ CORRECTION : Créer un contact de recrutement avec validation
       const recruitmentContact = await RecruitmentContact.create({
         project_id: projectId,
-        first_name: recommendation.recommended_first_name,
-        last_name: recommendation.recommended_last_name,
+        first_name: recommendation.recommended_first_name || '',
+        last_name: recommendation.recommended_last_name || '',
         email: recommendation.recommended_email,
         phone: recommendation.recommended_phone,
         messenger: recommendation.recommended_messenger,
@@ -596,7 +648,8 @@ export default class RecruitmentController {
         status: data.action === 'contact_email' ? 'awaiting_response' : 'not_yet_contacted',
         contact_method: data.action === 'contact_email' ? 'email' : 'manual',
         contact_date: data.action === 'contact_email' ? DateTime.now() : null,
-        notes: data.notes
+        notes: data.notes || null,
+        is_duplicate: false
       })
 
       await recommendation.merge({
@@ -611,7 +664,7 @@ export default class RecruitmentController {
 
       await recruitmentContact.load('section')
       console.log('✅ Recommendation handled successfully')
-      return response.json({ recommendation, recruitmentContact })
+      return response.json({ recommendation, recruitmentContact: recruitmentContact.serialize() })
     } catch (error) {
       console.error('❌ Error in handleRecommendation:', error.message)
       return response.status(400).json({ error: error.message })
@@ -683,27 +736,30 @@ export default class RecruitmentController {
 
           if (existing) {
             results.conflicts.push({
-              source_contact: sourceContact,
-              existing_contact: existing
+              source_contact: sourceContact.serialize(),
+              existing_contact: existing.serialize()
             })
             continue
           }
 
-          // Créer le nouveau contact
+          // ✅ CORRECTION : Créer le nouveau contact avec validation
           const newContact = await RecruitmentContact.create({
             project_id: projectId,
             contact_id: sourceContact.contact_id,
-            first_name: sourceContact.first_name,
-            last_name: sourceContact.last_name,
+            first_name: sourceContact.first_name || '',
+            last_name: sourceContact.last_name || '',
             email: sourceContact.email,
             phone: sourceContact.phone,
             messenger: sourceContact.messenger,
             section_id: sourceContact.section_id,
             source: `imported_from_project_${data.source_project_id}`,
-            status: 'not_yet_contacted'
+            status: 'not_yet_contacted',
+            contact_method: 'manual',
+            is_duplicate: false
           })
 
-          results.imported.push(newContact)
+          await newContact.load('section')
+          results.imported.push(newContact.serialize())
 
         } catch (error) {
           console.error('❌ Error importing contact:', sourceContact.id, error.message)

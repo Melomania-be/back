@@ -116,26 +116,42 @@ export default class RecruitmentContact extends BaseModel {
     return this.email || this.messenger || this.phone || 'Aucun contact'
   }
 
-  // Méthode pour la sérialisation propre
+  // ✅ CORRECTION : Méthode serialize corrigée pour éviter les undefined
   serialize() {
     const baseData = super.serialize()
 
     return {
       ...baseData,
-      // S'assurer que les dates sont bien formatées
+      // ✅ S'assurer que les noms ne sont jamais undefined
+      first_name: this.first_name || '',
+      last_name: this.last_name || '',
+      display_name: this.displayName,
+      primary_contact: this.primaryContact,
+
+      // Dates formatées
       contact_date: this.contact_date ? this.contact_date.toFormat('dd/MM/yyyy HH:mm') : null,
       contact_date_iso: this.contact_date ? this.contact_date.toISO() : null,
       created_at: this.createdAt ? this.createdAt.toFormat('dd/MM/yyyy HH:mm') : null,
       created_at_iso: this.createdAt ? this.createdAt.toISO() : null,
       updated_at: this.updatedAt ? this.updatedAt.toFormat('dd/MM/yyyy HH:mm') : null,
       updated_at_iso: this.updatedAt ? this.updatedAt.toISO() : null,
-      // Informations calculées
-      display_name: this.displayName,
-      primary_contact: this.primaryContact,
-      // Relations
-      section: this.section ? this.section.serialize() : null,
-      contact: this.contact ? this.contact.serialize() : null,
-      recommender: this.recommender ? this.recommender.serialize() : null
+
+      // Relations avec protection
+      section: this.section ? {
+        id: this.section.id,
+        name: this.section.name || 'Section inconnue'
+      } : null,
+      contact: this.contact ? {
+        id: this.contact.id,
+        first_name: this.contact.first_name || '',
+        last_name: this.contact.last_name || '',
+        email: this.contact.email || null
+      } : null,
+      recommender: this.recommender ? {
+        id: this.recommender.id,
+        first_name: this.recommender.first_name || '',
+        last_name: this.recommender.last_name || ''
+      } : null
     }
   }
 
