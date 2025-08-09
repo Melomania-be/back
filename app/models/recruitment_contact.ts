@@ -1,4 +1,4 @@
-// app/models/recruitment_contact.ts - Version complète corrigée
+// app/models/recruitment_contact.ts - Version corrigée
 import { DateTime } from 'luxon'
 import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
@@ -77,16 +77,19 @@ export default class RecruitmentContact extends BaseModel {
   })
   declare project: BelongsTo<typeof Project>
 
+  // ✅ CORRECTION : Relation optionnelle avec Contact
   @belongsTo(() => Contact, {
     foreignKey: 'contact_id',
   })
   declare contact: BelongsTo<typeof Contact>
 
+  // ✅ CORRECTION : Relation optionnelle avec Section
   @belongsTo(() => Section, {
     foreignKey: 'section_id',
   })
   declare section: BelongsTo<typeof Section>
 
+  // ✅ CORRECTION : Relation optionnelle avec le recommandeur
   @belongsTo(() => Contact, {
     foreignKey: 'recommender_contact_id',
   })
@@ -116,7 +119,7 @@ export default class RecruitmentContact extends BaseModel {
     return this.email || this.messenger || this.phone || 'Aucun contact'
   }
 
-  // ✅ CORRECTION : Méthode serialize corrigée pour éviter les undefined
+  // ✅ CORRECTION : Méthode serialize corrigée pour éviter les undefined et gérer les relations nulles
   serialize() {
     const baseData = super.serialize()
 
@@ -136,17 +139,21 @@ export default class RecruitmentContact extends BaseModel {
       updated_at: this.updatedAt ? this.updatedAt.toFormat('dd/MM/yyyy HH:mm') : null,
       updated_at_iso: this.updatedAt ? this.updatedAt.toISO() : null,
 
-      // Relations avec protection
+      // ✅ CORRECTION : Relations avec protection contre les valeurs nulles
       section: this.section ? {
         id: this.section.id,
         name: this.section.name || 'Section inconnue'
       } : null,
+
+      // ✅ Contact peut être null pour les contacts manuels
       contact: this.contact ? {
         id: this.contact.id,
         first_name: this.contact.first_name || '',
         last_name: this.contact.last_name || '',
         email: this.contact.email || null
       } : null,
+
+      // ✅ Recommandeur peut être null
       recommender: this.recommender ? {
         id: this.recommender.id,
         first_name: this.recommender.first_name || '',
