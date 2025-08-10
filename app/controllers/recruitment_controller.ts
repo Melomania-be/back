@@ -1,4 +1,4 @@
-// app/controllers/recruitment_controller.ts - Version corrigée
+// app/controllers/recruitment_controller.ts - Version corrigée avec envoi d'emails
 import { HttpContext } from '@adonisjs/core/http'
 import RecruitmentContact from '#models/recruitment_contact'
 import RecruitmentSettings from '#models/recruitment_settings'
@@ -6,9 +6,12 @@ import RecruitmentRecommendation from '#models/recruitment_recommendation'
 import Contact from '#models/contact'
 import Project from '#models/project'
 import Section from '#models/section'
+import Responsibles from '#models/responsibles'
 import { DateTime } from 'luxon'
 import { simpleFilter, advancedFilter } from 'adonisjs-filters'
 import vine from '@vinejs/vine'
+import mail from '@adonisjs/mail/services/main'
+import RecruitmentEmail from '#mails/recruitment_email'
 
 export default class RecruitmentController {
   // Validation des paramètres avec logging détaillé
@@ -298,7 +301,7 @@ export default class RecruitmentController {
     }
   }
 
-  // ✅ CORRECTION : Envoi d'emails avec logging amélioré
+  // ✅ CORRECTION : Envoi d'emails RÉEL avec logging amélioré
   async sendRecruitmentEmails({ params, request, response }: HttpContext) {
     try {
       console.log('📧 Sending recruitment emails for project:', params.id)
@@ -327,6 +330,28 @@ export default class RecruitmentController {
         return response.status(404).json({ error: 'Project not found' })
       }
 
+      // ✅ CORRECTION : Récupérer les responsables du projet pour l'expéditeur
+      const responsibles = await Responsibles.query()
+        .where('project_id', projectId)
+        .preload('contact')
+
+      let recruiterInfo = {
+        name: 'Équipe Melomania',
+        email: 'contact@melomania.com'
+      }
+
+      if (responsibles && responsibles.length > 0) {
+        const firstResponsible = responsibles[0]
+        if (firstResponsible.contact) {
+          recruiterInfo = {
+            name: `${firstResponsible.contact.first_name} ${firstResponsible.contact.last_name}`,
+            email: firstResponsible.contact.email || 'contact@melomania.com'
+          }
+        }
+      }
+
+      console.log('📧 Recruiter info:', recruiterInfo)
+
       for (const contactId of data.contact_ids) {
         const contact = await RecruitmentContact.query()
           .where('id', contactId)
@@ -344,18 +369,28 @@ export default class RecruitmentController {
         }
 
         try {
-          // ✅ SIMULATION D'ENVOI D'EMAIL
-          console.log('📧 SIMULATION - Sending email to:', contact.email)
+          // ✅ CORRECTION : ENVOI D'EMAIL RÉEL (plus de simulation)
+          console.log('📧 REAL EMAIL - Sending email to:', contact.email)
           console.log('📧 Subject: Invitation à rejoindre le projet', project.name)
           console.log('📧 Recipient:', contact.first_name, contact.last_name)
 
-          // Simuler un délai d'envoi réaliste
-          await new Promise(resolve => setTimeout(resolve, 200))
+          // Créer l'email de recrutement
+          const recruitmentMail = new RecruitmentEmail(
+            {
+              first_name: contact.first_name,
+              last_name: contact.last_name,
+              email: contact.email
+            },
+            {
+              id: project.id,
+              name: project.name
+            },
+            recruiterInfo,
+            contact.recommended_by || undefined
+          )
 
-          // ✅ Simulation d'échec aléatoire pour tester la gestion d'erreurs (5% de chance)
-          if (Math.random() < 0.05) {
-            throw new Error('Simulation: Service email temporairement indisponible')
-          }
+          // ✅ ENVOI RÉEL DE L'EMAIL
+          await mail.send(recruitmentMail)
 
           // ✅ Mettre à jour le statut du contact SEULEMENT si l'envoi réussit
           await contact.merge({
@@ -369,10 +404,10 @@ export default class RecruitmentController {
             email: contact.email,
             name: `${contact.first_name} ${contact.last_name}`,
             sent_at: new Date().toISOString(),
-            simulation: true
+            real_email: true
           })
 
-          console.log('✅ Email sent successfully (SIMULATION) to:', contact.email)
+          console.log('✅ Email sent successfully (REAL) to:', contact.email)
 
         } catch (error) {
           console.error('❌ Failed to send email to contact:', contactId, error.message)
@@ -393,8 +428,8 @@ export default class RecruitmentController {
 
       console.log('✅ Email sending completed:', summary)
 
-      const warningMessage = results.sent.length > 0 ?
-        `⚠️ SIMULATION : ${results.sent.length} email(s) seraient envoyé(s) en production. Status mis à jour.` :
+      const successMessage = results.sent.length > 0 ?
+        `✅ ${results.sent.length} email(s) envoyé(s) avec succès. Status mis à jour.` :
         `Aucun email envoyé. Vérifiez les adresses email.`
 
       return response.json({
@@ -402,8 +437,8 @@ export default class RecruitmentController {
         summary,
         details: results,
         message: `Emails envoyés: ${results.sent.length}/${data.contact_ids.length}`,
-        warning: warningMessage,
-        simulation_mode: true
+        info: successMessage,
+        simulation_mode: false // ✅ Plus de simulation
       })
     } catch (error) {
       console.error('❌ Error in sendRecruitmentEmails:', error.message)

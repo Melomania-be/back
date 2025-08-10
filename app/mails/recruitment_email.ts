@@ -1,7 +1,9 @@
-// app/mails/recruitment_email.ts - Email de recrutement
+// app/mails/recruitment_email.ts - Email de recrutement corrigé
 import env from '#start/env'
 import { BaseMail } from '@adonisjs/mail'
 import MailTemplate from '#models/mail_template'
+import type Project from '#models/project'
+import type Contact from '#models/contact'
 
 export default class RecruitmentEmail extends BaseMail {
   contact: {
@@ -40,6 +42,10 @@ export default class RecruitmentEmail extends BaseMail {
   async prepare() {
     const url = env.get('URL') || 'http://localhost:3333'
 
+    console.log('📧 Preparing recruitment email for:', this.contact.email)
+    console.log('📧 Project:', this.project.name)
+    console.log('📧 Recruiter:', this.recruiter.name)
+
     // Essayer de récupérer un template personnalisé
     let template = await MailTemplate.query()
       .where('name', 'recruitment_email.html')
@@ -55,8 +61,10 @@ export default class RecruitmentEmail extends BaseMail {
     let htmlContent = ''
 
     if (template) {
+      console.log('📧 Using template:', template.name)
       htmlContent = template.content
     } else {
+      console.log('📧 Using built-in template')
       // Template par défaut intégré
       htmlContent = `
         <!DOCTYPE html>
@@ -78,7 +86,7 @@ export default class RecruitmentEmail extends BaseMail {
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>Invitation Musicale</h1>
+                    <h1>🎵 Invitation Musicale</h1>
                 </div>
                 <div class="content">
                     <h2>Bonjour \${NAME},</h2>
@@ -140,6 +148,8 @@ export default class RecruitmentEmail extends BaseMail {
       .replace(/\${REGISTRATION_URL}/g, `${url}/registration/${this.project.id}`)
       .replace(/\${RECOMMEND_URL}/g, `${url}/projects/${this.project.id}/recommend`)
       .replace(/\${UNSUBSCRIBE_URL}/g, `${url}/unsubscribe?email=${encodeURIComponent(this.contact.email)}`)
+
+    console.log('📧 Email prepared successfully')
 
     this.message
       .to(this.contact.email)
