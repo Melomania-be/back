@@ -1,11 +1,12 @@
-// app/models/recruitment_recommendation.ts - Version complète corrigée
+// app/models/recruitment_recommendation.ts - Version corrigée avec bons statuts
 import { DateTime } from 'luxon'
 import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import Project from './project.js'
 import RecruitmentContact from './recruitment_contact.js'
 
-export type RecommendationStatus = 'pending' | 'ignored' | 'contact_email' | 'contact_manual'
+// ✅ CORRECTION : Types de statut corrigés pour correspondre à la contrainte DB
+export type RecommendationStatus = 'pending' | 'ignored' | 'contacted_email' | 'contacted_manual'
 
 export default class RecruitmentRecommendation extends BaseModel {
   @column({ isPrimary: true })
@@ -41,11 +42,11 @@ export default class RecruitmentRecommendation extends BaseModel {
   @column()
   declare recommendation_message: string | null
 
-  // ✅ CORRECTION : Valeur par défaut pour le statut avec sérialisation sécurisée
+  // ✅ CORRECTION : Valeur par défaut et validation corrigées
   @column({
     prepare: (value: RecommendationStatus | string | null | undefined) => {
       if (!value || typeof value !== 'string') return 'pending'
-      const validStatuses: RecommendationStatus[] = ['pending', 'ignored', 'contact_email', 'contact_manual']
+      const validStatuses: RecommendationStatus[] = ['pending', 'ignored', 'contacted_email', 'contacted_manual']
       return validStatuses.includes(value as RecommendationStatus) ? value : 'pending'
     },
     serialize: (value: RecommendationStatus | string | null | undefined) => {
@@ -73,27 +74,18 @@ export default class RecruitmentRecommendation extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  // ✅ GETTERS : Propriétés calculées sécurisées
+  // ✅ GETTERS : Propriétés calculées sécurisées avec statuts corrigés
 
-  /**
-   * Nom d'affichage sécurisé de la personne recommandée
-   */
   get recommendedDisplayName(): string {
     const firstName = this.recommended_first_name?.trim() || 'Prénom'
     const lastName = this.recommended_last_name?.trim() || 'Nom'
     return `${firstName} ${lastName}`.trim()
   }
 
-  /**
-   * Nom du recommandeur sécurisé
-   */
   get recommenderDisplayName(): string {
     return this.recommender_name?.trim() || 'Recommandeur anonyme'
   }
 
-  /**
-   * Formatage de date de création sécurisé
-   */
   get formattedCreatedAt(): string {
     if (!this.createdAt) return 'Date inconnue'
 
@@ -105,9 +97,6 @@ export default class RecruitmentRecommendation extends BaseModel {
     }
   }
 
-  /**
-   * Formatage de date de mise à jour sécurisé
-   */
   get formattedUpdatedAt(): string {
     if (!this.updatedAt) return 'Date inconnue'
 
@@ -119,16 +108,10 @@ export default class RecruitmentRecommendation extends BaseModel {
     }
   }
 
-  /**
-   * Vérifier si la recommandation a des informations de contact
-   */
   get hasContactInfo(): boolean {
     return !!(this.recommended_email || this.recommended_phone || this.recommended_messenger)
   }
 
-  /**
-   * Obtenir le moyen de contact principal
-   */
   get primaryContact(): string {
     if (this.recommended_email) return this.recommended_email
     if (this.recommended_phone) return this.recommended_phone
@@ -136,52 +119,39 @@ export default class RecruitmentRecommendation extends BaseModel {
     return 'Aucun contact'
   }
 
-  /**
-   * Vérifier si la recommandation peut être contactée par email
-   */
   get canContactByEmail(): boolean {
     return !!(this.recommended_email && this.recommended_email.includes('@'))
   }
 
-  // ✅ MÉTHODES : Utilitaires
+  // ✅ MÉTHODES : Utilitaires avec statuts corrigés
 
-  /**
-   * Marquer la recommandation comme ignorée
-   */
   async markAsIgnored(): Promise<void> {
     this.status = 'ignored'
     await this.save()
   }
 
-  /**
-   * Marquer la recommandation comme contactée par email
-   */
   async markAsContactedByEmail(recruitmentContactId?: number): Promise<void> {
-    this.status = 'contact_email'
+    this.status = 'contacted_email' // ✅ CORRECTION
     if (recruitmentContactId) {
       this.recruitment_contact_id = recruitmentContactId
     }
     await this.save()
   }
 
-  /**
-   * Marquer la recommandation comme contactée manuellement
-   */
   async markAsContactedManually(recruitmentContactId?: number): Promise<void> {
-    this.status = 'contact_manual'
+    this.status = 'contacted_manual' // ✅ CORRECTION
     if (recruitmentContactId) {
       this.recruitment_contact_id = recruitmentContactId
     }
     await this.save()
   }
 
-  // ✅ SÉRIALISATION : Méthode personnalisée pour corriger les valeurs undefined
+  // ✅ SÉRIALISATION : Méthode personnalisée avec statuts corrigés
   serialize() {
     const baseData = super.serialize()
 
     return {
       ...baseData,
-      // ✅ Protection contre les valeurs undefined/null
       id: this.id || 0,
       project_id: this.project_id || 0,
       recommender_name: this.recommender_name || 'Anonyme',
@@ -196,18 +166,18 @@ export default class RecruitmentRecommendation extends BaseModel {
       status: this.status || 'pending',
       recruitment_contact_id: this.recruitment_contact_id || null,
 
-      // ✅ Propriétés calculées
+      // Propriétés calculées
       recommended_display_name: this.recommendedDisplayName,
       recommender_display_name: this.recommenderDisplayName,
       has_contact_info: this.hasContactInfo,
       primary_contact: this.primaryContact,
       can_contact_by_email: this.canContactByEmail,
 
-      // ✅ Dates formatées
+      // Dates formatées
       formatted_created_at: this.formattedCreatedAt,
       formatted_updated_at: this.formattedUpdatedAt,
 
-      // ✅ Dates au format ISO pour JavaScript
+      // Dates au format ISO pour JavaScript
       created_at: this.createdAt ? this.createdAt.toFormat('yyyy-MM-dd HH:mm:ss') : null,
       updated_at: this.updatedAt ? this.updatedAt.toFormat('yyyy-MM-dd HH:mm:ss') : null,
       created_at_iso: this.createdAt ? this.createdAt.toISO() : null,
@@ -215,11 +185,8 @@ export default class RecruitmentRecommendation extends BaseModel {
     }
   }
 
-  // ✅ MÉTHODES STATIQUES : Utilitaires de classe
+  // ✅ MÉTHODES STATIQUES : Utilitaires de classe avec statuts corrigés
 
-  /**
-   * Obtenir toutes les recommandations en attente pour un projet
-   */
   static async getPendingForProject(projectId: number) {
     return await this.query()
       .where('project_id', projectId)
@@ -227,9 +194,6 @@ export default class RecruitmentRecommendation extends BaseModel {
       .orderBy('created_at', 'desc')
   }
 
-  /**
-   * Obtenir le nombre de recommandations en attente pour un projet
-   */
   static async getPendingCountForProject(projectId: number): Promise<number> {
     const result = await this.query()
       .where('project_id', projectId)
@@ -240,9 +204,6 @@ export default class RecruitmentRecommendation extends BaseModel {
     return Number(result?.$extras.total || 0)
   }
 
-  /**
-   * Obtenir toutes les recommandations pour un projet avec leurs relations
-   */
   static async getForProjectWithRelations(projectId: number) {
     return await this.query()
       .where('project_id', projectId)
@@ -253,9 +214,6 @@ export default class RecruitmentRecommendation extends BaseModel {
       .orderBy('created_at', 'desc')
   }
 
-  /**
-   * Rechercher des recommandations par nom
-   */
   static async searchByName(projectId: number, searchTerm: string) {
     const term = `%${searchTerm.toLowerCase()}%`
 

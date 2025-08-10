@@ -41,30 +41,27 @@ export default class RecruitmentRecommendationController {
   }
 
   /**
-   * ✅ FONCTION UTILITAIRE : Déterminer l'URL frontend selon l'environnement
-   * Utilise la même logique que les callsheets pour la cohérence
+   * ✅ FONCTION UTILITAIRE CORRIGÉE : Déterminer l'URL frontend selon l'environnement
    */
   private getFrontendUrl(): string {
     const envUrl = env.get('FRONTEND_URL')
     const nodeEnv = env.get('NODE_ENV', 'development')
     const host = env.get('HOST', 'localhost')
-    const port = env.get('PORT', '3333')
 
     console.log('🔍 Environment detection for recommendation:', {
       FRONTEND_URL: envUrl,
       NODE_ENV: nodeEnv,
       HOST: host,
-      PORT: port,
     })
 
     // Si FRONTEND_URL est définie explicitement et n'est pas localhost, l'utiliser
-    if (envUrl && !envUrl.includes('localhost')) {
+    if (envUrl && !envUrl.includes('localhost') && envUrl.trim() !== '') {
       console.log(`🌐 Using explicit FRONTEND_URL: ${envUrl}`)
       return envUrl
     }
 
     // Détection automatique basée sur HOST et NODE_ENV
-    if (host !== 'localhost' && host !== '127.0.0.1') {
+    if (host && host !== 'localhost' && host !== '127.0.0.1') {
       // On est sur un serveur distant
       if (nodeEnv === 'development' || host.includes('universe.wf')) {
         const frontendUrl = 'http://tool.sc1ciro3903.universe.wf'
@@ -79,16 +76,16 @@ export default class RecruitmentRecommendationController {
       }
 
       // Fallback pour serveur distant non reconnu
-      const isProduction = (nodeEnv as string) === 'production'
+      const isProduction = nodeEnv === 'production'
       const protocol = isProduction ? 'https' : 'http'
       const frontendUrl = `${protocol}://${host}`
       console.log(`⚡ Auto-detected REMOTE server: ${frontendUrl}`)
       return frontendUrl
     }
 
-    // Développement local - utiliser le port du frontend Svelte
+    // ✅ CORRECTION : Développement local - TOUJOURS utiliser le port 5173
     const frontendUrl = 'http://localhost:5173'
-    console.log(`🔧 Using LOCAL development: ${frontendUrl}`)
+    console.log(`🔧 Using LOCAL development (forced port 5173): ${frontendUrl}`)
     return frontendUrl
   }
 

@@ -1,9 +1,7 @@
-// app/mails/recruitment_email.ts - Version complète corrigée avec détection d'URL
+// app/mails/recruitment_email.ts - Version corrigée avec détection URL améliorée
 import env from '#start/env'
 import { BaseMail } from '@adonisjs/mail'
 import MailTemplate from '#models/mail_template'
-import type Project from '#models/project'
-import type Contact from '#models/contact'
 
 export default class RecruitmentEmail extends BaseMail {
   contact: {
@@ -40,29 +38,27 @@ export default class RecruitmentEmail extends BaseMail {
   }
 
   /**
-   * ✅ FONCTION DE DÉTECTION D'URL : Identique à celle des callsheets pour la cohérence
+   * ✅ CORRECTION : Fonction de détection d'URL corrigée avec fallback robuste
    */
   private getFrontendUrl(): string {
     const envUrl = env.get('FRONTEND_URL')
     const nodeEnv = env.get('NODE_ENV', 'development')
     const host = env.get('HOST', 'localhost')
-    const port = env.get('PORT', '3333')
 
     console.log('🔍 Environment detection for recruitment email:', {
       FRONTEND_URL: envUrl,
       NODE_ENV: nodeEnv,
       HOST: host,
-      PORT: port,
     })
 
     // Si FRONTEND_URL est définie explicitement et n'est pas localhost, l'utiliser
-    if (envUrl && !envUrl.includes('localhost')) {
+    if (envUrl && !envUrl.includes('localhost') && envUrl.trim() !== '') {
       console.log(`🌐 Using explicit FRONTEND_URL: ${envUrl}`)
       return envUrl
     }
 
     // Détection automatique basée sur HOST et NODE_ENV
-    if (host !== 'localhost' && host !== '127.0.0.1') {
+    if (host && host !== 'localhost' && host !== '127.0.0.1') {
       // On est sur un serveur distant
       if (nodeEnv === 'development' || host.includes('universe.wf')) {
         const frontendUrl = 'http://tool.sc1ciro3903.universe.wf'
@@ -77,21 +73,21 @@ export default class RecruitmentEmail extends BaseMail {
       }
 
       // Fallback pour serveur distant non reconnu
-      const isProduction = (nodeEnv as string) === 'production'
+      const isProduction = nodeEnv === 'production'
       const protocol = isProduction ? 'https' : 'http'
       const frontendUrl = `${protocol}://${host}`
       console.log(`⚡ Auto-detected REMOTE server: ${frontendUrl}`)
       return frontendUrl
     }
 
-    // Développement local
-    const frontendUrl = envUrl || 'http://localhost:5173'
-    console.log(`🔧 Using LOCAL development: ${frontendUrl}`)
+    // ✅ CORRECTION : Développement local - TOUJOURS utiliser le port 5173
+    const frontendUrl = 'http://localhost:5173'
+    console.log(`🔧 Using LOCAL development (forced port 5173): ${frontendUrl}`)
     return frontendUrl
   }
 
   /**
-   * ✅ MÉTHODE DE REMPLACEMENT SÉCURISÉ : Variables de template
+   * Méthode de remplacement sécurisé : Variables de template
    */
   private replaceTemplateVariables(htmlContent: string, variables: Record<string, string>): string {
     let result = htmlContent
@@ -116,7 +112,7 @@ export default class RecruitmentEmail extends BaseMail {
   }
 
   /**
-   * ✅ TEMPLATE PAR DÉFAUT : Email de recrutement moderne et responsive
+   * Template par défaut : Email de recrutement moderne et responsive
    */
   private getDefaultTemplate(): string {
     return `<!DOCTYPE html>
@@ -346,7 +342,7 @@ export default class RecruitmentEmail extends BaseMail {
 
   async prepare() {
     try {
-      // ✅ CORRECTION : Utiliser la même logique que les callsheets
+      // ✅ CORRECTION : Utiliser la fonction corrigée de détection d'URL
       const url = this.getFrontendUrl()
 
       console.log('📧 Preparing recruitment email for:', this.contact.email)
@@ -376,7 +372,7 @@ export default class RecruitmentEmail extends BaseMail {
         htmlContent = this.getDefaultTemplate()
       }
 
-      // ✅ TEXTE DE RECOMMANDATION : Si la personne a été recommandée
+      // Texte de recommandation : Si la personne a été recommandée
       let recommendationText = ''
       if (this.recommendedBy) {
         recommendationText = `
@@ -391,7 +387,7 @@ export default class RecruitmentEmail extends BaseMail {
         `
       }
 
-      // ✅ VARIABLES DE REMPLACEMENT : Toutes les URLs et données
+      // ✅ CORRECTION : Variables de remplacement avec URLs corrigées
       const templateVariables = {
         URL: url,
         NAME: `${this.contact.first_name} ${this.contact.last_name}`,
@@ -405,16 +401,17 @@ export default class RecruitmentEmail extends BaseMail {
       }
 
       console.log('🔧 Template variables prepared:')
+      console.log('  - Base URL:', url)
       console.log('  - Registration URL:', templateVariables.REGISTRATION_URL)
       console.log('  - Recommend URL:', templateVariables.RECOMMEND_URL)
       console.log('  - Has recommendation:', !!this.recommendedBy)
 
-      // ✅ REMPLACEMENT DES VARIABLES
+      // Remplacement des variables
       htmlContent = this.replaceTemplateVariables(htmlContent, templateVariables)
 
       console.log('📧 Email content prepared successfully')
 
-      // ✅ CONFIGURATION DE L'EMAIL
+      // Configuration de l'email
       this.message
         .to(this.contact.email)
         .from(`${this.recruiter.name} <${env.get('SMTP_USERNAME')}>`)

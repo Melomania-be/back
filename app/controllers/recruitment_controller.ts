@@ -671,13 +671,20 @@ export default class RecruitmentController {
       const projectId = this.validateProjectId(params.id)
       const recommendationId = this.validateProjectId(params.recommendationId)
 
+      if (!projectId || !recommendationId) {
+        console.error('❌ Invalid project ID or recommendation ID')
+        return response.status(400).json({ error: 'Invalid project ID or recommendation ID' })
+      }
+
       const data = await request.validateUsing(vine.compile(
         vine.object({
-          action: vine.enum(['ignore', 'contact_email', 'contact_manual']),
+          action: vine.enum(['ignore', 'contacted_email', 'contacted_manual']),
           section_id: vine.number().optional(),
           notes: vine.string().optional()
         })
       ))
+
+      console.log('📝 Recommendation action data:', data)
 
       const recommendation = await RecruitmentRecommendation.query()
         .where('id', recommendationId)
@@ -689,38 +696,111 @@ export default class RecruitmentController {
         return response.status(404).json({ error: 'Recommendation not found' })
       }
 
+      console.log('📋 Processing recommendation:', {
+        id: recommendation.id,
+        name: `${recommendation.recommended_first_name} ${recommendation.recommended_last_name}`,
+        action: data.action
+      })
+
       if (data.action === 'ignore') {
         await recommendation.merge({ status: 'ignored' }).save()
         console.log('✅ Recommendation ignored')
         return response.json(recommendation)
       }
 
-      // ✅ CORRECTION : Créer un contact de recrutement avec validation
+      // ✅ CORRECTION : Créer un contact de recrutement avec validation améliorée
+      console.log('👤 Creating recruitment contact from recommendation...')
+
+      // Validation des champs requis
+      if (!recommendation.recommended_first_name?.trim() || !recommendation.recommended_last_name?.trim()) {
+        console.error('❌ Invalid recommendation: missing name fields')
+        return response.status(400).json({ error: 'Recommendation has invalid name fields' })
+      }
+
       const recruitmentContact = await RecruitmentContact.create({
         project_id: projectId,
-        contact_id: null, // ✅ Null pour les recommandations aussi
-        first_name: recommendation.recommended_first_name || '',
-        last_name: recommendation.recommended_last_name || '',
-        email: recommendation.recommended_email,
-        phone: recommendation.recommended_phone,
-        messenger: recommendation.recommended_messenger,
+        contact_id: null, // ✅ Null pour les recommandations
+        first_name: recommendation.recommended_first_name.trim(),
+        last_name: recommendation.recommended_last_name.trim(),
+        email: recommendation.recommended_email?.trim() || null,
+        phone: recommendation.recommended_phone?.trim() || null,
+        messenger: recommendation.recommended_messenger?.trim() || null,
         section_id: data.section_id || null,
-        recommended_by: recommendation.recommender_name,
+        recommended_by: recommendation.recommender_name || null,
         source: 'recommendation',
-        status: data.action === 'contact_email' ? 'awaiting_response' : 'not_yet_contacted',
-        contact_method: data.action === 'contact_email' ? 'email' : 'manual',
-        contact_date: data.action === 'contact_email' ? DateTime.now() : null,
+        status: data.action === 'contacted_email' ? 'awaiting_response' : 'not_yet_contacted',
+        contact_method: data.action === 'contacted_email' ? 'email' : 'manual',
+        contact_date: data.action === 'contacted_email' ? DateTime.now() : null,
         notes: data.notes || null,
         is_duplicate: false
       })
 
+      console.log('✅ Recruitment contact created:', recruitmentContact.id)
+
+      // Mettre à jour le statut de la recommandation
       await recommendation.merge({
         status: data.action,
         recruitment_contact_id: recruitmentContact.id
       }).save()
 
-      if (data.action === 'contact_email') {
-        console.log('📧 Would send recommendation email to:', recruitmentContact.email)
+      console.log('📧 Recommendation status updated to:', data.action)
+
+      // ✅ CORRECTION : Envoyer l'email si l'action est contacted_email
+      if (data.action === 'contacted_email' && recommendation.recommended_email) {
+        try {
+          console.log('📧 Sending recruitment email to recommended person...')
+
+          // Récupérer le projet pour le contexte de l'email
+          const project = await Project.find(projectId)
+          if (!project) {
+            console.error('❌ Project not found for email sending')
+            return response.status(404).json({ error: 'Project not found' })
+          }
+
+          // Récupérer les responsables du projet pour l'expéditeur
+          const responsibles = await Responsibles.query()
+            .where('project_id', projectId)
+            .preload('contact')
+
+          let recruiterInfo = {
+            name: 'Équipe Melomania',
+            email: 'contact@melomania.com'
+          }
+
+          if (responsibles && responsibles.length > 0) {
+            const firstResponsible = responsibles[0]
+            if (firstResponsible.contact) {
+              recruiterInfo = {
+                name: `${firstResponsible.contact.first_name} ${firstResponsible.contact.last_name}`,
+                email: firstResponsible.contact.email || 'contact@melomania.com'
+              }
+            }
+          }
+
+          // Créer l'email de recrutement avec mention du recommandeur
+          const recruitmentMail = new RecruitmentEmail(
+            {
+              first_name: recommendation.recommended_first_name,
+              last_name: recommendation.recommended_last_name,
+              email: recommendation.recommended_email
+            },
+            {
+              id: project.id,
+              name: project.name
+            },
+            recruiterInfo,
+            recommendation.recommender_name // ✅ Mention du recommandeur
+          )
+
+          // Envoyer l'email
+          await mail.send(recruitmentMail)
+          console.log('✅ Recruitment email sent successfully')
+
+        } catch (emailError) {
+          console.error('❌ Failed to send recruitment email:', emailError)
+          // Ne pas faire échouer la requête principale si l'email échoue
+          // Le contact a déjà été créé et la recommandation traitée
+        }
       }
 
       // ✅ CORRECTION : Charger seulement la section si elle existe
@@ -729,10 +809,20 @@ export default class RecruitmentController {
       }
 
       console.log('✅ Recommendation handled successfully')
-      return response.json({ recommendation, recruitmentContact: recruitmentContact.serialize() })
+      return response.json({
+        success: true,
+        recommendation: recommendation.serialize(),
+        recruitmentContact: recruitmentContact.serialize(),
+        message: data.action === 'contacted_email'
+          ? 'Email envoyé et contact ajouté au recrutement'
+          : 'Contact ajouté au recrutement'
+      })
     } catch (error) {
-      console.error('❌ Error in handleRecommendation:', error.message)
-      return response.status(400).json({ error: error.message })
+      console.error('❌ Error in handleRecommendation:', error)
+      return response.status(400).json({
+        error: error.message,
+        details: 'Failed to handle recommendation'
+      })
     }
   }
 
