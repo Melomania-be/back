@@ -858,6 +858,10 @@ export default class RecruitmentController {
         })
       ))
 
+      // ✅ CORRECTION : Récupérer le nom du projet source
+      const sourceProject = await Project.find(data.source_project_id)
+      const sourceProjectName = sourceProject ? sourceProject.name : `Project_${data.source_project_id}`
+
       const sourceContacts = await RecruitmentContact.query()
         .where('project_id', data.source_project_id)
         .if(data.include_statuses, (query) => {
@@ -897,23 +901,22 @@ export default class RecruitmentController {
             continue
           }
 
-          // ✅ CORRECTION : Créer le nouveau contact avec validation
+          // ✅ CORRECTION : Créer le nouveau contact avec nom du projet source
           const newContact = await RecruitmentContact.create({
             project_id: projectId,
-            contact_id: sourceContact.contact_id, // Peut être null
+            contact_id: sourceContact.contact_id,
             first_name: sourceContact.first_name || '',
             last_name: sourceContact.last_name || '',
             email: sourceContact.email,
             phone: sourceContact.phone,
             messenger: sourceContact.messenger,
             section_id: sourceContact.section_id,
-            source: `imported_from_project_${data.source_project_id}`,
+            source: `Importé depuis "${sourceProjectName}"`, // ✅ NOM LISIBLE
             status: 'not_yet_contacted',
             contact_method: 'manual',
             is_duplicate: false
           })
 
-          // ✅ CORRECTION : Charger seulement la section si elle existe
           if (newContact.section_id) {
             await newContact.load('section')
           }
