@@ -1,4 +1,4 @@
-// app/controllers/recruitment_controller.ts - Version corrigée avec envoi d'emails
+// app/controllers/recruitment_controller.ts - Version complète avec auto-import
 import { HttpContext } from '@adonisjs/core/http'
 import RecruitmentContact from '#models/recruitment_contact'
 import RecruitmentSettings from '#models/recruitment_settings'
@@ -36,6 +36,143 @@ export default class RecruitmentController {
 
     console.log('✅ Project ID validated:', numericId)
     return numericId
+  }
+
+  // ✅ NOUVELLE MÉTHODE : Auto-import de tous les contacts disponibles
+  async autoImportAllContacts({ params, response }: HttpContext) {
+    try {
+      console.log('🔄 Auto-importing all available contacts for project:', params.id)
+      const projectId = this.validateProjectId(params.id)
+
+      // Vérifier que le projet existe
+      const project = await Project.find(projectId)
+      if (!project) {
+        return response.status(404).json({ error: 'Project not found' })
+      }
+
+      // Récupérer tous les contacts validés de la base de données
+      const allContacts = await Contact.query()
+        .where('validated', true)
+        .preload('instruments')
+
+      if (allContacts.length === 0) {
+        console.log('📭 No validated contacts found for import')
+        return response.json({
+          imported: [],
+          conflicts: [],
+          errors: [],
+          message: 'Aucun contact validé trouvé dans la base de données',
+          total_contacts: 0,
+          new_imports: 0,
+          already_imported: 0
+        })
+      }
+
+      console.log(`📥 Found ${allContacts.length} validated contacts, checking for existing ones...`)
+
+      // Récupérer les IDs des contacts déjà présents dans le recrutement
+      const existingContacts = await RecruitmentContact.query()
+        .where('project_id', projectId)
+        .whereNotNull('contact_id')
+        .select('contact_id')
+
+      const existingContactIds = new Set(existingContacts.map(c => c.contact_id))
+
+      // Filtrer les contacts qui ne sont pas encore dans le recrutement
+      const contactsToImport = allContacts.filter(contact =>
+        !existingContactIds.has(contact.id)
+      )
+
+      console.log(`📊 Import status: ${contactsToImport.length} new, ${allContacts.length - contactsToImport.length} already imported`)
+
+      const results = {
+        imported: [],
+        conflicts: [],
+        errors: []
+      }
+
+      // Importer les nouveaux contacts par batch pour éviter les timeouts
+      const batchSize = 50
+      for (let i = 0; i < contactsToImport.length; i += batchSize) {
+        const batch = contactsToImport.slice(i, i + batchSize)
+
+        for (const contact of batch) {
+          try {
+            // Validation des champs requis
+            const firstName = contact.first_name || ''
+            const lastName = contact.last_name || ''
+
+            if (!firstName.trim() || !lastName.trim()) {
+              console.warn('⚠️ Skipping contact with empty name fields:', contact.id)
+              results.errors.push(`Contact ${contact.id} has empty name fields`)
+              continue
+            }
+
+            // Créer l'entrée de recrutement
+            const recruitmentContact = await RecruitmentContact.create({
+              project_id: projectId,
+              contact_id: contact.id,
+              first_name: firstName.trim(),
+              last_name: lastName.trim(),
+              email: contact.email || null,
+              phone: contact.phone || null,
+              messenger: contact.messenger || null,
+              source: 'database_auto_import',
+              status: 'not_yet_contacted',
+              contact_method: 'manual',
+              is_duplicate: false
+            })
+
+            results.imported.push(recruitmentContact.serialize())
+
+          } catch (error) {
+            console.error('❌ Error importing contact:', contact.id, error.message)
+            results.errors.push(`Error importing contact ${contact.id}: ${error.message}`)
+          }
+        }
+
+        // Log progress pour les gros imports
+        if (contactsToImport.length > 100) {
+          console.log(`📊 Progress: ${Math.min(i + batchSize, contactsToImport.length)}/${contactsToImport.length} contacts processed`)
+        }
+      }
+
+      // Ajouter les conflits (contacts déjà présents)
+      const conflictContacts = allContacts.filter(contact =>
+        existingContactIds.has(contact.id)
+      )
+
+      results.conflicts = conflictContacts.map(contact => ({
+        contact: contact.serialize(),
+        reason: 'Already exists in recruitment'
+      }))
+
+      console.log('✅ Auto-import completed:', {
+        imported: results.imported.length,
+        conflicts: results.conflicts.length,
+        errors: results.errors.length
+      })
+
+      return response.json({
+        ...results,
+        message: `Import automatique terminé: ${results.imported.length} nouveaux contacts importés`,
+        total_contacts: allContacts.length,
+        new_imports: results.imported.length,
+        already_imported: results.conflicts.length
+      })
+
+    } catch (error) {
+      console.error('❌ Error in autoImportAllContacts:', error.message)
+      return response.status(400).json({
+        error: error.message,
+        imported: [],
+        conflicts: [],
+        errors: [error.message],
+        total_contacts: 0,
+        new_imports: 0,
+        already_imported: 0
+      })
+    }
   }
 
   // Obtenir les paramètres de recrutement d'un projet

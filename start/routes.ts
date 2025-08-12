@@ -232,6 +232,8 @@ router.group(() => {
               router.get('/settings', [RecruitmentController, 'getSettings'])
               router.put('/settings', [RecruitmentController, 'updateSettings'])
 
+              router.post('/auto-import-all', [RecruitmentController, 'autoImportAllContacts'])
+
               // Contacts de recrutement - Routes principales
               router.get('/contacts', [RecruitmentController, 'getContacts'])
               router.get('/', [RecruitmentController, 'getContacts']) // Alias pour la liste principale
