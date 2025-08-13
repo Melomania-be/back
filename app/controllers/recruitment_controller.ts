@@ -1,3 +1,4 @@
+// app/controllers/recruitment_controller.ts - Version mise à jour avec contacted_by
 import { HttpContext } from '@adonisjs/core/http'
 import RecruitmentContact from '#models/recruitment_contact'
 import RecruitmentSettings from '#models/recruitment_settings'
@@ -6,6 +7,7 @@ import Contact from '#models/contact'
 import Project from '#models/project'
 import Section from '#models/section'
 import Responsibles from '#models/responsibles'
+import User from '#models/user'
 import { DateTime } from 'luxon'
 import { simpleFilter, advancedFilter } from 'adonisjs-filters'
 import vine from '@vinejs/vine'
@@ -48,9 +50,20 @@ export default class RecruitmentController {
     return numericId
   }
 
-  async autoImportAllContacts({ params, response }: HttpContext) {
+  // 🆕 Méthode pour obtenir le nom de l'utilisateur connecté
+  private async getCurrentUserName(auth: any): Promise<string> {
+    try {
+      const user = await auth.authenticate()
+      return user.fullName || user.email || 'Utilisateur inconnu'
+    } catch (error) {
+      return 'Utilisateur inconnu'
+    }
+  }
+
+  async autoImportAllContacts({ params, response, auth }: HttpContext) {
     try {
       const projectId = this.validateProjectId(params.id)
+      const currentUserName = await this.getCurrentUserName(auth)
 
       const project = await Project.find(projectId)
       if (!project) {
@@ -115,7 +128,8 @@ export default class RecruitmentController {
               source: 'database_auto_import',
               status: 'not_yet_contacted',
               contact_method: 'manual',
-              is_duplicate: false
+              is_duplicate: false,
+              contacted_by: currentUserName // 🆕 Ajouter qui a importé
             })
 
             results.imported.push(recruitmentContact.serialize())
@@ -243,7 +257,7 @@ export default class RecruitmentController {
       const result = await simpleFilter(
         ctx,
         baseQuery,
-        ['first_name', 'last_name', 'email', 'phone', 'messenger', 'status', 'notes'],
+        ['first_name', 'last_name', 'email', 'phone', 'messenger', 'status', 'notes', 'contacted_by'], // 🆕 Ajouter contacted_by au filtre
         [
           { relationColumns: ['name'] as any, relationName: 'section' },
           { relationColumns: ['first_name', 'last_name'] as any, relationName: 'contact' }
@@ -255,7 +269,8 @@ export default class RecruitmentController {
           ...contact,
           first_name: contact.first_name || '',
           last_name: contact.last_name || '',
-          display_name: `${contact.first_name || ''} ${contact.last_name || ''}`.trim()
+          display_name: `${contact.first_name || ''} ${contact.last_name || ''}`.trim(),
+          contacted_by: contact.contacted_by || null // 🆕 S'assurer que contacted_by est inclus
         }))
       }
 
@@ -312,9 +327,10 @@ export default class RecruitmentController {
     }
   }
 
-  async createManualContact({ params, request, response }: HttpContext) {
+  async createManualContact({ params, request, response, auth }: HttpContext) {
     try {
       const projectId = this.validateProjectId(params.id)
+      const currentUserName = await this.getCurrentUserName(auth)
 
       const data = await request.validateUsing(vine.compile(
         vine.object({
@@ -324,7 +340,8 @@ export default class RecruitmentController {
           phone: vine.string().optional(),
           messenger: vine.string().optional(),
           section_id: vine.number().optional(),
-          notes: vine.string().optional()
+          notes: vine.string().optional(),
+          contacted_by: vine.string().optional() // 🆕 Champ optionnel pour permettre modification
         })
       ))
 
@@ -358,7 +375,8 @@ export default class RecruitmentController {
         source: 'manual',
         status: 'not_yet_contacted',
         contact_method: 'manual',
-        is_duplicate: isDuplicate
+        is_duplicate: isDuplicate,
+        contacted_by: data.contacted_by || currentUserName // 🆕 Utiliser la valeur fournie ou le nom de l'utilisateur connecté
       })
 
       const loadPromises = []
@@ -451,6 +469,7 @@ export default class RecruitmentController {
 
           await mail.send(recruitmentMail)
 
+          // 🔧 FIX: Utiliser DateTime.now() pour éviter les erreurs de date invalide
           await contact.merge({
             status: 'awaiting_response',
             contact_method: 'email',
@@ -461,7 +480,7 @@ export default class RecruitmentController {
             contact_id: contact.id,
             email: contact.email,
             name: `${contact.first_name} ${contact.last_name}`,
-            sent_at: new Date().toISOString(),
+            sent_at: DateTime.now().toISO(),
             real_email: true
           })
 
@@ -498,9 +517,10 @@ export default class RecruitmentController {
     }
   }
 
-  async importContacts({ params, request, response }: HttpContext) {
+  async importContacts({ params, request, response, auth }: HttpContext) {
     try {
       const projectId = this.validateProjectId(params.id)
+      const currentUserName = await this.getCurrentUserName(auth)
 
       const data = await request.validateUsing(vine.compile(
         vine.object({
@@ -556,7 +576,8 @@ export default class RecruitmentController {
             source: 'database',
             status: 'not_yet_contacted',
             contact_method: 'manual',
-            is_duplicate: false
+            is_duplicate: false,
+            contacted_by: currentUserName // 🆕 Ajouter qui a importé
           })
 
           const loadPromises = []
@@ -606,7 +627,8 @@ export default class RecruitmentController {
           status: vine.enum(['not_yet_contacted', 'awaiting_response', 'to_follow_up', 'not_available', 'pending_validation', 'cancelled', 'recruited']),
           contact_method: vine.enum(['manual', 'email', 'messenger', 'phone']).optional(),
           notes: vine.string().optional(),
-          contact_date: vine.date({ formats: ['iso'] }).optional()
+          contact_date: vine.date({ formats: ['iso'] }).optional(),
+          contacted_by: vine.string().optional() // 🆕 Permettre la mise à jour de contacted_by
         })
       ))
 
@@ -620,8 +642,10 @@ export default class RecruitmentController {
       }
 
       const updateData: any = { ...data }
+
+      // 🔧 FIX: Utiliser DateTime.now() si le statut change à "awaiting_response" et qu'il n'y a pas de date de contact
       if (data.status === 'awaiting_response' && !contact.contact_date) {
-        updateData.contact_date = new Date()
+        updateData.contact_date = DateTime.now()
       }
 
       await contact.merge(updateData).save()
@@ -679,10 +703,11 @@ export default class RecruitmentController {
     }
   }
 
-  async handleRecommendation({ params, request, response }: HttpContext) {
+  async handleRecommendation({ params, request, response, auth }: HttpContext) {
     try {
       const projectId = this.validateProjectId(params.id)
       const recommendationId = this.validateProjectId(params.recommendationId)
+      const currentUserName = await this.getCurrentUserName(auth)
 
       if (!projectId || !recommendationId) {
         return response.status(400).json({ error: 'Invalid project ID or recommendation ID' })
@@ -729,7 +754,8 @@ export default class RecruitmentController {
         contact_method: data.action === 'contacted_email' ? 'email' : 'manual',
         contact_date: data.action === 'contacted_email' ? DateTime.now() : null,
         notes: data.notes || null,
-        is_duplicate: false
+        is_duplicate: false,
+        contacted_by: currentUserName // 🆕 Ajouter qui a traité la recommandation
       })
 
       await recommendation.merge({
@@ -819,9 +845,10 @@ export default class RecruitmentController {
     }
   }
 
-  async importFromProject({ params, request, response }: HttpContext) {
+  async importFromProject({ params, request, response, auth }: HttpContext) {
     try {
       const projectId = this.validateProjectId(params.id)
+      const currentUserName = await this.getCurrentUserName(auth)
 
       const data = await request.validateUsing(vine.compile(
         vine.object({
@@ -885,7 +912,8 @@ export default class RecruitmentController {
             source: `Importé depuis "${sourceProjectName}"`,
             status: 'not_yet_contacted',
             contact_method: 'manual',
-            is_duplicate: false
+            is_duplicate: false,
+            contacted_by: currentUserName // 🆕 Ajouter qui a importé
           })
 
           if (newContact.section_id) {

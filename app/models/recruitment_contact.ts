@@ -1,4 +1,4 @@
-// app/models/recruitment_contact.ts - Version corrigée
+// app/models/recruitment_contact.ts - Version mise à jour avec contacted_by
 import { DateTime } from 'luxon'
 import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
@@ -72,24 +72,25 @@ export default class RecruitmentContact extends BaseModel {
   @column()
   declare source: string | null
 
+  // 🆕 Nouvelle colonne pour tracer qui a contacté
+  @column()
+  declare contacted_by: string | null
+
   @belongsTo(() => Project, {
     foreignKey: 'project_id',
   })
   declare project: BelongsTo<typeof Project>
 
-  // ✅ CORRECTION : Relation optionnelle avec Contact
   @belongsTo(() => Contact, {
     foreignKey: 'contact_id',
   })
   declare contact: BelongsTo<typeof Contact>
 
-  // ✅ CORRECTION : Relation optionnelle avec Section
   @belongsTo(() => Section, {
     foreignKey: 'section_id',
   })
   declare section: BelongsTo<typeof Section>
 
-  // ✅ CORRECTION : Relation optionnelle avec le recommandeur
   @belongsTo(() => Contact, {
     foreignKey: 'recommender_contact_id',
   })
@@ -101,7 +102,7 @@ export default class RecruitmentContact extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  // Méthodes utilitaires avec validation robuste
+  // Méthodes utilitaires
   shouldFollowUp(followUpDays: number): boolean {
     if (this.status !== 'awaiting_response' || !this.contact_date) {
       return false
@@ -119,33 +120,37 @@ export default class RecruitmentContact extends BaseModel {
     return this.email || this.messenger || this.phone || 'Aucun contact'
   }
 
-  // ✅ CORRECTION : Méthode serialize corrigée pour éviter les undefined et gérer les relations nulles
   serialize() {
     const baseData = super.serialize()
 
     return {
       ...baseData,
-      // ✅ S'assurer que les noms ne sont jamais undefined
       first_name: this.first_name || '',
       last_name: this.last_name || '',
       display_name: this.displayName,
       primary_contact: this.primaryContact,
+      contacted_by: this.contacted_by || null,
 
-      // Dates formatées
-      contact_date: this.contact_date ? this.contact_date.toFormat('dd/MM/yyyy HH:mm') : null,
-      contact_date_iso: this.contact_date ? this.contact_date.toISO() : null,
-      created_at: this.createdAt ? this.createdAt.toFormat('dd/MM/yyyy HH:mm') : null,
-      created_at_iso: this.createdAt ? this.createdAt.toISO() : null,
-      updated_at: this.updatedAt ? this.updatedAt.toFormat('dd/MM/yyyy HH:mm') : null,
-      updated_at_iso: this.updatedAt ? this.updatedAt.toISO() : null,
+      // 🔧 FIX: Dates formatées avec protection contre les dates invalides
+      contact_date: this.contact_date && this.contact_date.isValid ?
+        this.contact_date.toFormat('dd/MM/yyyy HH:mm') : null,
+      contact_date_iso: this.contact_date && this.contact_date.isValid ?
+        this.contact_date.toISO() : null,
+      created_at: this.createdAt && this.createdAt.isValid ?
+        this.createdAt.toFormat('dd/MM/yyyy HH:mm') : null,
+      created_at_iso: this.createdAt && this.createdAt.isValid ?
+        this.createdAt.toISO() : null,
+      updated_at: this.updatedAt && this.updatedAt.isValid ?
+        this.updatedAt.toFormat('dd/MM/yyyy HH:mm') : null,
+      updated_at_iso: this.updatedAt && this.updatedAt.isValid ?
+        this.updatedAt.toISO() : null,
 
-      // ✅ CORRECTION : Relations avec protection contre les valeurs nulles
+      // Relations avec protection contre les valeurs nulles
       section: this.section ? {
         id: this.section.id,
         name: this.section.name || 'Section inconnue'
       } : null,
 
-      // ✅ Contact peut être null pour les contacts manuels
       contact: this.contact ? {
         id: this.contact.id,
         first_name: this.contact.first_name || '',
@@ -153,7 +158,6 @@ export default class RecruitmentContact extends BaseModel {
         email: this.contact.email || null
       } : null,
 
-      // ✅ Recommandeur peut être null
       recommender: this.recommender ? {
         id: this.recommender.id,
         first_name: this.recommender.first_name || '',
@@ -162,18 +166,15 @@ export default class RecruitmentContact extends BaseModel {
     }
   }
 
-  // Méthode pour obtenir les jours depuis le contact
   getDaysSinceContact(): number | null {
-    if (!this.contact_date) return null
+    if (!this.contact_date || !this.contact_date.isValid) return null
     return Math.floor(DateTime.now().diff(this.contact_date, 'days').days)
   }
 
-  // Méthode pour vérifier si le contact doit être relancé
   needsFollowUp(followUpDays: number): boolean {
     return this.shouldFollowUp(followUpDays)
   }
 
-  // Méthode pour obtenir le statut avec badge
   getStatusBadge(): { label: string; color: string; icon: string } {
     const statusConfig = {
       'not_yet_contacted': { label: 'Pas encore contacté', color: 'gray', icon: 'AlertCircle' },
@@ -188,7 +189,6 @@ export default class RecruitmentContact extends BaseModel {
     return statusConfig[this.status] || statusConfig['not_yet_contacted']
   }
 
-  // Méthode statique pour obtenir tous les statuts disponibles
   static getAvailableStatuses(): Array<{ value: RecruitmentStatus; label: string }> {
     return [
       { value: 'not_yet_contacted', label: 'Pas encore contacté' },
@@ -201,7 +201,6 @@ export default class RecruitmentContact extends BaseModel {
     ]
   }
 
-  // Méthode statique pour obtenir tous les moyens de contact
   static getAvailableContactMethods(): Array<{ value: ContactMethod; label: string }> {
     return [
       { value: 'manual', label: 'Manuel' },

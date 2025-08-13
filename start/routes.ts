@@ -438,7 +438,9 @@ router.group(() => {
         .group(() => {
           router.get('/', [UsersController, 'getAll'])
           router.put('/', [UsersController, 'create'])
+          router.patch('/:id', [UsersController, 'update']) // 🆕 Route pour modifier
           router.delete('/:id', [UsersController, 'delete'])
+          router.get('/current', [UsersController, 'getCurrentUser']) // 🆕 Route pour utilisateur connecté
         })
         .prefix('/users')
 
