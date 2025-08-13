@@ -1,4 +1,3 @@
-// app/mails/recruitment_email.ts - Version corrigée avec détection URL améliorée
 import env from '#start/env'
 import { BaseMail } from '@adonisjs/mail'
 import MailTemplate from '#models/mail_template'
@@ -21,6 +20,7 @@ export default class RecruitmentEmail extends BaseMail {
   }
 
   recommendedBy?: string
+  subject: string
 
   constructor(
     contact: { first_name: string; last_name: string; email: string },
@@ -37,70 +37,42 @@ export default class RecruitmentEmail extends BaseMail {
     this.subject = `Invitation à rejoindre le projet "${project.name}"`
   }
 
-  /**
-   * ✅ CORRECTION : Fonction de détection d'URL corrigée avec fallback robuste
-   */
   private getFrontendUrl(): string {
     const envUrl = env.get('FRONTEND_URL')
     const nodeEnv = env.get('NODE_ENV', 'development')
     const host = env.get('HOST', 'localhost')
 
-    console.log('🔍 Environment detection for recruitment email:', {
-      FRONTEND_URL: envUrl,
-      NODE_ENV: nodeEnv,
-      HOST: host,
-    })
-
-    // Si FRONTEND_URL est définie explicitement et n'est pas localhost, l'utiliser
     if (envUrl && !envUrl.includes('localhost') && envUrl.trim() !== '') {
-      console.log(`🌐 Using explicit FRONTEND_URL: ${envUrl}`)
       return envUrl
     }
 
-    // Détection automatique basée sur HOST et NODE_ENV
     if (host && host !== 'localhost' && host !== '127.0.0.1') {
-      // On est sur un serveur distant
       if (nodeEnv === 'development' || host.includes('universe.wf')) {
-        const frontendUrl = 'http://tool.sc1ciro3903.universe.wf'
-        console.log(`🧪 Auto-detected TEST environment: ${frontendUrl}`)
-        return frontendUrl
+        return 'http://tool.sc1ciro3903.universe.wf'
       }
 
-      if (nodeEnv === 'production' || host.includes('melomania.be')) {
-        const frontendUrl = 'https://tool.melomania.be'
-        console.log(`🚀 Auto-detected PRODUCTION environment: ${frontendUrl}`)
-        return frontendUrl
-      }
-
-      // Fallback pour serveur distant non reconnu
       const isProduction = nodeEnv === 'production'
+      if (isProduction || host.includes('melomania.be')) {
+        return 'https://tool.melomania.be'
+      }
+
       const protocol = isProduction ? 'https' : 'http'
-      const frontendUrl = `${protocol}://${host}`
-      console.log(`⚡ Auto-detected REMOTE server: ${frontendUrl}`)
-      return frontendUrl
+      return `${protocol}://${host}`
     }
 
-    // ✅ CORRECTION : Développement local - TOUJOURS utiliser le port 5173
-    const frontendUrl = 'http://localhost:5173'
-    console.log(`🔧 Using LOCAL development (forced port 5173): ${frontendUrl}`)
-    return frontendUrl
+    return 'http://localhost:5173'
   }
 
-  /**
-   * Méthode de remplacement sécurisé : Variables de template
-   */
   private replaceTemplateVariables(htmlContent: string, variables: Record<string, string>): string {
     let result = htmlContent
 
     Object.entries(variables).forEach(([key, value]) => {
-      // Échapper la valeur pour éviter les problèmes avec les caractères spéciaux
       const safeValue = (value || '').replace(/\$/g, '$$')
 
-      // Patterns de remplacement pour différents formats
       const patterns = [
-        new RegExp(`\\$\\{${key}\\}`, 'g'),      // ${KEY}
-        new RegExp(`\\\\\\$\\{${key}\\}`, 'g'),  // \${KEY}
-        new RegExp(`\\{${key}\\}`, 'g'),         // {KEY}
+        new RegExp(`\\$\\{${key}\\}`, 'g'),
+        new RegExp(`\\\\\\$\\{${key}\\}`, 'g'),
+        new RegExp(`\\{${key}\\}`, 'g'),
       ]
 
       patterns.forEach((pattern) => {
@@ -111,9 +83,6 @@ export default class RecruitmentEmail extends BaseMail {
     return result
   }
 
-  /**
-   * Template par défaut : Email de recrutement moderne et responsive
-   */
   private getDefaultTemplate(): string {
     return `<!DOCTYPE html>
 <html lang="fr">
@@ -122,7 +91,6 @@ export default class RecruitmentEmail extends BaseMail {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Invitation - \${PROJECT}</title>
     <style>
-        /* Styles responsive */
         @media screen and (max-width: 600px) {
             .container { width: 100% !important; margin: 10px auto !important; padding: 15px !important; }
             .button { display: block !important; width: 100% !important; margin: 10px 0 !important; }
@@ -245,17 +213,12 @@ export default class RecruitmentEmail extends BaseMail {
             margin: 0 0 10px 0;
             color: #6B9AD9;
         }
-
-        .emoji {
-            font-size: 20px;
-            margin-right: 8px;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1><span class="emoji">🎵</span> Invitation Musicale</h1>
+            <h1>Invitation Musicale</h1>
             <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Rejoignez notre projet musical</p>
         </div>
 
@@ -270,7 +233,7 @@ export default class RecruitmentEmail extends BaseMail {
 
             <div class="highlight">
                 <h3 style="color: #6B9AD9; margin: 0; font-size: 24px; text-align: center;">
-                    <span class="emoji">🎼</span> \${PROJECT}
+                    \${PROJECT}
                 </h3>
             </div>
 
@@ -281,32 +244,32 @@ export default class RecruitmentEmail extends BaseMail {
 
             <div style="text-align: center; margin: 30px 0;">
                 <a href="\${REGISTRATION_URL}" class="button primary">
-                    <span class="emoji">📝</span> S'inscrire au projet
+                    S'inscrire au projet
                 </a>
                 <br>
                 <a href="\${RECOMMEND_URL}" class="button secondary">
-                    <span class="emoji">👥</span> Recommander un musicien
+                    Recommander un musicien
                 </a>
             </div>
 
             <div class="grid">
                 <div class="feature">
-                    <h4><span class="emoji">🎯</span> Inscription facile</h4>
+                    <h4>Inscription facile</h4>
                     <p style="margin: 0; font-size: 14px;">Découvrez les détails du projet et inscrivez-vous selon votre instrument</p>
                 </div>
 
                 <div class="feature">
-                    <h4><span class="emoji">🤝</span> Communauté</h4>
+                    <h4>Communauté</h4>
                     <p style="margin: 0; font-size: 14px;">Rencontrez d'autres musiciens passionnés et créez ensemble</p>
                 </div>
 
                 <div class="feature">
-                    <h4><span class="emoji">💬</span> Support</h4>
+                    <h4>Support</h4>
                     <p style="margin: 0; font-size: 14px;">Posez vos questions à notre équipe dédiée</p>
                 </div>
 
                 <div class="feature">
-                    <h4><span class="emoji">🌟</span> Recommandations</h4>
+                    <h4>Recommandations</h4>
                     <p style="margin: 0; font-size: 14px;">Invitez d'autres musiciens à nous rejoindre</p>
                 </div>
             </div>
@@ -319,7 +282,7 @@ export default class RecruitmentEmail extends BaseMail {
                 <p style="margin: 0; font-weight: bold;">\${RECRUITER_NAME}</p>
                 <p style="margin: 5px 0 0 0;">
                     <a href="mailto:\${RECRUITER_EMAIL}" style="color: #6B9AD9; text-decoration: none;">
-                        <span class="emoji">📧</span> \${RECRUITER_EMAIL}
+                        \${RECRUITER_EMAIL}
                     </a>
                 </p>
             </div>
@@ -342,20 +305,12 @@ export default class RecruitmentEmail extends BaseMail {
 
   async prepare() {
     try {
-      // ✅ CORRECTION : Utiliser la fonction corrigée de détection d'URL
       const url = this.getFrontendUrl()
 
-      console.log('📧 Preparing recruitment email for:', this.contact.email)
-      console.log('📧 Frontend URL detected:', url)
-      console.log('📧 Project:', this.project.name)
-      console.log('📧 Recruiter:', this.recruiter.name)
-
-      // Essayer de récupérer un template personnalisé
       let template = await MailTemplate.query()
         .where('name', 'recruitment_email.html')
         .first()
 
-      // Si pas de template personnalisé, essayer le template par défaut
       if (!template) {
         template = await MailTemplate.query()
           .where('name', 'default_recruitment.html')
@@ -365,20 +320,17 @@ export default class RecruitmentEmail extends BaseMail {
       let htmlContent = ''
 
       if (template) {
-        console.log('📧 Using database template:', template.name)
         htmlContent = template.content
       } else {
-        console.log('📧 Using built-in default template')
         htmlContent = this.getDefaultTemplate()
       }
 
-      // Texte de recommandation : Si la personne a été recommandée
       let recommendationText = ''
       if (this.recommendedBy) {
         recommendationText = `
           <div class="recommendation">
               <h3 style="margin: 0 0 15px 0; color: #6B9AD9;">
-                  <span class="emoji">💡</span> Vous avez été recommandé(e) !
+                  Vous avez été recommandé(e) !
               </h3>
               <p style="margin: 0; font-size: 16px;">
                   <strong>${this.recommendedBy}</strong> pense que ce projet musical pourrait vous intéresser et nous a parlé de vos talents musicaux.
@@ -387,7 +339,6 @@ export default class RecruitmentEmail extends BaseMail {
         `
       }
 
-      // ✅ CORRECTION : Variables de remplacement avec URLs corrigées
       const templateVariables = {
         URL: url,
         NAME: `${this.contact.first_name} ${this.contact.last_name}`,
@@ -400,18 +351,8 @@ export default class RecruitmentEmail extends BaseMail {
         UNSUBSCRIBE_URL: `${url}/unsubscribe?email=${encodeURIComponent(this.contact.email)}&project=${this.project.id}`
       }
 
-      console.log('🔧 Template variables prepared:')
-      console.log('  - Base URL:', url)
-      console.log('  - Registration URL:', templateVariables.REGISTRATION_URL)
-      console.log('  - Recommend URL:', templateVariables.RECOMMEND_URL)
-      console.log('  - Has recommendation:', !!this.recommendedBy)
-
-      // Remplacement des variables
       htmlContent = this.replaceTemplateVariables(htmlContent, templateVariables)
 
-      console.log('📧 Email content prepared successfully')
-
-      // Configuration de l'email
       this.message
         .to(this.contact.email)
         .from(`${this.recruiter.name} <${env.get('SMTP_USERNAME')}>`)
@@ -419,10 +360,7 @@ export default class RecruitmentEmail extends BaseMail {
         .subject(this.subject)
         .html(htmlContent)
 
-      console.log('✅ Email configured and ready to send')
-
     } catch (error) {
-      console.error('❌ Error preparing recruitment email:', error)
       throw error
     }
   }
