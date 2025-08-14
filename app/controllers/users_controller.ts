@@ -56,7 +56,7 @@ export default class UsersController {
     return await User.create(credentials)
   }
 
-  // 🆕 Nouvelle méthode pour mettre à jour un utilisateur
+  //  Nouvelle méthode pour mettre à jour un utilisateur
   async update(ctx: HttpContext) {
     if (!ctx.auth.user) {
       ctx.response.abort('You must be authenticated to update a user', 401)
@@ -110,13 +110,16 @@ export default class UsersController {
   async getCurrentUser(ctx: HttpContext) {
     try {
       const user = await ctx.auth.use('api').authenticate()
-      return {
+      return ctx.response.json({
         id: user.id,
         email: user.email,
-        fullName: user.fullName
-      }
+        fullName: user.fullName || user.email || 'Utilisateur actuel'
+      })
     } catch (error) {
-      return ctx.response.status(401).json({ error: 'Not authenticated' })
+      return ctx.response.status(401).json({
+        error: 'Not authenticated',
+        fullName: 'Utilisateur actuel'
+      })
     }
   }
 }

@@ -56,6 +56,7 @@ export default class RecruitmentController {
       const user = await auth.authenticate()
       return user.fullName || user.email || 'Utilisateur inconnu'
     } catch (error) {
+      console.error('Error getting current user:', error)
       return 'Utilisateur inconnu'
     }
   }
@@ -257,7 +258,7 @@ export default class RecruitmentController {
       const result = await simpleFilter(
         ctx,
         baseQuery,
-        ['first_name', 'last_name', 'email', 'phone', 'messenger', 'status', 'notes', 'contacted_by'], // 🆕 Ajouter contacted_by au filtre
+        ['first_name', 'last_name', 'email', 'phone', 'messenger', 'status', 'notes', 'contacted_by'],
         [
           { relationColumns: ['name'] as any, relationName: 'section' },
           { relationColumns: ['first_name', 'last_name'] as any, relationName: 'contact' }
@@ -270,7 +271,7 @@ export default class RecruitmentController {
           first_name: contact.first_name || '',
           last_name: contact.last_name || '',
           display_name: `${contact.first_name || ''} ${contact.last_name || ''}`.trim(),
-          contacted_by: contact.contacted_by || null // 🆕 S'assurer que contacted_by est inclus
+          contacted_by: contact.contacted_by || null
         }))
       }
 
@@ -341,7 +342,7 @@ export default class RecruitmentController {
           messenger: vine.string().optional(),
           section_id: vine.number().optional(),
           notes: vine.string().optional(),
-          contacted_by: vine.string().optional() // 🆕 Champ optionnel pour permettre modification
+          contacted_by: vine.string().optional()
         })
       ))
 
@@ -376,7 +377,7 @@ export default class RecruitmentController {
         status: 'not_yet_contacted',
         contact_method: 'manual',
         is_duplicate: isDuplicate,
-        contacted_by: data.contacted_by || currentUserName // 🆕 Utiliser la valeur fournie ou le nom de l'utilisateur connecté
+        contacted_by: data.contacted_by || currentUserName
       })
 
       const loadPromises = []
@@ -577,7 +578,7 @@ export default class RecruitmentController {
             status: 'not_yet_contacted',
             contact_method: 'manual',
             is_duplicate: false,
-            contacted_by: currentUserName // 🆕 Ajouter qui a importé
+            contacted_by: currentUserName
           })
 
           const loadPromises = []
@@ -628,7 +629,7 @@ export default class RecruitmentController {
           contact_method: vine.enum(['manual', 'email', 'messenger', 'phone']).optional(),
           notes: vine.string().optional(),
           contact_date: vine.date({ formats: ['iso'] }).optional(),
-          contacted_by: vine.string().optional() // 🆕 Permettre la mise à jour de contacted_by
+          contacted_by: vine.string().optional()
         })
       ))
 
@@ -755,7 +756,7 @@ export default class RecruitmentController {
         contact_date: data.action === 'contacted_email' ? DateTime.now() : null,
         notes: data.notes || null,
         is_duplicate: false,
-        contacted_by: currentUserName // 🆕 Ajouter qui a traité la recommandation
+        contacted_by: currentUserName
       })
 
       await recommendation.merge({
@@ -913,7 +914,7 @@ export default class RecruitmentController {
             status: 'not_yet_contacted',
             contact_method: 'manual',
             is_duplicate: false,
-            contacted_by: currentUserName // 🆕 Ajouter qui a importé
+            contacted_by: currentUserName
           })
 
           if (newContact.section_id) {

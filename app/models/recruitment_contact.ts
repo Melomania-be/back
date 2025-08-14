@@ -72,7 +72,7 @@ export default class RecruitmentContact extends BaseModel {
   @column()
   declare source: string | null
 
-  // 🆕 Nouvelle colonne pour tracer qui a contacté
+  //  Nouvelle colonne pour tracer qui a contacté
   @column()
   declare contacted_by: string | null
 
