@@ -1,4 +1,4 @@
-// app/models/recruitment_contact.ts - Version mise à jour avec contacted_by
+// app/models/recruitment_contact.ts
 import { DateTime } from 'luxon'
 import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
@@ -72,7 +72,6 @@ export default class RecruitmentContact extends BaseModel {
   @column()
   declare source: string | null
 
-  //  Nouvelle colonne pour tracer qui a contacté
   @column()
   declare contacted_by: string | null
 
@@ -120,6 +119,30 @@ export default class RecruitmentContact extends BaseModel {
     return this.email || this.messenger || this.phone || 'Aucun contact'
   }
 
+  private formatDateSafely(date: DateTime | null): string | null {
+    if (!date) return null
+
+    try {
+      if (!date.isValid) return null
+      return date.toFormat('dd/MM/yyyy HH:mm')
+    } catch (error) {
+      console.error('Error formatting date:', error)
+      return null
+    }
+  }
+
+  private formatDateTimeToISO(date: DateTime | null): string | null {
+    if (!date) return null
+
+    try {
+      if (!date.isValid) return null
+      return date.toISO()
+    } catch (error) {
+      console.error('Error formatting date to ISO:', error)
+      return null
+    }
+  }
+
   serialize() {
     const baseData = super.serialize()
 
@@ -131,19 +154,15 @@ export default class RecruitmentContact extends BaseModel {
       primary_contact: this.primaryContact,
       contacted_by: this.contacted_by || null,
 
-      // 🔧 FIX: Dates formatées avec protection contre les dates invalides
-      contact_date: this.contact_date && this.contact_date.isValid ?
-        this.contact_date.toFormat('dd/MM/yyyy HH:mm') : null,
-      contact_date_iso: this.contact_date && this.contact_date.isValid ?
-        this.contact_date.toISO() : null,
-      created_at: this.createdAt && this.createdAt.isValid ?
-        this.createdAt.toFormat('dd/MM/yyyy HH:mm') : null,
-      created_at_iso: this.createdAt && this.createdAt.isValid ?
-        this.createdAt.toISO() : null,
-      updated_at: this.updatedAt && this.updatedAt.isValid ?
-        this.updatedAt.toFormat('dd/MM/yyyy HH:mm') : null,
-      updated_at_iso: this.updatedAt && this.updatedAt.isValid ?
-        this.updatedAt.toISO() : null,
+      // Dates formatées avec protection complète contre les erreurs
+      contact_date: this.formatDateSafely(this.contact_date),
+      contact_date_iso: this.formatDateTimeToISO(this.contact_date),
+      last_follow_up: this.formatDateSafely(this.last_follow_up),
+      last_follow_up_iso: this.formatDateTimeToISO(this.last_follow_up),
+      created_at: this.formatDateSafely(this.createdAt),
+      created_at_iso: this.formatDateTimeToISO(this.createdAt),
+      updated_at: this.formatDateSafely(this.updatedAt),
+      updated_at_iso: this.formatDateTimeToISO(this.updatedAt),
 
       // Relations avec protection contre les valeurs nulles
       section: this.section ? {

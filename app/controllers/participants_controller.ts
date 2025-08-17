@@ -3,6 +3,8 @@ import { HttpContext } from '@adonisjs/core/http'
 import { createParticipantValidator, validateParticipantValidator } from '#validators/participant'
 import { simpleFilter } from 'adonisjs-filters'
 import Section from '#models/section'
+import RecruitmentContact from '#models/recruitment_contact'
+import Contact from '#models/contact'
 
 export default class ParticipantsController {
   async getAll(ctx: HttpContext) {
@@ -170,18 +172,28 @@ export default class ParticipantsController {
       .first()
   }
 
-  async validateParticipant({ request, response }: HttpContext) {
+  async validateParticipant({ request, response, auth }: HttpContext) {
     const data = await request.validateUsing(validateParticipantValidator)
 
     const participant = await Participant.query()
       .where('id', data.id)
       .andWhere('project_id', data.params.id)
+      .preload('contact')
       .first()
 
     if (!participant) return response.send("Couldn't find the participant")
 
     participant.accepted = true
     await participant.save()
+
+    // Ajouter automatiquement au recrutement si pas déjà présent
+    if (participant.contact && participant.contact.id) {
+      await this.addToRecruitmentIfNotExists(
+        data.params.id,
+        participant.contact,
+        auth
+      )
+    }
 
     return response.send('Participant validated')
   }
@@ -238,5 +250,52 @@ export default class ParticipantsController {
       .preload('answers')
 
     return participants
+  }
+
+  private async getCurrentUserName(auth: any): Promise<string> {
+    try {
+      const user = await auth.authenticate()
+      return user.fullName || user.email || 'Système'
+    } catch (error) {
+      return 'Système'
+    }
+  }
+
+  private async addToRecruitmentIfNotExists(projectId: number, contact: Contact, auth: any) {
+    try {
+      const existingRecruitment = await RecruitmentContact.query()
+        .where('project_id', projectId)
+        .where('contact_id', contact.id)
+        .first()
+
+      if (existingRecruitment) {
+        // Si déjà présent, mettre à jour le statut vers "recruited"
+        if (existingRecruitment.status !== 'recruited') {
+          await existingRecruitment.merge({ status: 'recruited' }).save()
+        }
+        return
+      }
+
+      const currentUserName = await this.getCurrentUserName(auth)
+
+      // Créer un nouveau contact de recrutement
+      await RecruitmentContact.create({
+        project_id: projectId,
+        contact_id: contact.id,
+        first_name: contact.first_name || '',
+        last_name: contact.last_name || '',
+        email: contact.email || null,
+        phone: contact.phone || null,
+        messenger: contact.messenger || null,
+        source: 'participant_validation',
+        status: 'recruited',
+        contact_method: 'manual',
+        is_duplicate: false,
+        contacted_by: currentUserName
+      })
+
+    } catch (error) {
+      console.error('Error adding to recruitment:', error)
+    }
   }
 }

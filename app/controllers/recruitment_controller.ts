@@ -1,4 +1,4 @@
-// app/controllers/recruitment_controller.ts - Version mise à jour avec contacted_by
+// app/controllers/recruitment_controller.ts
 import { HttpContext } from '@adonisjs/core/http'
 import RecruitmentContact from '#models/recruitment_contact'
 import RecruitmentSettings from '#models/recruitment_settings'
@@ -50,7 +50,6 @@ export default class RecruitmentController {
     return numericId
   }
 
-  // 🆕 Méthode pour obtenir le nom de l'utilisateur connecté
   private async getCurrentUserName(auth: any): Promise<string> {
     try {
       const user = await auth.authenticate()
@@ -66,42 +65,53 @@ export default class RecruitmentController {
       const projectId = this.validateProjectId(params.id)
       const currentUserName = await this.getCurrentUserName(auth)
 
-      const project = await Project.find(projectId)
+      const project = await Project.query()
+        .where('id', projectId)
+        .preload('participants', (query) => {
+          query.where('accepted', true).preload('contact')
+        })
+        .first()
+
       if (!project) {
         return response.status(404).json({ error: 'Project not found' })
       }
 
-      const allContacts = await Contact.query()
-        .where('validated', true)
-        .preload('instruments')
+      const projectContactIds = project.participants
+        .filter((p) => p.contact && p.contact.id)
+        .map((p) => p.contact.id)
 
-      if (allContacts.length === 0) {
+      if (projectContactIds.length === 0) {
         return response.json({
           imported: [],
           conflicts: [],
           errors: [],
-          message: 'Aucun contact validé trouvé dans la base de données',
+          message: 'Aucun participant validé trouvé dans ce projet',
           total_contacts: 0,
           new_imports: 0,
-          already_imported: 0
+          already_imported: 0,
         })
       }
+
+      const projectContacts = await Contact.query()
+        .whereIn('id', projectContactIds)
+        .where('validated', true)
+        .preload('instruments')
 
       const existingContacts = await RecruitmentContact.query()
         .where('project_id', projectId)
         .whereNotNull('contact_id')
         .select('contact_id')
 
-      const existingContactIds = new Set(existingContacts.map(c => c.contact_id))
+      const existingContactIds = new Set(existingContacts.map((c) => c.contact_id))
 
-      const contactsToImport = allContacts.filter(contact =>
-        !existingContactIds.has(contact.id)
+      const contactsToImport = projectContacts.filter(
+        (contact) => !existingContactIds.has(contact.id)
       )
 
       const results: ImportResult = {
         imported: [],
         conflicts: [],
-        errors: []
+        errors: [],
       }
 
       const batchSize = 50
@@ -130,34 +140,32 @@ export default class RecruitmentController {
               status: 'not_yet_contacted',
               contact_method: 'manual',
               is_duplicate: false,
-              contacted_by: currentUserName // 🆕 Ajouter qui a importé
+              contacted_by: currentUserName,
             })
 
             results.imported.push(recruitmentContact.serialize())
-
           } catch (error) {
             results.errors.push(`Error importing contact ${contact.id}: ${error.message}`)
           }
         }
       }
 
-      const conflictContacts = allContacts.filter(contact =>
+      const conflictContacts = projectContacts.filter((contact) =>
         existingContactIds.has(contact.id)
       )
 
-      results.conflicts = conflictContacts.map(contact => ({
+      results.conflicts = conflictContacts.map((contact) => ({
         contact: contact.serialize(),
-        reason: 'Already exists in recruitment'
+        reason: 'Already exists in recruitment',
       }))
 
       return response.json({
         ...results,
         message: `Import automatique terminé: ${results.imported.length} nouveaux contacts importés`,
-        total_contacts: allContacts.length,
+        total_contacts: projectContacts.length,
         new_imports: results.imported.length,
-        already_imported: results.conflicts.length
+        already_imported: results.conflicts.length,
       })
-
     } catch (error) {
       return response.status(400).json({
         error: error.message,
@@ -166,7 +174,7 @@ export default class RecruitmentController {
         errors: [error.message],
         total_contacts: 0,
         new_imports: 0,
-        already_imported: 0
+        already_imported: 0,
       })
     }
   }
@@ -180,15 +188,13 @@ export default class RecruitmentController {
         return response.status(404).json({ error: 'Project not found' })
       }
 
-      let settings = await RecruitmentSettings.query()
-        .where('project_id', projectId)
-        .first()
+      let settings = await RecruitmentSettings.query().where('project_id', projectId).first()
 
       if (!settings) {
         settings = await RecruitmentSettings.create({
           project_id: projectId,
           follow_up_days: 7,
-          auto_follow_up_enabled: true
+          auto_follow_up_enabled: true,
         })
       }
 
@@ -202,27 +208,27 @@ export default class RecruitmentController {
     try {
       const projectId = this.validateProjectId(params.id)
 
-      const data = await request.validateUsing(vine.compile(
-        vine.object({
-          follow_up_days: vine.number().min(1).max(30),
-          auto_follow_up_enabled: vine.boolean()
-        })
-      ))
+      const data = await request.validateUsing(
+        vine.compile(
+          vine.object({
+            follow_up_days: vine.number().min(1).max(30),
+            auto_follow_up_enabled: vine.boolean(),
+          })
+        )
+      )
 
       const project = await Project.find(projectId)
       if (!project) {
         return response.status(404).json({ error: 'Project not found' })
       }
 
-      let settings = await RecruitmentSettings.query()
-        .where('project_id', projectId)
-        .first()
+      let settings = await RecruitmentSettings.query().where('project_id', projectId).first()
 
       if (!settings) {
         settings = await RecruitmentSettings.create({
           project_id: projectId,
           follow_up_days: data.follow_up_days,
-          auto_follow_up_enabled: data.auto_follow_up_enabled
+          auto_follow_up_enabled: data.auto_follow_up_enabled,
         })
       } else {
         await settings.merge(data).save()
@@ -258,10 +264,19 @@ export default class RecruitmentController {
       const result = await simpleFilter(
         ctx,
         baseQuery,
-        ['first_name', 'last_name', 'email', 'phone', 'messenger', 'status', 'notes', 'contacted_by'],
+        [
+          'first_name',
+          'last_name',
+          'email',
+          'phone',
+          'messenger',
+          'status',
+          'notes',
+          'contacted_by',
+        ],
         [
           { relationColumns: ['name'] as any, relationName: 'section' },
-          { relationColumns: ['first_name', 'last_name'] as any, relationName: 'contact' }
+          { relationColumns: ['first_name', 'last_name'] as any, relationName: 'contact' },
         ]
       )
 
@@ -271,7 +286,7 @@ export default class RecruitmentController {
           first_name: contact.first_name || '',
           last_name: contact.last_name || '',
           display_name: `${contact.first_name || ''} ${contact.last_name || ''}`.trim(),
-          contacted_by: contact.contacted_by || null
+          contacted_by: contact.contacted_by || null,
         }))
       }
 
@@ -298,9 +313,9 @@ export default class RecruitmentController {
 
       const total = Number(totalResult?.$extras.total || 0)
 
-      const byStatus = statsResults.map(result => ({
+      const byStatus = statsResults.map((result) => ({
         status: result.status,
-        count: Number(result.$extras.total || 0)
+        count: Number(result.$extras.total || 0),
       }))
 
       const pendingRecommendationsResult = await RecruitmentRecommendation.query()
@@ -314,7 +329,7 @@ export default class RecruitmentController {
       const stats = {
         total,
         by_status: byStatus,
-        pending_recommendations: pendingRecommendations
+        pending_recommendations: pendingRecommendations,
       }
 
       return response.json(stats)
@@ -323,7 +338,7 @@ export default class RecruitmentController {
         error: error.message,
         total: 0,
         by_status: [],
-        pending_recommendations: 0
+        pending_recommendations: 0,
       })
     }
   }
@@ -333,22 +348,24 @@ export default class RecruitmentController {
       const projectId = this.validateProjectId(params.id)
       const currentUserName = await this.getCurrentUserName(auth)
 
-      const data = await request.validateUsing(vine.compile(
-        vine.object({
-          first_name: vine.string().trim().minLength(1),
-          last_name: vine.string().trim().minLength(1),
-          email: vine.string().email().optional(),
-          phone: vine.string().optional(),
-          messenger: vine.string().optional(),
-          section_id: vine.number().optional(),
-          notes: vine.string().optional(),
-          contacted_by: vine.string().optional()
-        })
-      ))
+      const data = await request.validateUsing(
+        vine.compile(
+          vine.object({
+            first_name: vine.string().trim().minLength(1),
+            last_name: vine.string().trim().minLength(1),
+            email: vine.string().email().optional(),
+            phone: vine.string().optional(),
+            messenger: vine.string().optional(),
+            section_id: vine.number().optional(),
+            notes: vine.string().optional(),
+            contacted_by: vine.string().optional(),
+          })
+        )
+      )
 
       if (!data.first_name || !data.last_name) {
         return response.status(400).json({
-          error: 'Le prénom et le nom sont requis et ne peuvent pas être vides'
+          error: 'Le prénom et le nom sont requis et ne peuvent pas être vides',
         })
       }
 
@@ -356,7 +373,7 @@ export default class RecruitmentController {
         const section = await Section.find(data.section_id)
         if (!section) {
           return response.status(400).json({
-            error: 'La section spécifiée n\'existe pas'
+            error: "La section spécifiée n'existe pas",
           })
         }
       }
@@ -377,7 +394,7 @@ export default class RecruitmentController {
         status: 'not_yet_contacted',
         contact_method: 'manual',
         is_duplicate: isDuplicate,
-        contacted_by: data.contacted_by || currentUserName
+        contacted_by: data.contacted_by || currentUserName,
       })
 
       const loadPromises = []
@@ -398,19 +415,21 @@ export default class RecruitmentController {
     try {
       const projectId = this.validateProjectId(params.id)
 
-      const data = await request.validateUsing(vine.compile(
-        vine.object({
-          contact_ids: vine.array(vine.number()),
-          template_id: vine.number().optional(),
-          custom_subject: vine.string().optional(),
-          custom_content: vine.string().optional()
-        })
-      ))
+      const data = await request.validateUsing(
+        vine.compile(
+          vine.object({
+            contact_ids: vine.array(vine.number()),
+            template_id: vine.number().optional(),
+            custom_subject: vine.string().optional(),
+            custom_content: vine.string().optional(),
+          })
+        )
+      )
 
       const results: EmailResult = {
         sent: [],
         failed: [],
-        skipped: []
+        skipped: [],
       }
 
       const project = await Project.find(projectId)
@@ -424,7 +443,7 @@ export default class RecruitmentController {
 
       let recruiterInfo = {
         name: 'Équipe Melomania',
-        email: 'contact@melomania.com'
+        email: 'contact@melomania.com',
       }
 
       if (responsibles && responsibles.length > 0) {
@@ -432,7 +451,7 @@ export default class RecruitmentController {
         if (firstResponsible.contact) {
           recruiterInfo = {
             name: `${firstResponsible.contact.first_name} ${firstResponsible.contact.last_name}`,
-            email: firstResponsible.contact.email || 'contact@melomania.com'
+            email: firstResponsible.contact.email || 'contact@melomania.com',
           }
         }
       }
@@ -458,11 +477,11 @@ export default class RecruitmentController {
             {
               first_name: contact.first_name,
               last_name: contact.last_name,
-              email: contact.email
+              email: contact.email,
             },
             {
               id: project.id,
-              name: project.name
+              name: project.name,
             },
             recruiterInfo,
             contact.recommended_by || undefined
@@ -470,26 +489,26 @@ export default class RecruitmentController {
 
           await mail.send(recruitmentMail)
 
-          // 🔧 FIX: Utiliser DateTime.now() pour éviter les erreurs de date invalide
-          await contact.merge({
-            status: 'awaiting_response',
-            contact_method: 'email',
-            contact_date: DateTime.now()
-          }).save()
+          await contact
+            .merge({
+              status: 'awaiting_response',
+              contact_method: 'email',
+              contact_date: DateTime.now(),
+            })
+            .save()
 
           results.sent.push({
             contact_id: contact.id,
             email: contact.email,
             name: `${contact.first_name} ${contact.last_name}`,
             sent_at: DateTime.now().toISO(),
-            real_email: true
+            real_email: true,
           })
-
         } catch (error) {
           results.failed.push({
             contact_id: contactId,
             error: error.message,
-            email: contact.email
+            email: contact.email,
           })
         }
       }
@@ -498,12 +517,13 @@ export default class RecruitmentController {
         sent: results.sent.length,
         failed: results.failed.length,
         skipped: results.skipped.length,
-        total: data.contact_ids.length
+        total: data.contact_ids.length,
       }
 
-      const successMessage = results.sent.length > 0 ?
-        `${results.sent.length} email(s) envoyé(s) avec succès. Status mis à jour.` :
-        `Aucun email envoyé. Vérifiez les adresses email.`
+      const successMessage =
+        results.sent.length > 0
+          ? `${results.sent.length} email(s) envoyé(s) avec succès. Status mis à jour.`
+          : `Aucun email envoyé. Vérifiez les adresses email.`
 
       return response.json({
         success: true,
@@ -511,7 +531,7 @@ export default class RecruitmentController {
         details: results,
         message: `Emails envoyés: ${results.sent.length}/${data.contact_ids.length}`,
         info: successMessage,
-        simulation_mode: false
+        simulation_mode: false,
       })
     } catch (error) {
       return response.status(400).json({ error: error.message })
@@ -523,17 +543,19 @@ export default class RecruitmentController {
       const projectId = this.validateProjectId(params.id)
       const currentUserName = await this.getCurrentUserName(auth)
 
-      const data = await request.validateUsing(vine.compile(
-        vine.object({
-          contact_ids: vine.array(vine.number()),
-          from_project_id: vine.number().optional()
-        })
-      ))
+      const data = await request.validateUsing(
+        vine.compile(
+          vine.object({
+            contact_ids: vine.array(vine.number()),
+            from_project_id: vine.number().optional(),
+          })
+        )
+      )
 
       const results: ContactResult = {
         imported: [],
         conflicts: [],
-        errors: []
+        errors: [],
       }
 
       for (const contactId of data.contact_ids) {
@@ -553,7 +575,7 @@ export default class RecruitmentController {
             results.conflicts.push({
               contact,
               existing_status: existing.status,
-              recruitment_id: existing.id
+              recruitment_id: existing.id,
             })
             continue
           }
@@ -578,7 +600,7 @@ export default class RecruitmentController {
             status: 'not_yet_contacted',
             contact_method: 'manual',
             is_duplicate: false,
-            contacted_by: currentUserName
+            contacted_by: currentUserName,
           })
 
           const loadPromises = []
@@ -591,7 +613,6 @@ export default class RecruitmentController {
           await Promise.all(loadPromises)
 
           results.imported.push(recruitmentContact.serialize())
-
         } catch (error) {
           results.errors.push(`Error importing contact ${contactId}: ${error.message}`)
         }
@@ -623,15 +644,25 @@ export default class RecruitmentController {
       const projectId = this.validateProjectId(params.id)
       const contactId = this.validateProjectId(params.contactId)
 
-      const data = await request.validateUsing(vine.compile(
-        vine.object({
-          status: vine.enum(['not_yet_contacted', 'awaiting_response', 'to_follow_up', 'not_available', 'pending_validation', 'cancelled', 'recruited']),
-          contact_method: vine.enum(['manual', 'email', 'messenger', 'phone']).optional(),
-          notes: vine.string().optional(),
-          contact_date: vine.date({ formats: ['iso'] }).optional(),
-          contacted_by: vine.string().optional()
-        })
-      ))
+      const data = await request.validateUsing(
+        vine.compile(
+          vine.object({
+            status: vine.enum([
+              'not_yet_contacted',
+              'awaiting_response',
+              'to_follow_up',
+              'not_available',
+              'pending_validation',
+              'cancelled',
+              'recruited',
+            ]),
+            contact_method: vine.enum(['manual', 'email', 'messenger', 'phone']).optional(),
+            notes: vine.string().optional(),
+            contact_date: vine.date({ formats: ['iso'] }).optional(),
+            contacted_by: vine.string().optional(),
+          })
+        )
+      )
 
       const contact = await RecruitmentContact.query()
         .where('id', contactId)
@@ -644,7 +675,6 @@ export default class RecruitmentController {
 
       const updateData: any = { ...data }
 
-      // 🔧 FIX: Utiliser DateTime.now() si le statut change à "awaiting_response" et qu'il n'y a pas de date de contact
       if (data.status === 'awaiting_response' && !contact.contact_date) {
         updateData.contact_date = DateTime.now()
       }
@@ -698,9 +728,46 @@ export default class RecruitmentController {
         .where('project_id', projectId)
         .orderBy('created_at', 'desc')
 
-      return response.json(recommendations)
+      // Serialiser correctement les recommandations
+      const serializedRecommendations = recommendations.map((recommendation) => ({
+        id: recommendation.id,
+        project_id: recommendation.project_id,
+        recommender_name: recommendation.recommender_name || 'Unknown',
+        recommender_email: recommendation.recommender_email || null,
+        recommended_first_name: recommendation.recommended_first_name || '',
+        recommended_last_name: recommendation.recommended_last_name || '',
+        recommended_email: recommendation.recommended_email || null,
+        recommended_phone: recommendation.recommended_phone || null,
+        recommended_messenger: recommendation.recommended_messenger || null,
+        recommended_instrument: recommendation.recommended_instrument || null,
+        recommendation_message: recommendation.recommendation_message || null,
+        status: recommendation.status || 'pending',
+        recruitment_contact_id: recommendation.recruitment_contact_id || null,
+        created_at:
+          recommendation.createdAt && recommendation.createdAt.isValid
+            ? recommendation.createdAt.toISO()
+            : new Date().toISOString(),
+        updated_at:
+          recommendation.updatedAt && recommendation.updatedAt.isValid
+            ? recommendation.updatedAt.toISO()
+            : new Date().toISOString(),
+
+        // Propriétés calculées pour l'affichage
+        recommended_display_name:
+          `${recommendation.recommended_first_name || ''} ${recommendation.recommended_last_name || ''}`.trim(),
+        formatted_created_at:
+          recommendation.createdAt && recommendation.createdAt.isValid
+            ? recommendation.createdAt.toFormat('dd/MM/yyyy HH:mm')
+            : 'Date inconnue',
+      }))
+
+      return response.json(serializedRecommendations)
     } catch (error) {
-      return response.status(400).json({ error: error.message })
+      console.error('Error fetching recommendations:', error)
+      return response.status(400).json({
+        error: error.message,
+        recommendations: [],
+      })
     }
   }
 
@@ -714,13 +781,15 @@ export default class RecruitmentController {
         return response.status(400).json({ error: 'Invalid project ID or recommendation ID' })
       }
 
-      const data = await request.validateUsing(vine.compile(
-        vine.object({
-          action: vine.enum(['ignore', 'contacted_email', 'contacted_manual']),
-          section_id: vine.number().optional(),
-          notes: vine.string().optional()
-        })
-      ))
+      const data = await request.validateUsing(
+        vine.compile(
+          vine.object({
+            action: vine.enum(['ignore', 'contacted_email', 'contacted_manual']),
+            section_id: vine.number().optional(),
+            notes: vine.string().optional(),
+          })
+        )
+      )
 
       const recommendation = await RecruitmentRecommendation.query()
         .where('id', recommendationId)
@@ -736,7 +805,10 @@ export default class RecruitmentController {
         return response.json(recommendation)
       }
 
-      if (!recommendation.recommended_first_name?.trim() || !recommendation.recommended_last_name?.trim()) {
+      if (
+        !recommendation.recommended_first_name?.trim() ||
+        !recommendation.recommended_last_name?.trim()
+      ) {
         return response.status(400).json({ error: 'Recommendation has invalid name fields' })
       }
 
@@ -756,13 +828,15 @@ export default class RecruitmentController {
         contact_date: data.action === 'contacted_email' ? DateTime.now() : null,
         notes: data.notes || null,
         is_duplicate: false,
-        contacted_by: currentUserName
+        contacted_by: currentUserName,
       })
 
-      await recommendation.merge({
-        status: data.action,
-        recruitment_contact_id: recruitmentContact.id
-      }).save()
+      await recommendation
+        .merge({
+          status: data.action,
+          recruitment_contact_id: recruitmentContact.id,
+        })
+        .save()
 
       if (data.action === 'contacted_email' && recommendation.recommended_email) {
         try {
@@ -777,7 +851,7 @@ export default class RecruitmentController {
 
           let recruiterInfo = {
             name: 'Équipe Melomania',
-            email: 'contact@melomania.com'
+            email: 'contact@melomania.com',
           }
 
           if (responsibles && responsibles.length > 0) {
@@ -785,7 +859,7 @@ export default class RecruitmentController {
             if (firstResponsible.contact) {
               recruiterInfo = {
                 name: `${firstResponsible.contact.first_name} ${firstResponsible.contact.last_name}`,
-                email: firstResponsible.contact.email || 'contact@melomania.com'
+                email: firstResponsible.contact.email || 'contact@melomania.com',
               }
             }
           }
@@ -794,18 +868,17 @@ export default class RecruitmentController {
             {
               first_name: recommendation.recommended_first_name,
               last_name: recommendation.recommended_last_name,
-              email: recommendation.recommended_email
+              email: recommendation.recommended_email,
             },
             {
               id: project.id,
-              name: project.name
+              name: project.name,
             },
             recruiterInfo,
             recommendation.recommender_name
           )
 
           await mail.send(recruitmentMail)
-
         } catch (emailError) {
           // Ne pas faire échouer la requête principale si l'email échoue
         }
@@ -819,14 +892,15 @@ export default class RecruitmentController {
         success: true,
         recommendation: recommendation.serialize(),
         recruitmentContact: recruitmentContact.serialize(),
-        message: data.action === 'contacted_email'
-          ? 'Email envoyé et contact ajouté au recrutement'
-          : 'Contact ajouté au recrutement'
+        message:
+          data.action === 'contacted_email'
+            ? 'Email envoyé et contact ajouté au recrutement'
+            : 'Contact ajouté au recrutement',
       })
     } catch (error) {
       return response.status(400).json({
         error: error.message,
-        details: 'Failed to handle recommendation'
+        details: 'Failed to handle recommendation',
       })
     }
   }
@@ -851,15 +925,19 @@ export default class RecruitmentController {
       const projectId = this.validateProjectId(params.id)
       const currentUserName = await this.getCurrentUserName(auth)
 
-      const data = await request.validateUsing(vine.compile(
-        vine.object({
-          source_project_id: vine.number(),
-          include_statuses: vine.array(vine.string()).optional()
-        })
-      ))
+      const data = await request.validateUsing(
+        vine.compile(
+          vine.object({
+            source_project_id: vine.number(),
+            include_statuses: vine.array(vine.string()).optional(),
+          })
+        )
+      )
 
       const sourceProject = await Project.find(data.source_project_id)
-      const sourceProjectName = sourceProject ? sourceProject.name : `Project_${data.source_project_id}`
+      const sourceProjectName = sourceProject
+        ? sourceProject.name
+        : `Project_${data.source_project_id}`
 
       const sourceContacts = await RecruitmentContact.query()
         .where('project_id', data.source_project_id)
@@ -870,7 +948,7 @@ export default class RecruitmentController {
       const results: ContactResult = {
         imported: [],
         conflicts: [],
-        errors: []
+        errors: [],
       }
 
       for (const sourceContact of sourceContacts) {
@@ -896,7 +974,7 @@ export default class RecruitmentController {
           if (existing) {
             results.conflicts.push({
               source_contact: sourceContact.serialize(),
-              existing_contact: existing.serialize()
+              existing_contact: existing.serialize(),
             })
             continue
           }
@@ -914,7 +992,7 @@ export default class RecruitmentController {
             status: 'not_yet_contacted',
             contact_method: 'manual',
             is_duplicate: false,
-            contacted_by: currentUserName
+            contacted_by: currentUserName,
           })
 
           if (newContact.section_id) {
@@ -922,7 +1000,6 @@ export default class RecruitmentController {
           }
 
           results.imported.push(newContact.serialize())
-
         } catch (error) {
           results.errors.push(`Error importing contact ${sourceContact.id}: ${error.message}`)
         }

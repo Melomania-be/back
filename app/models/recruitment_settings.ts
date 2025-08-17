@@ -17,6 +17,12 @@ export default class RecruitmentSettings extends BaseModel {
   @column()
   declare auto_follow_up_enabled: boolean
 
+  @column()
+  declare auto_import_enabled: boolean
+
+  @column.dateTime()
+  declare last_auto_import: DateTime | null
+
   @belongsTo(() => Project, {
     foreignKey: 'project_id',
   })
@@ -27,4 +33,36 @@ export default class RecruitmentSettings extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  shouldAutoImport(): boolean {
+    if (!this.auto_import_enabled) return false
+
+    if (!this.last_auto_import) return true
+
+    const daysSinceLastImport = DateTime.now().diff(this.last_auto_import, 'days').days
+    return daysSinceLastImport >= 1
+  }
+
+  async markAutoImportPerformed() {
+    this.last_auto_import = DateTime.now()
+    await this.save()
+  }
+
+  serialize() {
+    const baseData = super.serialize()
+
+    return {
+      ...baseData,
+      auto_import_enabled: this.auto_import_enabled || false,
+      last_auto_import: this.last_auto_import && this.last_auto_import.isValid
+        ? this.last_auto_import.toISO()
+        : null,
+      created_at: this.createdAt && this.createdAt.isValid
+        ? this.createdAt.toISO()
+        : null,
+      updated_at: this.updatedAt && this.updatedAt.isValid
+        ? this.updatedAt.toISO()
+        : null,
+    }
+  }
 }
