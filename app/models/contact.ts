@@ -1,3 +1,4 @@
+// app/models/contact.ts - Version avec mapping des champs
 import { DateTime } from 'luxon'
 import { BaseModel, column, hasMany, manyToMany } from '@adonisjs/lucid/orm'
 import Instrument from './instrument.js'
@@ -65,6 +66,20 @@ export default class Contact extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  // Getters pour compatibilité avec différents formats de noms
+  get firstName(): string {
+    return this.first_name
+  }
+
+  get lastName(): string {
+    return this.last_name
+  }
+
+  // Méthode pour obtenir le nom complet
+  get fullName(): string {
+    return `${this.first_name} ${this.last_name}`.trim()
+  }
 
   serializeExtras() {
     return { pivot_proficiency_level: this.$extras.pivot_proficiency_level }

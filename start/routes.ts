@@ -32,6 +32,8 @@ const TemplateController = () => import('#controllers/template_controller')
 const DefaultTemplatesController = () => import('#controllers/default_templates_controller')
 const FilesystemController = () => import('#controllers/filesystem_controller')
 const SharedFolderController = () => import('#controllers/shared_folder_controller')
+const RecruitmentController = () => import('#controllers/recruitment_controller')
+const RecruitmentRecommendationController = () => import('#controllers/recruitment_recommendation_controller')
 
 router.group(() => {
   // =============================================================================
@@ -92,6 +94,13 @@ router.group(() => {
       router.get('/:token/pdf/:pdfFileId/download', [AuditionsController, 'downloadAuditionPdf'])
     })
     .prefix('/audition')
+
+  // =============================================================================
+  // ROUTES PUBLIQUES POUR RECOMMANDATIONS DE RECRUTEMENT
+  // =============================================================================
+  router.get('/projects/:id/recommend', [RecruitmentRecommendationController, 'getRecommendationPage'])
+  router.post('/projects/:id/recommend', [RecruitmentRecommendationController, 'submitRecommendation'])
+  router.get('/projects/:id/recommend/success', [RecruitmentRecommendationController, 'confirmationPage'])
 
   // =============================================================================
   // ROUTES PROTÉGÉES (AVEC AUTHENTIFICATION)
@@ -213,6 +222,46 @@ router.group(() => {
             MaterialsController,
             'getProjectAssignedMaterials',
           ])
+
+          // =============================================================================
+          // GESTION DU RECRUTEMENT
+          // =============================================================================
+          router
+            .group(() => {
+              // Paramètres de recrutement
+              router.get('/settings', [RecruitmentController, 'getSettings'])
+              router.put('/settings', [RecruitmentController, 'updateSettings'])
+
+              router.post('/auto-import-all', [RecruitmentController, 'autoImportAllContacts'])
+
+              // Contacts de recrutement - Routes principales
+              router.get('/contacts', [RecruitmentController, 'getContacts'])
+              router.get('/', [RecruitmentController, 'getContacts']) // Alias pour la liste principale
+              router.post('/contacts/manual', [RecruitmentController, 'createManualContact'])
+              router.post('/contacts', [RecruitmentController, 'createManualContact']) // Route principale pour création
+              router.post('/contacts/import', [RecruitmentController, 'importContacts'])
+              router.put('/contacts/:contactId/status', [RecruitmentController, 'updateContactStatus'])
+              router.put('/contacts/:contactId', [RecruitmentController, 'updateContactStatus']) // Alias
+              router.delete('/contacts/:contactId', [RecruitmentController, 'deleteContact'])
+
+              // Recherche de contacts
+              router.post('/search-contacts', [RecruitmentController, 'searchContacts'])
+
+              // Envoi d'emails
+              router.post('/send-emails', [RecruitmentController, 'sendRecruitmentEmails'])
+
+              // Import depuis projet
+              router.get('/import-project', [RecruitmentController, 'getAvailableProjects'])
+              router.post('/import-project', [RecruitmentController, 'importFromProject'])
+
+              // Recommandations
+              router.get('/recommendations', [RecruitmentController, 'getRecommendations'])
+              router.post('/recommendations/:recommendationId/handle', [RecruitmentController, 'handleRecommendation'])
+
+              // Statistiques
+              router.get('/stats', [RecruitmentController, 'getStats'])
+            })
+            .prefix('/:id/management/recruitment')
 
           // =============================================================================
           // GESTION DES PARTICIPANTS
@@ -388,7 +437,9 @@ router.group(() => {
       router
         .group(() => {
           router.get('/', [UsersController, 'getAll'])
+          router.get('/current', [UsersController, 'getCurrentUser'])
           router.put('/', [UsersController, 'create'])
+          router.patch('/:id', [UsersController, 'update'])
           router.delete('/:id', [UsersController, 'delete'])
         })
         .prefix('/users')

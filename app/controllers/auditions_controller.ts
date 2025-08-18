@@ -1,5 +1,3 @@
-// app/controllers/auditions_controller.ts - Version complète avec pièces jointes PDF et corrections DateTime
-
 import { HttpContext } from '@adonisjs/core/http'
 import Audition from '#models/audition'
 import Participant from '#models/participant'
@@ -22,22 +20,18 @@ import {
 } from '#validators/audition'
 import { uploadAuditionPdfValidator } from '#validators/audition_pdf'
 
-//  FONCTION UTILITAIRE POUR FORMATAGE SÉCURISÉ DES DATES
 function formatDateSafely(dateValue: any): string | null {
   if (!dateValue) return null
 
   try {
-    // Si c'est déjà un DateTime de Luxon
     if (dateValue && typeof dateValue.toISO === 'function') {
       return dateValue.toISO()
     }
 
-    // Si c'est une Date JavaScript
     if (dateValue instanceof Date) {
       return dateValue.toISOString()
     }
 
-    // Si c'est une string, essayer de la convertir
     if (typeof dateValue === 'string') {
       const date = new Date(dateValue)
       if (!isNaN(date.getTime())) {
@@ -45,27 +39,17 @@ function formatDateSafely(dateValue: any): string | null {
       }
     }
 
-    console.warn('Date value could not be formatted:', dateValue)
     return null
   } catch (error) {
-    console.error('Error formatting date:', error, 'for value:', dateValue)
     return null
   }
 }
 
 export default class AuditionsController {
-  // ================================================================================
-  // MÉTHODES POUR LA CRÉATION ET GESTION DES AUDITIONS
-  // ================================================================================
-
-  // ✅ MÉTHODE MISE À JOUR : Créer une nouvelle audition pour un participant avec PDFs en pièces jointes
   async requestAudition({ request, response, params }: HttpContext) {
     const data = await request.validateUsing(createAuditionValidator)
 
     try {
-      console.log(`🎭 Starting audition request for participant ${params.participantId} in project ${params.id}`)
-
-      // Vérifier que le participant existe et n'est pas encore validé
       const participant = await Participant.query()
         .where('id', params.participantId)
         .where('project_id', params.id)
@@ -74,109 +58,92 @@ export default class AuditionsController {
         .preload('section')
         .firstOrFail()
 
-      console.log(`✅ Participant found: ${participant.contact.first_name} ${participant.contact.last_name} (${participant.section.name})`)
-
-      // Charger le projet avec ses répétitions pour définir la deadline par défaut
       const project = await Project.query()
         .where('id', params.id)
         .preload('responsibles')
         .preload('rehearsals')
         .firstOrFail()
 
-      // Créer un token sécurisé unique
       const secureToken = cuid()
 
-      // Gérer la deadline avec première répétition par défaut
       let deadline = null
 
       if (data.deadline) {
-        // Si une deadline est fournie explicitement, l'utiliser
         try {
           deadline = DateTime.fromISO(data.deadline)
         } catch (error) {
           deadline = DateTime.fromFormat(data.deadline, "yyyy-MM-dd'T'HH:mm")
         }
       } else {
-        // Si pas de deadline fournie, utiliser la première répétition
         if (project.rehearsals && project.rehearsals.length > 0) {
-          // Trouver la première répétition future (après maintenant)
           const now = DateTime.now()
 
-          // ✅ CORRECTION : Gérer les répétitions qui peuvent être DateTime ou Date
           const futureRehearsals = project.rehearsals
-            .filter(rehearsal => {
-              // Si start_date est déjà un DateTime
-              if (rehearsal.start_date && typeof (rehearsal.start_date as any).toJSDate === 'function') {
+            .filter((rehearsal) => {
+              if (
+                rehearsal.start_date &&
+                typeof (rehearsal.start_date as any).toJSDate === 'function'
+              ) {
                 return (rehearsal.start_date as any) > now
               }
-              // Si start_date est une Date JavaScript
               return DateTime.fromJSDate(rehearsal.start_date as unknown as Date) > now
             })
             .sort((a, b) => {
-              // ✅ CORRECTION : Conversion appropriée pour le tri
-              const dateA = (a.start_date && typeof (a.start_date as any).toJSDate === 'function')
-                ? (a.start_date as any).toJSDate()
-                : (a.start_date as unknown as Date)
-              const dateB = (b.start_date && typeof (b.start_date as any).toJSDate === 'function')
-                ? (b.start_date as any).toJSDate()
-                : (b.start_date as unknown as Date)
+              const dateA =
+                a.start_date && typeof (a.start_date as any).toJSDate === 'function'
+                  ? (a.start_date as any).toJSDate()
+                  : (a.start_date as unknown as Date)
+              const dateB =
+                b.start_date && typeof (b.start_date as any).toJSDate === 'function'
+                  ? (b.start_date as any).toJSDate()
+                  : (b.start_date as unknown as Date)
               return dateA.getTime() - dateB.getTime()
             })
 
           if (futureRehearsals.length > 0) {
-            // ✅ CORRECTION : Définir la deadline à 24h avant la première répétition
             const firstRehearsalStartDate = futureRehearsals[0].start_date
             let firstRehearsal: DateTime
 
-            if (firstRehearsalStartDate && typeof (firstRehearsalStartDate as any).toJSDate === 'function') {
-              // Si c'est déjà un DateTime
+            if (
+              firstRehearsalStartDate &&
+              typeof (firstRehearsalStartDate as any).toJSDate === 'function'
+            ) {
               firstRehearsal = firstRehearsalStartDate as any
             } else {
-              // Si c'est une Date JavaScript
               firstRehearsal = DateTime.fromJSDate(firstRehearsalStartDate as unknown as Date)
             }
 
             deadline = firstRehearsal.minus({ days: 1 })
-            console.log(`⏰ Auto-set audition deadline to ${deadline.toISO()} (1 day before first rehearsal)`)
           } else {
-            // Si pas de répétitions futures, définir à 7 jours par défaut
             deadline = DateTime.now().plus({ days: 7 })
-            console.log(`⏰ No future rehearsals, setting default 7-day deadline: ${deadline.toISO()}`)
           }
         } else {
-          // Si pas de répétitions du tout, définir à 7 jours par défaut
           deadline = DateTime.now().plus({ days: 7 })
-          console.log(`⏰ No rehearsals found, setting default 7-day deadline: ${deadline.toISO()}`)
         }
       }
 
-      // ✅ CORRECTION : Créer l'audition avec DateTime (pas de conversion)
       const audition = await Audition.create({
         participant_id: participant.id,
         project_id: params.id,
         secure_token: secureToken,
         instructions: data.instructions || '',
         required_files: data.required_files || [],
-        deadline: deadline, // ✅ Garder l'objet DateTime
+        deadline: deadline,
         is_submitted: false,
         candidate_notes: '',
       })
 
-      console.log(`✅ Audition created with ID: ${audition.id}`)
+      const associatedPdfsCount = await this.associateSectionPdfsToAudition(
+        audition.id,
+        participant.section_id,
+        params.id
+      )
 
-      // ✅ ASSOCIER AUTOMATIQUEMENT LES PDFs DE LA SECTION
-      const associatedPdfsCount = await this.associateSectionPdfsToAudition(audition.id, participant.section_id, params.id)
-      console.log(`📎 Associated ${associatedPdfsCount} PDFs to the audition`)
-
-      // ✅ CORRECTION DATETIME : Mettre à jour le statut du participant avec DateTime (pas de conversion)
-      participant.audition_status = 'pending' as 'pending' // ✅ Cast explicite pour éviter l'erreur de type
-      participant.audition_requested_at = DateTime.now() // ✅ Garder DateTime
-      participant.audition_deadline = deadline // ✅ Garder DateTime (peut être null)
+      participant.audition_status = 'pending' as 'pending'
+      participant.audition_requested_at = DateTime.now()
+      participant.audition_deadline = deadline
       await participant.save()
 
-      console.log(`✅ Participant status updated to 'pending'`)
-
-      // Préparer des informations sur le responsable pour l'email
       let responsibleContact = null
       if (project.responsibles && project.responsibles.length > 0) {
         responsibleContact = {
@@ -188,13 +155,10 @@ export default class AuditionsController {
         }
       }
 
-      // ✅ ENVOYER L'EMAIL D'AUDITION AVEC LES PDFs EN PIÈCES JOINTES
       let emailSent = false
       let emailError = null
 
       try {
-        console.log(`📧 Sending audition email to ${participant.contact.email} with ${associatedPdfsCount} PDF attachments...`)
-
         const auditionRequestMail = new AuditionRequest(
           participant.contact,
           project,
@@ -205,14 +169,10 @@ export default class AuditionsController {
 
         await mail.send(auditionRequestMail)
         emailSent = true
-        console.log(`✅ Audition email sent successfully with PDF attachments`)
       } catch (error) {
         emailError = error.message
-        console.error(`❌ Error sending audition email:`, error)
-        // Ne pas faire échouer la création d'audition si l'email échoue
       }
 
-      // Retourner des informations complètes sur la deadline et les PDFs
       const deadlineInfo = data.deadline
         ? 'Custom deadline provided'
         : deadline
@@ -226,19 +186,20 @@ export default class AuditionsController {
           secure_token: audition.secure_token,
           deadline: deadline?.toISO(),
           instructions: audition.instructions,
-          required_files: audition.required_files
+          required_files: audition.required_files,
         },
         deadline_info: deadlineInfo,
         email_status: {
           sent: emailSent,
           error: emailError,
-          attachments_count: associatedPdfsCount
+          attachments_count: associatedPdfsCount,
         },
         pdf_attachments: {
           count: associatedPdfsCount,
-          message: associatedPdfsCount > 0
-            ? `${associatedPdfsCount} PDF(s) automatically attached to email`
-            : 'No PDFs configured for this section - candidate will upload free-form recordings'
+          message:
+            associatedPdfsCount > 0
+              ? `${associatedPdfsCount} PDF(s) automatically attached to email`
+              : 'No PDFs configured for this section - candidate will upload free-form recordings',
         },
         debug_info: {
           rehearsals_count: project.rehearsals?.length || 0,
@@ -246,11 +207,10 @@ export default class AuditionsController {
           deadline_calculation: deadlineInfo,
           participant_section: participant.section.name,
           pdfs_associated: associatedPdfsCount,
-          email_sent: emailSent
-        }
+          email_sent: emailSent,
+        },
       })
     } catch (error) {
-      console.error('❌ Error creating audition:', error)
       return response.status(500).json({
         error: 'Error creating audition request',
         details: error.message || 'Unknown error',
@@ -258,7 +218,6 @@ export default class AuditionsController {
     }
   }
 
-  // Supprimer une audition
   async deleteAudition({ params, response }: HttpContext) {
     try {
       const audition = await Audition.query()
@@ -267,70 +226,55 @@ export default class AuditionsController {
         .preload('participant')
         .firstOrFail()
 
-      // Supprimer les fichiers d'audition associés
       const auditionFiles = await AuditionFile.query()
         .where('audition_id', audition.id)
         .preload('file')
 
       for (const auditionFile of auditionFiles) {
-        // Supprimer le fichier physique
         if (auditionFile.file.path) {
           try {
             const fs = await import('node:fs/promises')
             await fs.unlink(auditionFile.file.path)
           } catch (fileError) {
-            console.warn(`Could not delete file: ${auditionFile.file.path}`, fileError)
+            // Continue without blocking
           }
         }
-        // Supprimer l'entrée du fichier
         await auditionFile.file.delete()
         await auditionFile.delete()
       }
 
-      // Supprimer les associations PDF
-      await AuditionPdfFile.query()
-        .where('audition_id', audition.id)
-        .delete()
+      await AuditionPdfFile.query().where('audition_id', audition.id).delete()
 
-      // ✅ CORRECTION : Réinitialiser le statut du participant avec gestion de null
       const participant = audition.participant
-      participant.audition_status = 'none' as 'none' // ✅ Utiliser 'none' au lieu de null
+      participant.audition_status = 'none' as 'none'
       participant.audition_requested_at = null
       participant.audition_deadline = null
       await participant.save()
 
-      // Supprimer l'audition
       await audition.delete()
 
       return response.ok({
         message: 'Audition deleted successfully',
-        deleted_files_count: auditionFiles.length
+        deleted_files_count: auditionFiles.length,
       })
     } catch (error) {
-      console.error('Error deleting audition:', error)
       return response.status(500).json({
         error: 'Error deleting audition',
-        details: error.message || 'Unknown error'
+        details: error.message || 'Unknown error',
       })
     }
   }
 
-  // ✅ MÉTHODE MISE À JOUR : Récupérer toutes les auditions d'un projet avec mapping complet
   async getProjectAuditions({ params }: HttpContext) {
     try {
-      console.log('📊 Getting auditions for project:', params.id)
-
       const auditions = await Audition.query()
         .where('auditions.project_id', params.id)
         .preload('participant', (query) => {
           query.preload('contact').preload('section')
         })
-        .preload('project') // ✅ AJOUT : Preload du projet
+        .preload('project')
         .orderBy('auditions.created_at', 'desc')
 
-      console.log(`📋 Found ${auditions.length} auditions for project ${params.id}`)
-
-      // ✅ CORRECTION COMPLÈTE : Mapping explicite de tous les champs
       const processedAuditions = await Promise.all(
         auditions.map(async (audition) => {
           const auditionFiles = await AuditionFile.query()
@@ -345,11 +289,10 @@ export default class AuditionsController {
             .orderBy('order', 'asc')
 
           return {
-            // ✅ CORRECTION : Inclure explicitement tous les champs nécessaires
             id: audition.id,
             participant_id: audition.participant_id,
             project_id: audition.project_id,
-            secure_token: audition.secure_token, // ← AJOUT EXPLICITE DU TOKEN
+            secure_token: audition.secure_token,
             instructions: audition.instructions,
             required_files: audition.required_files,
             deadline: formatDateSafely(audition.deadline),
@@ -359,7 +302,6 @@ export default class AuditionsController {
             createdAt: formatDateSafely(audition.createdAt),
             updatedAt: formatDateSafely(audition.updatedAt),
 
-            // ✅ CORRECTION : Relation participant avec structure cohérente
             participant: {
               id: audition.participant.id,
               contact: {
@@ -369,14 +311,13 @@ export default class AuditionsController {
               },
               section: {
                 id: audition.participant.section?.id,
-                name: audition.participant.section?.name || 'Non définie'
-              }
+                name: audition.participant.section?.name || 'Non définie',
+              },
             },
 
-            // ✅ CORRECTION : Relation project
             project: {
               id: audition.project?.id,
-              name: audition.project?.name
+              name: audition.project?.name,
             },
 
             files: auditionFiles.map((af) => ({
@@ -416,7 +357,6 @@ export default class AuditionsController {
         })
       )
 
-      // ✅ Statistiques enrichies avec informations sur les PDFs
       const now = DateTime.now()
       const stats = {
         total: processedAuditions.length,
@@ -429,28 +369,25 @@ export default class AuditionsController {
         ).length,
         totalFiles: processedAuditions.reduce((sum, a) => sum + (a.files?.length || 0), 0),
         totalPdfs: processedAuditions.reduce((sum, a) => sum + (a.pdfs?.length || 0), 0),
-        auditionsWithPdfs: processedAuditions.filter(a => a.pdfs && a.pdfs.length > 0).length,
-        auditionsWithFiles: processedAuditions.filter(a => a.files && a.files.length > 0).length,
-        averagePdfsPerAudition: processedAuditions.length > 0
-          ? Math.round((processedAuditions.reduce((sum, a) => sum + (a.pdfs?.length || 0), 0) / processedAuditions.length) * 100) / 100
-          : 0,
-        averageFilesPerAudition: processedAuditions.length > 0
-          ? Math.round((processedAuditions.reduce((sum, a) => sum + (a.files?.length || 0), 0) / processedAuditions.length) * 100) / 100
-          : 0
+        auditionsWithPdfs: processedAuditions.filter((a) => a.pdfs && a.pdfs.length > 0).length,
+        auditionsWithFiles: processedAuditions.filter((a) => a.files && a.files.length > 0).length,
+        averagePdfsPerAudition:
+          processedAuditions.length > 0
+            ? Math.round(
+                (processedAuditions.reduce((sum, a) => sum + (a.pdfs?.length || 0), 0) /
+                  processedAuditions.length) *
+                  100
+              ) / 100
+            : 0,
+        averageFilesPerAudition:
+          processedAuditions.length > 0
+            ? Math.round(
+                (processedAuditions.reduce((sum, a) => sum + (a.files?.length || 0), 0) /
+                  processedAuditions.length) *
+                  100
+              ) / 100
+            : 0,
       }
-
-      // ✅ DEBUG : Log pour vérifier la présence des tokens
-      console.log('🔍 Checking secure_tokens in processed data:');
-      processedAuditions.forEach((audition, index) => {
-        console.log(`  Audition ${index + 1}:`, {
-          id: audition.id,
-          has_secure_token: !!audition.secure_token,
-          secure_token_preview: audition.secure_token ? `${audition.secure_token.substring(0, 8)}...` : 'MISSING',
-          participant_name: `${audition.participant?.contact?.firstName} ${audition.participant?.contact?.lastName}`
-        });
-      });
-
-      console.log('📊 Enhanced auditions stats:', stats)
 
       return {
         auditions: processedAuditions,
@@ -458,93 +395,64 @@ export default class AuditionsController {
         lastUpdate: DateTime.now().toISO(),
       }
     } catch (error) {
-      console.error('❌ Error in getProjectAuditions:', error)
       throw error
     }
   }
 
-  // ================================================================================
-  // MÉTHODES POUR LA GESTION DES PDFs PAR SECTION
-  // ================================================================================
-
-  // ✅ MÉTHODE CORRIGÉE : Upload de PDF pour une section avec persistance dans section_pdfs
   async uploadPdfForSection({ request, response, params }: HttpContext) {
     try {
-      console.log('📄 PDF upload request for project:', params.id)
-
       const data = await request.validateUsing(
         vine.compile(
           vine.object({
             file: vine.file({
               size: '25mb',
-              extnames: ['pdf']
+              extnames: ['pdf'],
             }),
             title: vine.string().trim().minLength(1).maxLength(255),
             description: vine.string().optional(),
             section_id: vine.number(),
-            order: vine.number().optional()
+            order: vine.number().optional(),
           })
         )
       )
       const { file, title, description, section_id, order } = data
 
-      console.log('📄 PDF upload details:', {
-        title,
-        section_id,
-        filename: file.clientName,
-        size: file.size
-      })
-
-      // ✅ CORRECTION : Supprimer la variable project non utilisée
-      await Project.findOrFail(params.id) // Vérifier que le projet existe
+      await Project.findOrFail(params.id)
       const section = await Section.findOrFail(section_id)
 
-      // Générer un nom unique pour le fichier PDF
       const uniqueFileName = `project_${params.id}_section_${section_id}_${cuid()}.pdf`
 
-      // Créer le dossier uploads/audition_pdfs s'il n'existe pas
       const uploadsPath = app.makePath('uploads', 'audition_pdfs')
 
-      // Sauvegarder le fichier PDF
       await file.move(uploadsPath, {
         name: uniqueFileName,
-        overwrite: true
+        overwrite: true,
       })
 
       if (!file.isValid) {
-        console.log('❌ PDF file move failed:', file.errors)
         return response.status(400).json({
           error: 'PDF upload failed',
-          details: file.errors
+          details: file.errors,
         })
       }
 
-      console.log('✅ PDF moved to:', file.filePath)
-
-      // Créer l'entrée dans la table files
       const savedFile = await File.create({
         name: file.clientName,
         type: file.type || 'application/pdf',
         content: '',
         path: file.filePath,
-        size: file.size || 0, // ✅ Ajouter la taille
+        size: file.size || 0,
       })
 
-      console.log('✅ PDF file saved in database:', savedFile.id)
-
-      // ✅ Créer l'entrée dans section_pdfs pour persistance
       const sectionPdf = await SectionPdf.create({
         project_id: params.id,
         section_id: section_id,
         file_id: savedFile.id,
         title: title,
         description: description || '',
-        order: order || 0
+        order: order || 0,
       })
 
-      console.log('✅ Section PDF created:', sectionPdf.id)
-
-      // ✅ Associer automatiquement aux auditions actives existantes
       const auditions = await Audition.query()
         .where('auditions.project_id', params.id)
         .where('auditions.is_submitted', false)
@@ -552,15 +460,11 @@ export default class AuditionsController {
         .where('participants.section_id', section_id)
         .select('auditions.*')
 
-      console.log(`📎 Found ${auditions.length} active auditions for section ${section.name}`)
-
       let associationCount = 0
       const errors: string[] = []
 
-      // Créer les associations pour chaque audition existante
       for (const audition of auditions) {
         try {
-          // Vérifier qu'il n'y a pas déjà une association
           const existingAssociation = await AuditionPdfFile.query()
             .where('audition_id', audition.id)
             .where('file_id', savedFile.id)
@@ -574,17 +478,14 @@ export default class AuditionsController {
               section_id: section_id,
               title: title,
               description: description || '',
-              order: order || 0
+              order: order || 0,
             })
             associationCount++
           }
         } catch (associationError) {
           errors.push(`Audition ${audition.id}: ${associationError.message}`)
-          console.error(`❌ Error associating PDF to audition ${audition.id}:`, associationError)
         }
       }
-
-      console.log(`✅ Created ${associationCount} associations for the new PDF`)
 
       return response.ok({
         message: 'PDF uploaded and stored successfully',
@@ -598,34 +499,28 @@ export default class AuditionsController {
           section_name: section.name,
           order: order || 0,
           project_id: params.id,
-          size: savedFile.size ?? 0 // ✅ Correction size
+          size: savedFile.size ?? 0,
         },
         section_pdf: {
           id: sectionPdf.id,
-          stored_in_section: true
+          stored_in_section: true,
         },
         stats: {
           auditions_associated: associationCount,
           total_auditions_found: auditions.length,
-          errors: errors.length > 0 ? errors : null
-        }
+          errors: errors.length > 0 ? errors : null,
+        },
       })
-
     } catch (error) {
-      console.error('❌ Error uploading PDF for section:', error)
       return response.status(500).json({
         error: 'Error uploading PDF',
-        details: error.message || 'Unknown error'
+        details: error.message || 'Unknown error',
       })
     }
   }
 
-  // ✅ MÉTHODE CORRIGÉE : Récupérer tous les PDFs par section (utilise section_pdfs)
   async getProjectPdfs({ params, response }: HttpContext) {
     try {
-      console.log('📄 Getting project PDFs for project:', params.id)
-
-      // Vérifier que le projet existe
       const project = await Project.query()
         .where('id', params.id)
         .preload('sectionGroup', (query) => {
@@ -633,9 +528,6 @@ export default class AuditionsController {
         })
         .firstOrFail()
 
-      console.log('✅ Project found:', project.name)
-
-      // ✅ Récupérer tous les PDFs depuis la table section_pdfs
       const sectionPdfs = await SectionPdf.query()
         .where('project_id', params.id)
         .preload('file')
@@ -644,29 +536,27 @@ export default class AuditionsController {
         .orderBy('order')
         .orderBy('title')
 
-      console.log('📄 Found section PDFs:', sectionPdfs.length)
+      const pdfsBySection: Record<
+        number,
+        {
+          section_id: number
+          section_name: string
+          pdfs: any[]
+          auditions_count: number
+        }
+      > = {}
 
-      // ✅ CORRECTION : Grouper par section avec typage correct
-      const pdfsBySection: Record<number, {
-        section_id: number
-        section_name: string
-        pdfs: any[]
-        auditions_count: number
-      }> = {}
-
-      // Initialiser avec toutes les sections du projet
       if (project.sectionGroup && project.sectionGroup.sections) {
         for (const section of project.sectionGroup.sections) {
           pdfsBySection[section.id] = {
             section_id: section.id,
             section_name: section.name,
             pdfs: [],
-            auditions_count: 0
+            auditions_count: 0,
           }
         }
       }
 
-      // Compter les auditions par section
       const auditionsPerSection = await Audition.query()
         .where('auditions.project_id', params.id)
         .where('auditions.is_submitted', false)
@@ -675,31 +565,27 @@ export default class AuditionsController {
         .select('participants.section_id')
         .count('* as total')
 
-      console.log('📊 Auditions per section:', auditionsPerSection)
-
-      // ✅ CORRECTION : Ajouter le compte d'auditions avec typage correct
       for (const sectionCount of auditionsPerSection) {
         const sectionId = Number(sectionCount.$extras.section_id)
         if (pdfsBySection[sectionId]) {
-          pdfsBySection[sectionId].auditions_count = parseInt(String(sectionCount.$extras.total))
+          pdfsBySection[sectionId].auditions_count = Number.parseInt(
+            String(sectionCount.$extras.total)
+          )
         }
       }
 
-      // ✅ Ajouter les PDFs depuis section_pdfs
       for (const sectionPdf of sectionPdfs) {
         const sectionId = sectionPdf.section_id
 
         if (!pdfsBySection[sectionId]) {
-          // Si la section n'existe pas dans le sectionGroup, la créer
           pdfsBySection[sectionId] = {
             section_id: sectionId,
             section_name: sectionPdf.section.name,
             pdfs: [],
-            auditions_count: 0
+            auditions_count: 0,
           }
         }
 
-        // Compter combien d'auditions utilisent ce PDF
         const usageCount = await AuditionPdfFile.query()
           .whereHas('audition', (query) => {
             query.where('project_id', params.id)
@@ -719,64 +605,56 @@ export default class AuditionsController {
             name: sectionPdf.file.name,
             type: sectionPdf.file.type,
             path: sectionPdf.file.path,
-            size: sectionPdf.file.size ?? 0 // ✅ Correction size
+            size: sectionPdf.file.size ?? 0,
           },
-          usage_count: parseInt(String(usageCount[0].$extras.total || '0'))
+          usage_count: Number.parseInt(String(usageCount[0].$extras.total || '0')),
         })
       }
 
-      // Convertir en array et trier
       const sectionsArray = Object.values(pdfsBySection).sort((a, b) =>
         a.section_name.localeCompare(b.section_name)
       )
-
-      console.log('📊 Final sections array:', sectionsArray.length, 'sections')
 
       return response.ok({
         project_id: params.id,
         project_name: project.name,
         sections: sectionsArray,
         total_sections: sectionsArray.length,
-        total_unique_pdfs: sectionPdfs.length
+        total_unique_pdfs: sectionPdfs.length,
       })
-
     } catch (error) {
-      console.error('❌ Error getting project PDFs:', error)
       return response.status(500).json({
         error: 'Error retrieving project PDFs',
-        details: error.message || 'Unknown error'
+        details: error.message || 'Unknown error',
       })
     }
   }
 
-  // ✅ MÉTHODE CORRIGÉE : Envoyer des PDFs en masse depuis section_pdfs
   async bulkSendPdfsToSection({ request, response, params }: HttpContext) {
     try {
       const data = await request.validateUsing(
         vine.compile(
           vine.object({
             section_id: vine.number(),
-            pdf_files: vine.array(
-              vine.object({
-                file_id: vine.number(),
-                title: vine.string().trim().minLength(1),
-                description: vine.string().optional(),
-                order: vine.number().optional()
-              })
-            ).minLength(1)
+            pdf_files: vine
+              .array(
+                vine.object({
+                  file_id: vine.number(),
+                  title: vine.string().trim().minLength(1),
+                  description: vine.string().optional(),
+                  order: vine.number().optional(),
+                })
+              )
+              .minLength(1),
           })
         )
       )
 
       const { section_id, pdf_files } = data
 
-      console.log(`📤 Bulk sending ${pdf_files.length} PDFs to section ${section_id} in project ${params.id}`)
-
-      // Vérifier que le projet et la section existent
       await Project.findOrFail(params.id)
       const section = await Section.findOrFail(section_id)
 
-      // Récupérer toutes les auditions actives pour cette section
       const auditions = await Audition.query()
         .where('auditions.project_id', params.id)
         .where('auditions.is_submitted', false)
@@ -787,21 +665,16 @@ export default class AuditionsController {
           query.preload('contact')
         })
 
-      console.log(`📋 Found ${auditions.length} active auditions for section ${section.name}`)
-
       let successCount = 0
       let errorCount = 0
       let associationCount = 0
       const errors: string[] = []
 
-      // Pour chaque audition, associer tous les PDFs sélectionnés
       for (const audition of auditions) {
         try {
           for (const pdfData of pdf_files) {
-            // Vérifier que le fichier existe
             await File.findOrFail(pdfData.file_id)
 
-            // Créer l'association (éviter les doublons)
             const existingAssociation = await AuditionPdfFile.query()
               .where('audition_id', audition.id)
               .where('file_id', pdfData.file_id)
@@ -815,18 +688,15 @@ export default class AuditionsController {
                 section_id: section_id,
                 title: pdfData.title,
                 description: pdfData.description || '',
-                order: pdfData.order || 0
+                order: pdfData.order || 0,
               })
               associationCount++
-            } else {
-              console.log(`⚠️ PDF ${pdfData.file_id} already associated with audition ${audition.id}`)
             }
           }
           successCount++
         } catch (associationError) {
           errorCount++
           errors.push(`Audition ${audition.id}: ${associationError.message}`)
-          console.error(`❌ Error associating PDFs to audition ${audition.id}:`, associationError)
         }
       }
 
@@ -838,26 +708,22 @@ export default class AuditionsController {
           successful_auditions: successCount,
           failed_auditions: errorCount,
           pdf_files_count: pdf_files.length,
-          total_associations_created: associationCount
+          total_associations_created: associationCount,
         },
-        errors: errors.length > 0 ? errors : null
+        errors: errors.length > 0 ? errors : null,
       })
-
     } catch (error) {
-      console.error('❌ Error in bulk PDF sending:', error)
       return response.status(500).json({
         error: 'Error sending PDFs to section',
-        details: error.message || 'Unknown error'
+        details: error.message || 'Unknown error',
       })
     }
   }
 
-  // ✅ MÉTHODE CORRIGÉE : Supprimer un PDF de section_pdfs
   async removePdfFromSection({ params, response }: HttpContext) {
     try {
       const { pdfFileId } = params
 
-      // Supprimer depuis section_pdfs
       const sectionPdf = await SectionPdf.query()
         .where('project_id', params.id)
         .where('file_id', pdfFileId)
@@ -866,11 +732,10 @@ export default class AuditionsController {
 
       if (!sectionPdf) {
         return response.status(404).json({
-          error: 'PDF not found in this project'
+          error: 'PDF not found in this project',
         })
       }
 
-      // Supprimer toutes les associations aux auditions
       const associations = await AuditionPdfFile.query()
         .whereHas('audition', (query) => {
           query.where('project_id', params.id)
@@ -883,19 +748,16 @@ export default class AuditionsController {
         deletedAssociations++
       }
 
-      // Supprimer de section_pdfs
       await sectionPdf.delete()
 
-      // Supprimer le fichier physique et l'entrée
       const file = sectionPdf.file
       if (file && file.path) {
         try {
           const fs = await import('node:fs/promises')
           await fs.unlink(file.path)
           await file.delete()
-          console.log(`🗑️ Physical PDF file deleted: ${file.path}`)
         } catch (fileError) {
-          console.warn(`⚠️ Could not delete physical PDF file: ${file.path}`, fileError)
+          // Continue without blocking
         }
       }
 
@@ -904,39 +766,33 @@ export default class AuditionsController {
         stats: {
           section_pdf_deleted: true,
           associations_deleted: deletedAssociations,
-          file_deleted: true
-        }
+          file_deleted: true,
+        },
       })
-
     } catch (error) {
-      console.error('❌ Error removing PDF from section:', error)
       return response.status(500).json({
         error: 'Error removing PDF',
-        details: error.message || 'Unknown error'
+        details: error.message || 'Unknown error',
       })
     }
   }
 
-  // ✅ MÉTHODE MISE À JOUR : Associer automatiquement les PDFs de section à une nouvelle audition
-  async associateSectionPdfsToAudition(auditionId: number, sectionId: number, projectId: number): Promise<number> {
+  async associateSectionPdfsToAudition(
+    auditionId: number,
+    sectionId: number,
+    projectId: number
+  ): Promise<number> {
     try {
-      console.log(`📎 Auto-associating PDFs for audition ${auditionId}, section ${sectionId}, project ${projectId}`)
-
-      // ✅ Récupérer tous les PDFs de la section depuis section_pdfs
       const sectionPdfs = await SectionPdf.query()
         .where('project_id', projectId)
         .where('section_id', sectionId)
         .preload('file')
         .orderBy('order', 'asc')
 
-      console.log(`📄 Found ${sectionPdfs.length} PDFs for section ${sectionId} in project ${projectId}`)
-
       let associatedCount = 0
 
-      // Associer chaque PDF de la section à la nouvelle audition
       for (const sectionPdf of sectionPdfs) {
         try {
-          // Vérifier que cette association n'existe pas déjà
           const existingAssociation = await AuditionPdfFile.query()
             .where('audition_id', auditionId)
             .where('file_id', sectionPdf.file_id)
@@ -950,48 +806,32 @@ export default class AuditionsController {
               section_id: sectionId,
               title: sectionPdf.title,
               description: sectionPdf.description || '',
-              order: sectionPdf.order || 0
+              order: sectionPdf.order || 0,
             })
             associatedCount++
-            console.log(`✅ Associated PDF "${sectionPdf.title}" to audition ${auditionId}`)
-          } else {
-            console.log(`⚠️ PDF "${sectionPdf.title}" already associated with audition ${auditionId}`)
           }
         } catch (associationError) {
-          console.error(`❌ Error associating PDF ${sectionPdf.id} to audition ${auditionId}:`, associationError)
+          // Continue without blocking
         }
       }
 
-      console.log(`✅ Auto-associated ${associatedCount} PDFs to new audition ${auditionId}`)
       return associatedCount
-
     } catch (error) {
-      console.error('❌ Error auto-associating section PDFs:', error)
       return 0
     }
   }
 
-  // ✅ MÉTHODE DE DEBUG : Voir tous les fichiers uploadés
   async debugFiles({ params, response }: HttpContext) {
     try {
-      console.log('🔍 DEBUG: Listing all files for project', params.id)
-
-      // Tous les fichiers PDF dans le système
       const allPdfFiles = await File.query()
         .where('type', 'like', '%pdf%')
         .orderBy('created_at', 'desc')
 
-      console.log('📄 Total PDF files in system:', allPdfFiles.length)
-
-      // Tous les PDFs dans section_pdfs pour ce projet
       const sectionPdfs = await SectionPdf.query()
         .where('project_id', params.id)
         .preload('file')
         .preload('section')
 
-      console.log('📊 Total section PDFs for project:', sectionPdfs.length)
-
-      // Toutes les associations audition-PDF pour ce projet
       const allAssociations = await AuditionPdfFile.query()
         .whereHas('audition', (query) => {
           query.where('project_id', params.id)
@@ -1003,16 +843,11 @@ export default class AuditionsController {
           })
         })
 
-      console.log('🔗 Total associations for project:', allAssociations.length)
-
-      // Toutes les auditions du projet
       const allAuditions = await Audition.query()
         .where('project_id', params.id)
         .preload('participant', (query) => {
           query.preload('section').preload('contact')
         })
-
-      console.log('🎭 Total auditions for project:', allAuditions.length)
 
       return response.ok({
         debug_info: {
@@ -1020,17 +855,17 @@ export default class AuditionsController {
           total_pdf_files: allPdfFiles.length,
           section_pdfs: sectionPdfs.length,
           total_associations: allAssociations.length,
-          total_auditions: allAuditions.length
+          total_auditions: allAuditions.length,
         },
-        pdf_files: allPdfFiles.map(file => ({
+        pdf_files: allPdfFiles.map((file) => ({
           id: file.id,
           name: file.name,
           type: file.type,
           path: file.path,
-          size: file.size ?? 0, // ✅ Correction size
-          created_at: file.createdAt
+          size: file.size ?? 0,
+          created_at: file.createdAt,
         })),
-        section_pdfs: sectionPdfs.map(sp => ({
+        section_pdfs: sectionPdfs.map((sp) => ({
           id: sp.id,
           project_id: sp.project_id,
           section_id: sp.section_id,
@@ -1039,9 +874,9 @@ export default class AuditionsController {
           description: sp.description,
           order: sp.order,
           section_name: sp.section.name,
-          file_name: sp.file.name
+          file_name: sp.file.name,
         })),
-        associations: allAssociations.map(assoc => ({
+        associations: allAssociations.map((assoc) => ({
           id: assoc.id,
           audition_id: assoc.audition_id,
           file_id: assoc.file_id,
@@ -1051,48 +886,37 @@ export default class AuditionsController {
           order: assoc.order,
           file_name: assoc.file.name,
           participant_name: `${assoc.audition.participant.contact.first_name} ${assoc.audition.participant.contact.last_name}`,
-          section_name: assoc.audition.participant.section?.name || 'No section'
+          section_name: assoc.audition.participant.section?.name || 'No section',
         })),
-        auditions: allAuditions.map(aud => ({
+        auditions: allAuditions.map((aud) => ({
           id: aud.id,
           participant_id: aud.participant_id,
           is_submitted: aud.is_submitted,
           participant_name: `${aud.participant.contact.first_name} ${aud.participant.contact.last_name}`,
           section_name: aud.participant.section?.name || 'No section',
-          section_id: aud.participant.section?.id || null
-        }))
+          section_id: aud.participant.section?.id || null,
+        })),
       })
-
     } catch (error) {
-      console.error('❌ Error in debug files:', error)
       return response.status(500).json({
         error: 'Debug error',
-        details: error.message
+        details: error.message,
       })
     }
   }
 
-  // ================================================================================
-  // MÉTHODES POUR LES AUDITIONS (CÔTÉ CANDIDAT)
-  // ================================================================================
-
-  // ✅ MÉTHODE MISE À JOUR : Page d'audition sécurisée pour les candidats
   async getAuditionPage({ params, response }: HttpContext) {
     try {
       const { token } = params
 
-      console.log(`📄 Loading audition page for token: ${token}`)
-
-      // ✅ CORRECTION : Meilleure gestion des tokens invalides
       if (!token || token.length < 10) {
-        console.log(`❌ Invalid token format: ${token}`)
         return response.status(400).json({
           error: 'Invalid audition token format',
-          message: 'The audition link appears to be malformed. Please check the link and try again.',
+          message:
+            'The audition link appears to be malformed. Please check the link and try again.',
         })
       }
 
-      // Trouver l'audition par token avec gestion d'erreur spécifique
       let audition
       try {
         audition = await Audition.query()
@@ -1103,34 +927,29 @@ export default class AuditionsController {
           .preload('project')
           .firstOrFail()
       } catch (auditionError) {
-        console.log(`❌ Audition not found for token: ${token}`)
         return response.status(404).json({
           error: 'Audition not found',
-          message: 'This audition link is invalid or has expired. Please contact the project organizers for assistance.',
-          token: token
+          message:
+            'This audition link is invalid or has expired. Please contact the project organizers for assistance.',
+          token: token,
         })
       }
 
-      console.log(`✅ Audition found: ID ${audition.id} for ${audition.participant.contact.first_name} ${audition.participant.contact.last_name}`)
-
-      // Vérifier que l'audition n'est pas expirée
       const now = DateTime.now()
       if (audition.deadline && audition.deadline < now) {
-        console.log(`⏰ Audition expired: deadline was ${audition.deadline}`)
         return response.status(410).json({
           error: 'Audition deadline has passed',
-          message: 'The deadline for this audition has passed. Please contact the project organizers if you need assistance.',
-          deadline: audition.deadline
+          message:
+            'The deadline for this audition has passed. Please contact the project organizers if you need assistance.',
+          deadline: audition.deadline,
         })
       }
 
-      // Récupérer les fichiers déjà uploadés
       const auditionFiles = await AuditionFile.query()
         .where('audition_id', audition.id)
         .preload('file')
         .orderBy('uploaded_at', 'desc')
 
-      // Récupérer les PDFs avec gestion d'erreur
       let auditionPdfs: any[] = []
       try {
         auditionPdfs = await AuditionPdfFile.query()
@@ -1139,11 +958,8 @@ export default class AuditionsController {
           .preload('section')
           .orderBy('order', 'asc')
       } catch (pdfError) {
-        console.warn(`⚠️ Error loading PDFs for audition ${audition.id}:`, pdfError)
-        // Continue sans PDFs plutôt que de faire échouer toute la requête
+        // Continue without PDFs
       }
-
-      console.log(`📎 Audition has ${auditionFiles.length} uploaded files and ${auditionPdfs.length} PDF documents`)
 
       return response.ok({
         id: audition.id,
@@ -1157,18 +973,18 @@ export default class AuditionsController {
           contact: {
             firstName: audition.participant.contact.first_name,
             lastName: audition.participant.contact.last_name,
-            email: audition.participant.contact.email
+            email: audition.participant.contact.email,
           },
           section: {
             id: audition.participant.section?.id,
-            name: audition.participant.section?.name || 'Non définie'
-          }
+            name: audition.participant.section?.name || 'Non définie',
+          },
         },
         project: {
           id: audition.project.id,
-          name: audition.project.name
+          name: audition.project.name,
         },
-        files: auditionFiles.map(af => ({
+        files: auditionFiles.map((af) => ({
           id: af.id,
           file_id: af.file_id,
           file_type: af.file_type,
@@ -1179,10 +995,10 @@ export default class AuditionsController {
             id: af.file.id,
             name: af.file.name,
             type: af.file.type,
-            size: af.file.size ?? 0
-          }
+            size: af.file.size ?? 0,
+          },
         })),
-        pdfs: auditionPdfs.map(apf => ({
+        pdfs: auditionPdfs.map((apf) => ({
           id: apf.id,
           title: apf.title,
           description: apf.description,
@@ -1192,83 +1008,70 @@ export default class AuditionsController {
             id: apf.file.id,
             name: apf.file.name,
             type: apf.file.type,
-            size: apf.file.size ?? 0
-          }
-        }))
+            size: apf.file.size ?? 0,
+          },
+        })),
       })
-
     } catch (error) {
-      console.error('❌ Error getting audition page:', error)
       return response.status(500).json({
         error: 'Error retrieving audition',
         message: 'An unexpected error occurred while loading the audition. Please try again later.',
-        details: error.message || 'Unknown error'
+        details: error.message || 'Unknown error',
       })
     }
   }
 
-
-  // Upload de fichier d'audition par les candidats
   async uploadAuditionFile({ request, response, params }: HttpContext) {
     try {
       const { token } = params
 
-      // Trouver l'audition par token
-      const audition = await Audition.query()
-        .where('secure_token', token)
-        .firstOrFail()
+      const audition = await Audition.query().where('secure_token', token).firstOrFail()
 
-      // Vérifier que l'audition n'est pas déjà soumise
       if (audition.is_submitted) {
         return response.status(403).json({
-          error: 'Audition already submitted'
+          error: 'Audition already submitted',
         })
       }
 
-      // Vérifier que la deadline n'est pas dépassée
       const now = DateTime.now()
       if (audition.deadline && audition.deadline < now) {
         return response.status(403).json({
-          error: 'Audition deadline has passed'
+          error: 'Audition deadline has passed',
         })
       }
 
       const data = await request.validateUsing(uploadAuditionFileValidator)
       const { file, fileType, description } = data
 
-      // Générer un nom unique pour le fichier
       const uniqueFileName = `audition_${audition.id}_${cuid()}.${file.extname}`
       const uploadsPath = app.makePath('uploads', 'auditions')
 
-      // Sauvegarder le fichier
       await file.move(uploadsPath, {
         name: uniqueFileName,
-        overwrite: true
+        overwrite: true,
       })
 
       if (!file.isValid) {
         return response.status(400).json({
           error: 'File upload failed',
-          details: file.errors
+          details: file.errors,
         })
       }
 
-      // Créer l'entrée dans la table files
       const savedFile = await File.create({
         name: file.clientName,
         type: file.type || 'application/octet-stream',
         content: '',
         path: file.filePath,
-        size: file.size || 0, // ✅ Ajouter la taille
+        size: file.size || 0,
       })
 
-      // Créer l'association audition-fichier
       const auditionFile = await AuditionFile.create({
         audition_id: audition.id,
         file_id: savedFile.id,
         file_type: fileType,
         description: description || '',
-        uploaded_at: DateTime.now()
+        uploaded_at: DateTime.now(),
       })
 
       return response.ok({
@@ -1283,196 +1086,158 @@ export default class AuditionsController {
             id: savedFile.id,
             name: savedFile.name,
             type: savedFile.type,
-            size: savedFile.size ?? 0 // ✅ Correction size
-          }
-        }
+            size: savedFile.size ?? 0,
+          },
+        },
       })
-
     } catch (error) {
-      console.error('Error uploading audition file:', error)
       return response.status(500).json({
         error: 'Error uploading file',
-        details: error.message || 'Unknown error'
+        details: error.message || 'Unknown error',
       })
     }
   }
 
-  // Supprimer un fichier d'audition
   async deleteAuditionFile({ params, response }: HttpContext) {
     try {
       const { token, fileId } = params
 
-      // Trouver l'audition par token
-      const audition = await Audition.query()
-        .where('secure_token', token)
-        .firstOrFail()
+      const audition = await Audition.query().where('secure_token', token).firstOrFail()
 
-      // Vérifier que l'audition n'est pas déjà soumise
       if (audition.is_submitted) {
         return response.status(403).json({
-          error: 'Cannot delete files from submitted audition'
+          error: 'Cannot delete files from submitted audition',
         })
       }
 
-      // Trouver le fichier d'audition
       const auditionFile = await AuditionFile.query()
         .where('id', fileId)
         .where('audition_id', audition.id)
         .preload('file')
         .firstOrFail()
 
-      // Supprimer le fichier physique
       if (auditionFile.file.path) {
         try {
           const fs = await import('node:fs/promises')
           await fs.unlink(auditionFile.file.path)
         } catch (fileError) {
-          console.warn(`Could not delete file: ${auditionFile.file.path}`, fileError)
+          // Continue without blocking
         }
       }
 
-      // Supprimer l'entrée du fichier
       await auditionFile.file.delete()
       await auditionFile.delete()
 
       return response.ok({
-        message: 'File deleted successfully'
+        message: 'File deleted successfully',
       })
-
     } catch (error) {
-      console.error('Error deleting audition file:', error)
       return response.status(500).json({
         error: 'Error deleting file',
-        details: error.message || 'Unknown error'
+        details: error.message || 'Unknown error',
       })
     }
   }
 
-  // Sauvegarder les notes temporaires
   async saveTemporaryNotes({ request, response, params }: HttpContext) {
     try {
       const { token } = params
       const { notes } = await request.validateUsing(
         vine.compile(
           vine.object({
-            notes: vine.string().maxLength(2000)
+            notes: vine.string().maxLength(2000),
           })
         )
       )
 
-      // Trouver l'audition par token
-      const audition = await Audition.query()
-        .where('secure_token', token)
-        .firstOrFail()
+      const audition = await Audition.query().where('secure_token', token).firstOrFail()
 
-      // Vérifier que l'audition n'est pas déjà soumise
       if (audition.is_submitted) {
         return response.status(403).json({
-          error: 'Cannot modify submitted audition'
+          error: 'Cannot modify submitted audition',
         })
       }
 
-      // Sauvegarder les notes
       audition.candidate_notes = notes
       await audition.save()
 
       return response.ok({
-        message: 'Notes saved successfully'
+        message: 'Notes saved successfully',
       })
-
     } catch (error) {
-      console.error('Error saving notes:', error)
       return response.status(500).json({
         error: 'Error saving notes',
-        details: error.message || 'Unknown error'
+        details: error.message || 'Unknown error',
       })
     }
   }
 
-  // Soumettre l'audition complète
   async submitAudition({ request, response, params }: HttpContext) {
     try {
       const { token } = params
       const data = await request.validateUsing(submitAuditionValidator)
 
-      // Trouver l'audition par token
       const audition = await Audition.query()
         .where('secure_token', token)
         .preload('participant')
         .firstOrFail()
 
-      // Vérifier que l'audition n'est pas déjà soumise
       if (audition.is_submitted) {
         return response.status(409).json({
-          error: 'Audition already submitted'
+          error: 'Audition already submitted',
         })
       }
 
-      // ✅ CORRECTION DATETIME : Vérifier que la deadline n'est pas dépassée
       const now = DateTime.now()
       if (audition.deadline && audition.deadline < now) {
         return response.status(403).json({
-          error: 'Audition deadline has passed'
+          error: 'Audition deadline has passed',
         })
       }
 
-      // Marquer l'audition comme soumise
       audition.is_submitted = true
       audition.submitted_at = DateTime.now()
       audition.candidate_notes = data.notes || audition.candidate_notes
       await audition.save()
 
-      // Mettre à jour le statut du participant
       const participant = audition.participant
-      participant.audition_status = 'completed' as 'completed' // ✅ Cast explicite
+      participant.audition_status = 'completed' as 'completed'
       await participant.save()
 
       return response.ok({
         message: 'Audition submitted successfully',
-        submitted_at: formatDateSafely(audition.submitted_at)
+        submitted_at: formatDateSafely(audition.submitted_at),
       })
-
     } catch (error) {
-      console.error('Error submitting audition:', error)
       return response.status(500).json({
         error: 'Error submitting audition',
-        details: error.message || 'Unknown error'
+        details: error.message || 'Unknown error',
       })
     }
   }
 
-  // ================================================================================
-  // MÉTHODES POUR LES PDFs D'AUDITION
-  // ================================================================================
-
-  // Récupérer les PDFs d'audition (côté participant)
   async getAuditionPdfs({ params, response }: HttpContext) {
     try {
       const { token } = params
 
-      // Validation du token
       if (!token || token.length < 10) {
         return response.status(400).json({
           error: 'Invalid token format',
-          message: 'The audition token appears to be malformed.'
+          message: 'The audition token appears to be malformed.',
         })
       }
 
-      // Trouver l'audition par token
       let audition
       try {
-        audition = await Audition.query()
-          .where('secure_token', token)
-          .firstOrFail()
+        audition = await Audition.query().where('secure_token', token).firstOrFail()
       } catch (auditionError) {
         return response.status(404).json({
           error: 'Audition not found',
           message: 'This audition link is invalid or has expired.',
-          token: token
+          token: token,
         })
       }
 
-      // Récupérer les PDFs avec gestion d'erreur
       let auditionPdfs = []
       try {
         auditionPdfs = await AuditionPdfFile.query()
@@ -1481,13 +1246,11 @@ export default class AuditionsController {
           .preload('section')
           .orderBy('order', 'asc')
       } catch (pdfError) {
-        console.warn(`⚠️ Error loading PDFs for audition ${audition.id}:`, pdfError)
-        // Retourner un tableau vide plutôt qu'une erreur
         return response.ok([])
       }
 
       return response.ok(
-        auditionPdfs.map(apf => ({
+        auditionPdfs.map((apf) => ({
           id: apf.id,
           title: apf.title,
           description: apf.description,
@@ -1497,134 +1260,103 @@ export default class AuditionsController {
             id: apf.file.id,
             name: apf.file.name,
             type: apf.file.type,
-            size: apf.file.size ?? 0
-          }
+            size: apf.file.size ?? 0,
+          },
         }))
       )
-
     } catch (error) {
-      console.error('❌ Error getting audition PDFs:', error)
       return response.status(500).json({
         error: 'Error retrieving PDFs',
         message: 'An error occurred while loading the PDFs.',
-        details: error.message || 'Unknown error'
+        details: error.message || 'Unknown error',
       })
     }
   }
 
-  // Télécharger un PDF d'audition (côté participant)
   async downloadAuditionPdf({ params, response }: HttpContext) {
     try {
       const { token, pdfFileId } = params
 
-      console.log('📥 Download PDF request:', { token, pdfFileId })
+      const audition = await Audition.query().where('secure_token', token).firstOrFail()
 
-      // Trouver l'audition par token
-      const audition = await Audition.query()
-        .where('secure_token', token)
-        .firstOrFail()
-
-      console.log('✅ Audition found:', audition.id)
-
-      // Trouver le PDF associé à cette audition
       const auditionPdf = await AuditionPdfFile.query()
         .where('audition_id', audition.id)
         .where('file_id', pdfFileId)
         .preload('file')
         .firstOrFail()
 
-      console.log('✅ PDF found:', auditionPdf.file.name, 'at path:', auditionPdf.file.path)
-
       const file = auditionPdf.file
 
       if (!file.path) {
-        console.error('❌ File path is empty for file:', file.id)
         return response.status(404).json({
-          error: 'File path not found'
+          error: 'File path not found',
         })
       }
 
-      // ✅ CORRECTION : Vérifier que le fichier existe physiquement
       const fs = await import('node:fs/promises')
 
       try {
         await fs.access(file.path)
-        console.log('✅ File exists on disk:', file.path)
       } catch (accessError) {
-        console.error('❌ File does not exist on disk:', file.path, accessError)
         return response.status(404).json({
           error: 'Physical file not found',
-          path: file.path
+          path: file.path,
         })
       }
 
-      // ✅ CORRECTION : Headers appropriés pour le téléchargement PDF
       const fileName = file.name || `document_${pdfFileId}.pdf`
 
       response.header('Content-Type', 'application/pdf')
       response.header('Content-Disposition', `attachment; filename="${fileName}"`)
       response.header('Cache-Control', 'no-cache')
 
-      // ✅ CORRECTION : Retourner le fichier pour téléchargement (sans le paramètre fileName)
       return response.download(file.path)
-
     } catch (error) {
-      console.error('❌ Error downloading audition PDF:', error)
       return response.status(500).json({
         error: 'Error downloading PDF',
-        details: error.message || 'Unknown error'
+        details: error.message || 'Unknown error',
       })
     }
   }
 
-  // ================================================================================
-  // MÉTHODES POUR LES PDFs D'AUDITION (CÔTÉ ADMINISTRATEUR)
-  // ================================================================================
-
-  // Upload de PDF pour audition (côté administrateur)
   async uploadPdfForAudition({ request, response, params }: HttpContext) {
     try {
       const data = await request.validateUsing(uploadAuditionPdfValidator)
       const { file, title, description, section_id, order } = data
 
-      // Vérifier que le projet et la section existent
       await Project.findOrFail(params.id)
       const section = await Section.findOrFail(section_id)
 
-      // Générer un nom unique pour le fichier PDF
       const uniqueFileName = `audition_pdf_${params.id}_${cuid()}.${file.extname}`
       const uploadsPath = app.makePath('uploads', 'audition_pdfs')
 
-      // Sauvegarder le fichier PDF
       await file.move(uploadsPath, {
         name: uniqueFileName,
-        overwrite: true
+        overwrite: true,
       })
 
       if (!file.isValid) {
         return response.status(400).json({
           error: 'PDF upload failed',
-          details: file.errors
+          details: file.errors,
         })
       }
 
-      // Créer l'entrée dans la table files
       const savedFile = await File.create({
         name: file.clientName,
         type: file.type || 'application/pdf',
         content: '',
         path: file.filePath,
-        size: file.size || 0 // ✅ Ajouter la taille
+        size: file.size || 0,
       })
 
-      // Créer l'association dans section_pdfs
       const sectionPdf = await SectionPdf.create({
         project_id: params.id,
         section_id: section_id,
         file_id: savedFile.id,
         title: title,
         description: description || '',
-        order: order || 0
+        order: order || 0,
       })
 
       return response.ok({
@@ -1638,26 +1370,22 @@ export default class AuditionsController {
             id: savedFile.id,
             name: savedFile.name,
             type: savedFile.type,
-            size: savedFile.size ?? 0 // ✅ Correction size
-          }
-        }
+            size: savedFile.size ?? 0,
+          },
+        },
       })
-
     } catch (error) {
-      console.error('Error uploading PDF for audition:', error)
       return response.status(500).json({
         error: 'Error uploading PDF',
-        details: error.message || 'Unknown error'
+        details: error.message || 'Unknown error',
       })
     }
   }
 
-  // Supprimer un PDF d'audition (côté administrateur)
   async deleteAuditionPdf({ params, response }: HttpContext) {
     try {
       const { pdfFileId } = params
 
-      // Trouver l'association PDF
       const auditionPdf = await AuditionPdfFile.query()
         .where('file_id', pdfFileId)
         .whereHas('audition', (query) => {
@@ -1668,29 +1396,25 @@ export default class AuditionsController {
 
       const file = auditionPdf.file
 
-      // Supprimer le fichier physique
       if (file.path) {
         try {
           const fs = await import('node:fs/promises')
           await fs.unlink(file.path)
         } catch (fileError) {
-          console.warn(`Could not delete PDF file: ${file.path}`, fileError)
+          // Continue without blocking
         }
       }
 
-      // Supprimer l'entrée du fichier et l'association
       await file.delete()
       await auditionPdf.delete()
 
       return response.ok({
-        message: 'PDF deleted successfully'
+        message: 'PDF deleted successfully',
       })
-
     } catch (error) {
-      console.error('Error deleting audition PDF:', error)
       return response.status(500).json({
         error: 'Error deleting PDF',
-        details: error.message || 'Unknown error'
+        details: error.message || 'Unknown error',
       })
     }
   }

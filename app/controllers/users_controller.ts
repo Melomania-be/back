@@ -1,8 +1,7 @@
-// import type { HttpContext } from '@adonisjs/core/http'
-
+// app/controllers/users_controller.ts - Version mise à jour avec fullName
 import { adminRights } from '#abilities/main'
 import User from '#models/user'
-import { userCreationValidator, userLoginValidator } from '#validators/user'
+import { userCreationValidator, userLoginValidator, userUpdateValidator } from '#validators/user'
 import { HttpContext } from '@adonisjs/core/http'
 import env from '#start/env'
 
@@ -57,6 +56,35 @@ export default class UsersController {
     return await User.create(credentials)
   }
 
+  //  Nouvelle méthode pour mettre à jour un utilisateur
+  async update(ctx: HttpContext) {
+    if (!ctx.auth.user) {
+      ctx.response.abort('You must be authenticated to update a user', 401)
+    }
+
+    if (await ctx.bouncer.denies(adminRights)) {
+      ctx.response.abort('You cannot update a user', 403)
+    }
+
+    const data = await ctx.request.validateUsing(userUpdateValidator)
+    const user = await User.find(ctx.params.id)
+
+    if (!user) {
+      return ctx.response.notFound({ message: 'User not found' })
+    }
+
+    // Vérifier si l'email n'est pas déjà utilisé par un autre utilisateur
+    if (data.email && data.email !== user.email) {
+      const existingUser = await User.findBy('email', data.email)
+      if (existingUser && existingUser.id !== user.id) {
+        return ctx.response.badRequest({ message: 'Email already exists' })
+      }
+    }
+
+    await user.merge(data).save()
+    return user.serialize()
+  }
+
   async delete(ctx: HttpContext) {
     if (!ctx.auth.user) {
       ctx.response.abort('You must be authenticated to delete a user', 401)
@@ -76,5 +104,22 @@ export default class UsersController {
 
     user?.delete()
     return ctx.response.send('User deleted')
+  }
+
+  // 🆕 Méthode pour obtenir l'utilisateur connecté
+  async getCurrentUser(ctx: HttpContext) {
+    try {
+      const user = await ctx.auth.use('api').authenticate()
+      return ctx.response.json({
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName || user.email || 'Utilisateur actuel'
+      })
+    } catch (error) {
+      return ctx.response.status(401).json({
+        error: 'Not authenticated',
+        fullName: 'Utilisateur actuel'
+      })
+    }
   }
 }
