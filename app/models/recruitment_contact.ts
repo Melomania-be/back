@@ -1,4 +1,3 @@
-// app/models/recruitment_contact.ts
 import { DateTime } from 'luxon'
 import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
@@ -101,9 +100,12 @@ export default class RecruitmentContact extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  // Méthodes utilitaires
   shouldFollowUp(followUpDays: number): boolean {
     if (this.status !== 'awaiting_response' || !this.contact_date) {
+      return false
+    }
+
+    if (!this.contact_date.isValid) {
       return false
     }
 
@@ -154,7 +156,6 @@ export default class RecruitmentContact extends BaseModel {
       primary_contact: this.primaryContact,
       contacted_by: this.contacted_by || null,
 
-      // Dates formatées avec protection complète contre les erreurs
       contact_date: this.formatDateSafely(this.contact_date),
       contact_date_iso: this.formatDateTimeToISO(this.contact_date),
       last_follow_up: this.formatDateSafely(this.last_follow_up),
@@ -164,24 +165,29 @@ export default class RecruitmentContact extends BaseModel {
       updated_at: this.formatDateSafely(this.updatedAt),
       updated_at_iso: this.formatDateTimeToISO(this.updatedAt),
 
-      // Relations avec protection contre les valeurs nulles
-      section: this.section ? {
-        id: this.section.id,
-        name: this.section.name || 'Section inconnue'
-      } : null,
+      section: this.section
+        ? {
+            id: this.section.id,
+            name: this.section.name || 'Section inconnue',
+          }
+        : null,
 
-      contact: this.contact ? {
-        id: this.contact.id,
-        first_name: this.contact.first_name || '',
-        last_name: this.contact.last_name || '',
-        email: this.contact.email || null
-      } : null,
+      contact: this.contact
+        ? {
+            id: this.contact.id,
+            first_name: this.contact.first_name || '',
+            last_name: this.contact.last_name || '',
+            email: this.contact.email || null,
+          }
+        : null,
 
-      recommender: this.recommender ? {
-        id: this.recommender.id,
-        first_name: this.recommender.first_name || '',
-        last_name: this.recommender.last_name || ''
-      } : null
+      recommender: this.recommender
+        ? {
+            id: this.recommender.id,
+            first_name: this.recommender.first_name || '',
+            last_name: this.recommender.last_name || '',
+          }
+        : null,
     }
   }
 
@@ -196,13 +202,13 @@ export default class RecruitmentContact extends BaseModel {
 
   getStatusBadge(): { label: string; color: string; icon: string } {
     const statusConfig = {
-      'not_yet_contacted': { label: 'Pas encore contacté', color: 'gray', icon: 'AlertCircle' },
-      'awaiting_response': { label: 'En attente de réponse', color: 'blue', icon: 'Clock' },
-      'to_follow_up': { label: 'À relancer', color: 'yellow', icon: 'AlertTriangle' },
-      'not_available': { label: 'Non disponible', color: 'red', icon: 'XCircle' },
-      'pending_validation': { label: 'En validation', color: 'purple', icon: 'Clock' },
-      'cancelled': { label: 'Annulé', color: 'gray', icon: 'XCircle' },
-      'recruited': { label: 'Recruté', color: 'green', icon: 'CheckCircle' }
+      not_yet_contacted: { label: 'Pas encore contacté', color: 'gray', icon: 'AlertCircle' },
+      awaiting_response: { label: 'En attente de réponse', color: 'blue', icon: 'Clock' },
+      to_follow_up: { label: 'À relancer', color: 'yellow', icon: 'AlertTriangle' },
+      not_available: { label: 'Non disponible', color: 'red', icon: 'XCircle' },
+      pending_validation: { label: 'En validation', color: 'purple', icon: 'Clock' },
+      cancelled: { label: 'Annulé', color: 'gray', icon: 'XCircle' },
+      recruited: { label: 'Recruté', color: 'green', icon: 'CheckCircle' },
     }
 
     return statusConfig[this.status] || statusConfig['not_yet_contacted']
@@ -216,7 +222,7 @@ export default class RecruitmentContact extends BaseModel {
       { value: 'not_available', label: 'Non disponible' },
       { value: 'pending_validation', label: 'En validation' },
       { value: 'cancelled', label: 'Annulé' },
-      { value: 'recruited', label: 'Recruté' }
+      { value: 'recruited', label: 'Recruté' },
     ]
   }
 
@@ -225,7 +231,101 @@ export default class RecruitmentContact extends BaseModel {
       { value: 'manual', label: 'Manuel' },
       { value: 'email', label: 'Email' },
       { value: 'messenger', label: 'Messenger' },
-      { value: 'phone', label: 'Téléphone' }
+      { value: 'phone', label: 'Téléphone' },
     ]
+  }
+
+  async markAsContacted(method: ContactMethod = 'manual'): Promise<void> {
+    this.status = 'awaiting_response'
+    this.contact_method = method
+    this.contact_date = DateTime.now()
+    await this.save()
+  }
+
+  async markAsRecruited(): Promise<void> {
+    this.status = 'recruited'
+    await this.save()
+  }
+
+  async markAsNotAvailable(): Promise<void> {
+    this.status = 'not_available'
+    await this.save()
+  }
+
+  async markForFollowUp(): Promise<void> {
+    this.status = 'to_follow_up'
+    this.last_follow_up = DateTime.now()
+    await this.save()
+  }
+
+  isContactable(): boolean {
+    return !!(this.email || this.phone || this.messenger)
+  }
+
+  hasValidEmail(): boolean {
+    if (!this.email) return false
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(this.email)
+  }
+
+  canBeContacted(): boolean {
+    return this.status === 'not_yet_contacted' || this.status === 'to_follow_up'
+  }
+
+  isInProgress(): boolean {
+    return this.status === 'awaiting_response' || this.status === 'to_follow_up'
+  }
+
+  isCompleted(): boolean {
+    return (
+      this.status === 'recruited' || this.status === 'not_available' || this.status === 'cancelled'
+    )
+  }
+
+  updateContactedBy(contactedBy: string): void {
+    this.contacted_by = contactedBy
+  }
+
+  addNotes(notes: string): void {
+    this.notes = notes
+  }
+
+  static async updateFollowUpStatuses(projectId: number, followUpDays: number): Promise<number> {
+    const contactsToUpdate = await this.query()
+      .where('project_id', projectId)
+      .where('status', 'awaiting_response')
+      .whereNotNull('contact_date')
+
+    let updatedCount = 0
+    for (const contact of contactsToUpdate) {
+      if (contact.shouldFollowUp(followUpDays)) {
+        contact.status = 'to_follow_up'
+        await contact.save()
+        updatedCount++
+      }
+    }
+
+    return updatedCount
+  }
+
+  static async findDuplicatesInProject(
+    projectId: number,
+    firstName: string,
+    lastName: string,
+    email?: string
+  ): Promise<RecruitmentContact[]> {
+    const query = this.query().where('project_id', projectId)
+
+    if (email) {
+      query.orWhere('email', email)
+    }
+
+    query.orWhere((subQuery) => {
+      subQuery
+        .where('first_name', 'ilike', `%${firstName}%`)
+        .where('last_name', 'ilike', `%${lastName}%`)
+    })
+
+    return await query
   }
 }

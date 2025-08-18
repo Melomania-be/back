@@ -1,4 +1,3 @@
-// app/models/recruitment_settings.ts
 import { DateTime } from 'luxon'
 import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
@@ -53,7 +52,9 @@ export default class RecruitmentSettings extends BaseModel {
 
     return {
       ...baseData,
-      auto_import_enabled: this.auto_import_enabled || false,
+      follow_up_days: Number(this.follow_up_days),
+      auto_follow_up_enabled: Boolean(this.auto_follow_up_enabled),
+      auto_import_enabled: Boolean(this.auto_import_enabled || false),
       last_auto_import: this.last_auto_import && this.last_auto_import.isValid
         ? this.last_auto_import.toISO()
         : null,
@@ -64,5 +65,50 @@ export default class RecruitmentSettings extends BaseModel {
         ? this.updatedAt.toISO()
         : null,
     }
+  }
+
+  static async getOrCreateForProject(projectId: number): Promise<RecruitmentSettings> {
+    let settings = await this.query().where('project_id', projectId).first()
+
+    if (!settings) {
+      settings = await this.create({
+        project_id: projectId,
+        follow_up_days: 7,
+        auto_follow_up_enabled: true,
+        auto_import_enabled: false,
+      })
+    }
+
+    return settings
+  }
+
+  static getValidationRules() {
+    return {
+      follow_up_days: {
+        min: 1,
+        max: 30,
+        type: 'number'
+      },
+      auto_follow_up_enabled: {
+        type: 'boolean'
+      },
+      auto_import_enabled: {
+        type: 'boolean'
+      }
+    }
+  }
+
+  isValidFollowUpDays(days: number): boolean {
+    return Number.isInteger(days) && days >= 1 && days <= 30
+  }
+
+  updateFollowUpSettings(followUpDays: number, autoFollowUpEnabled: boolean): boolean {
+    if (!this.isValidFollowUpDays(followUpDays)) {
+      return false
+    }
+
+    this.follow_up_days = followUpDays
+    this.auto_follow_up_enabled = Boolean(autoFollowUpEnabled)
+    return true
   }
 }

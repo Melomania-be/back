@@ -1,4 +1,3 @@
-// app/controllers/recruitment_controller.ts
 import { HttpContext } from '@adonisjs/core/http'
 import RecruitmentContact from '#models/recruitment_contact'
 import RecruitmentSettings from '#models/recruitment_settings'
@@ -182,15 +181,18 @@ export default class RecruitmentController {
   async getSettings({ params, response }: HttpContext) {
     try {
       const projectId = this.validateProjectId(params.id)
+      console.log('Getting settings for project:', projectId)
 
       const project = await Project.find(projectId)
       if (!project) {
+        console.log('Project not found:', projectId)
         return response.status(404).json({ error: 'Project not found' })
       }
 
       let settings = await RecruitmentSettings.query().where('project_id', projectId).first()
 
       if (!settings) {
+        console.log('Creating default settings for project:', projectId)
         settings = await RecruitmentSettings.create({
           project_id: projectId,
           follow_up_days: 7,
@@ -198,24 +200,55 @@ export default class RecruitmentController {
         })
       }
 
-      return response.json(settings.serialize())
+      const responseData = {
+        id: settings.id,
+        project_id: settings.project_id,
+        follow_up_days: Number(settings.follow_up_days),
+        auto_follow_up_enabled: Boolean(settings.auto_follow_up_enabled),
+        created_at: settings.createdAt?.toISO() || null,
+        updated_at: settings.updatedAt?.toISO() || null,
+      }
+
+      console.log('Returning settings:', responseData)
+      return response.json(responseData)
     } catch (error) {
-      return response.status(400).json({ error: error.message })
+      console.error('Error getting settings:', error)
+      return response.status(400).json({
+        error: error.message,
+        details: 'Failed to retrieve recruitment settings'
+      })
     }
   }
 
   async updateSettings({ params, request, response }: HttpContext) {
     try {
       const projectId = this.validateProjectId(params.id)
+      console.log('Updating settings for project:', projectId)
 
-      const data = await request.validateUsing(
-        vine.compile(
-          vine.object({
-            follow_up_days: vine.number().min(1).max(30),
-            auto_follow_up_enabled: vine.boolean(),
-          })
-        )
-      )
+      const requestBody = request.body()
+      console.log('Request body received:', requestBody)
+
+      if (!requestBody || typeof requestBody !== 'object') {
+        return response.status(400).json({
+          error: 'Invalid request body format'
+        })
+      }
+
+      const followUpDays = Number(requestBody.follow_up_days)
+      const autoFollowUpEnabled = Boolean(requestBody.auto_follow_up_enabled)
+
+      if (isNaN(followUpDays) || followUpDays < 1 || followUpDays > 30) {
+        return response.status(400).json({
+          error: 'Follow-up days must be a number between 1 and 30'
+        })
+      }
+
+      const validatedData = {
+        follow_up_days: followUpDays,
+        auto_follow_up_enabled: autoFollowUpEnabled
+      }
+
+      console.log('Validated data:', validatedData)
 
       const project = await Project.find(projectId)
       if (!project) {
@@ -225,22 +258,49 @@ export default class RecruitmentController {
       let settings = await RecruitmentSettings.query().where('project_id', projectId).first()
 
       if (!settings) {
+        console.log('Creating new settings for project:', projectId)
         settings = await RecruitmentSettings.create({
           project_id: projectId,
-          follow_up_days: data.follow_up_days,
-          auto_follow_up_enabled: data.auto_follow_up_enabled,
+          follow_up_days: validatedData.follow_up_days,
+          auto_follow_up_enabled: validatedData.auto_follow_up_enabled,
         })
       } else {
-        await settings.merge(data).save()
+        console.log('Updating existing settings for project:', projectId)
+        settings.follow_up_days = validatedData.follow_up_days
+        settings.auto_follow_up_enabled = validatedData.auto_follow_up_enabled
+        await settings.save()
       }
 
-      if (data.auto_follow_up_enabled) {
-        await this.updateFollowUpStatuses(projectId, data.follow_up_days)
+      if (validatedData.auto_follow_up_enabled) {
+        console.log('Updating follow-up statuses with delay:', validatedData.follow_up_days)
+        await this.updateFollowUpStatuses(projectId, validatedData.follow_up_days)
       }
 
-      return response.json(settings.serialize())
+      const responseData = {
+        id: settings.id,
+        project_id: settings.project_id,
+        follow_up_days: Number(settings.follow_up_days),
+        auto_follow_up_enabled: Boolean(settings.auto_follow_up_enabled),
+        created_at: settings.createdAt?.toISO() || null,
+        updated_at: settings.updatedAt?.toISO() || null,
+      }
+
+      console.log('Settings updated successfully:', responseData)
+      return response.json(responseData)
     } catch (error) {
-      return response.status(400).json({ error: error.message })
+      console.error('Error updating settings:', error)
+
+      if (error.messages) {
+        return response.status(400).json({
+          error: 'Validation failed',
+          details: error.messages,
+        })
+      }
+
+      return response.status(400).json({
+        error: error.message,
+        details: 'Failed to update recruitment settings'
+      })
     }
   }
 
@@ -348,20 +408,18 @@ export default class RecruitmentController {
       const projectId = this.validateProjectId(params.id)
       const currentUserName = await this.getCurrentUserName(auth)
 
-      const data = await request.validateUsing(
-        vine.compile(
-          vine.object({
-            first_name: vine.string().trim().minLength(1),
-            last_name: vine.string().trim().minLength(1),
-            email: vine.string().email().optional(),
-            phone: vine.string().optional(),
-            messenger: vine.string().optional(),
-            section_id: vine.number().optional(),
-            notes: vine.string().optional(),
-            contacted_by: vine.string().optional(),
-          })
-        )
-      )
+      const requestBody = request.body()
+
+      const data = {
+        first_name: requestBody.first_name?.trim(),
+        last_name: requestBody.last_name?.trim(),
+        email: requestBody.email?.trim() || null,
+        phone: requestBody.phone?.trim() || null,
+        messenger: requestBody.messenger?.trim() || null,
+        section_id: requestBody.section_id ? Number(requestBody.section_id) : null,
+        notes: requestBody.notes?.trim() || null,
+        contacted_by: requestBody.contacted_by?.trim() || currentUserName,
+      }
 
       if (!data.first_name || !data.last_name) {
         return response.status(400).json({
@@ -385,16 +443,16 @@ export default class RecruitmentController {
         contact_id: null,
         first_name: data.first_name,
         last_name: data.last_name,
-        email: data.email || null,
-        phone: data.phone || null,
-        messenger: data.messenger || null,
-        section_id: data.section_id || null,
-        notes: data.notes || null,
+        email: data.email,
+        phone: data.phone,
+        messenger: data.messenger,
+        section_id: data.section_id,
+        notes: data.notes,
         source: 'manual',
         status: 'not_yet_contacted',
         contact_method: 'manual',
         is_duplicate: isDuplicate,
-        contacted_by: data.contacted_by || currentUserName,
+        contacted_by: data.contacted_by,
       })
 
       const loadPromises = []
@@ -414,17 +472,14 @@ export default class RecruitmentController {
   async sendRecruitmentEmails({ params, request, response }: HttpContext) {
     try {
       const projectId = this.validateProjectId(params.id)
+      const requestBody = request.body()
 
-      const data = await request.validateUsing(
-        vine.compile(
-          vine.object({
-            contact_ids: vine.array(vine.number()),
-            template_id: vine.number().optional(),
-            custom_subject: vine.string().optional(),
-            custom_content: vine.string().optional(),
-          })
-        )
-      )
+      const data = {
+        contact_ids: requestBody.contact_ids || [],
+        template_id: requestBody.template_id ? Number(requestBody.template_id) : null,
+        custom_subject: requestBody.custom_subject?.trim() || null,
+        custom_content: requestBody.custom_content?.trim() || null,
+      }
 
       const results: EmailResult = {
         sent: [],
@@ -489,13 +544,10 @@ export default class RecruitmentController {
 
           await mail.send(recruitmentMail)
 
-          await contact
-            .merge({
-              status: 'awaiting_response',
-              contact_method: 'email',
-              contact_date: DateTime.now(),
-            })
-            .save()
+          contact.status = 'awaiting_response'
+          contact.contact_method = 'email'
+          contact.contact_date = DateTime.now()
+          await contact.save()
 
           results.sent.push({
             contact_id: contact.id,
@@ -542,15 +594,12 @@ export default class RecruitmentController {
     try {
       const projectId = this.validateProjectId(params.id)
       const currentUserName = await this.getCurrentUserName(auth)
+      const requestBody = request.body()
 
-      const data = await request.validateUsing(
-        vine.compile(
-          vine.object({
-            contact_ids: vine.array(vine.number()),
-            from_project_id: vine.number().optional(),
-          })
-        )
-      )
+      const data = {
+        contact_ids: requestBody.contact_ids || [],
+        from_project_id: requestBody.from_project_id ? Number(requestBody.from_project_id) : null,
+      }
 
       const results: ContactResult = {
         imported: [],
@@ -643,26 +692,15 @@ export default class RecruitmentController {
     try {
       const projectId = this.validateProjectId(params.id)
       const contactId = this.validateProjectId(params.contactId)
+      const requestBody = request.body()
 
-      const data = await request.validateUsing(
-        vine.compile(
-          vine.object({
-            status: vine.enum([
-              'not_yet_contacted',
-              'awaiting_response',
-              'to_follow_up',
-              'not_available',
-              'pending_validation',
-              'cancelled',
-              'recruited',
-            ]),
-            contact_method: vine.enum(['manual', 'email', 'messenger', 'phone']).optional(),
-            notes: vine.string().optional(),
-            contact_date: vine.date({ formats: ['iso'] }).optional(),
-            contacted_by: vine.string().optional(),
-          })
-        )
-      )
+      const data = {
+        status: requestBody.status,
+        contact_method: requestBody.contact_method || null,
+        notes: requestBody.notes?.trim() || null,
+        contact_date: requestBody.contact_date ? new Date(requestBody.contact_date) : null,
+        contacted_by: requestBody.contacted_by?.trim() || null,
+      }
 
       const contact = await RecruitmentContact.query()
         .where('id', contactId)
@@ -679,7 +717,8 @@ export default class RecruitmentController {
         updateData.contact_date = DateTime.now()
       }
 
-      await contact.merge(updateData).save()
+      Object.assign(contact, updateData)
+      await contact.save()
 
       const loadPromises = []
 
@@ -728,7 +767,6 @@ export default class RecruitmentController {
         .where('project_id', projectId)
         .orderBy('created_at', 'desc')
 
-      // Serialiser correctement les recommandations
       const serializedRecommendations = recommendations.map((recommendation) => ({
         id: recommendation.id,
         project_id: recommendation.project_id,
@@ -752,7 +790,6 @@ export default class RecruitmentController {
             ? recommendation.updatedAt.toISO()
             : new Date().toISOString(),
 
-        // Propriétés calculées pour l'affichage
         recommended_display_name:
           `${recommendation.recommended_first_name || ''} ${recommendation.recommended_last_name || ''}`.trim(),
         formatted_created_at:
@@ -776,20 +813,17 @@ export default class RecruitmentController {
       const projectId = this.validateProjectId(params.id)
       const recommendationId = this.validateProjectId(params.recommendationId)
       const currentUserName = await this.getCurrentUserName(auth)
+      const requestBody = request.body()
 
       if (!projectId || !recommendationId) {
         return response.status(400).json({ error: 'Invalid project ID or recommendation ID' })
       }
 
-      const data = await request.validateUsing(
-        vine.compile(
-          vine.object({
-            action: vine.enum(['ignore', 'contacted_email', 'contacted_manual']),
-            section_id: vine.number().optional(),
-            notes: vine.string().optional(),
-          })
-        )
-      )
+      const data = {
+        action: requestBody.action,
+        section_id: requestBody.section_id ? Number(requestBody.section_id) : null,
+        notes: requestBody.notes?.trim() || null,
+      }
 
       const recommendation = await RecruitmentRecommendation.query()
         .where('id', recommendationId)
@@ -801,7 +835,8 @@ export default class RecruitmentController {
       }
 
       if (data.action === 'ignore') {
-        await recommendation.merge({ status: 'ignored' }).save()
+        recommendation.status = 'ignored'
+        await recommendation.save()
         return response.json(recommendation)
       }
 
@@ -831,12 +866,9 @@ export default class RecruitmentController {
         contacted_by: currentUserName,
       })
 
-      await recommendation
-        .merge({
-          status: data.action,
-          recruitment_contact_id: recruitmentContact.id,
-        })
-        .save()
+      recommendation.status = data.action
+      recommendation.recruitment_contact_id = recruitmentContact.id
+      await recommendation.save()
 
       if (data.action === 'contacted_email' && recommendation.recommended_email) {
         try {
@@ -880,7 +912,6 @@ export default class RecruitmentController {
 
           await mail.send(recruitmentMail)
         } catch (emailError) {
-          // Ne pas faire échouer la requête principale si l'email échoue
         }
       }
 
@@ -924,15 +955,12 @@ export default class RecruitmentController {
     try {
       const projectId = this.validateProjectId(params.id)
       const currentUserName = await this.getCurrentUserName(auth)
+      const requestBody = request.body()
 
-      const data = await request.validateUsing(
-        vine.compile(
-          vine.object({
-            source_project_id: vine.number(),
-            include_statuses: vine.array(vine.string()).optional(),
-          })
-        )
-      )
+      const data = {
+        source_project_id: Number(requestBody.source_project_id),
+        include_statuses: requestBody.include_statuses || null,
+      }
 
       const sourceProject = await Project.find(data.source_project_id)
       const sourceProjectName = sourceProject
@@ -1030,17 +1058,24 @@ export default class RecruitmentController {
   }
 
   private async updateFollowUpStatuses(projectId: number, followUpDays: number) {
+    console.log(`Updating follow-up statuses for project ${projectId} with delay ${followUpDays} days`)
+
     const contactsToUpdate = await RecruitmentContact.query()
       .where('project_id', projectId)
       .where('status', 'awaiting_response')
       .whereNotNull('contact_date')
 
+    console.log(`Found ${contactsToUpdate.length} contacts to potentially update`)
+
     let updatedCount = 0
     for (const contact of contactsToUpdate) {
       if (contact.shouldFollowUp(followUpDays)) {
-        await contact.merge({ status: 'to_follow_up' }).save()
+        contact.status = 'to_follow_up'
+        await contact.save()
         updatedCount++
       }
     }
+
+    console.log(`Updated ${updatedCount} contacts to follow-up status`)
   }
 }
