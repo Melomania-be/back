@@ -11,6 +11,7 @@ export default class extends BaseSchema {
       table.text('description').nullable()
 
       table.boolean('is_default').notNullable().defaultTo(false)
+      table.text('color').nullable()
 
       table.timestamp('created_at')
       table.timestamp('updated_at')
