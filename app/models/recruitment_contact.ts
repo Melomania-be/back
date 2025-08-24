@@ -118,7 +118,7 @@ export default class RecruitmentContact extends BaseModel {
   }
 
   get primaryContact(): string {
-    return this.email || this.messenger || this.phone || 'Aucun contact'
+    return this.email || this.messenger || this.phone || 'No contact'
   }
 
   private formatDateSafely(date: DateTime | null): string | null {
@@ -167,26 +167,26 @@ export default class RecruitmentContact extends BaseModel {
 
       section: this.section
         ? {
-            id: this.section.id,
-            name: this.section.name || 'Section inconnue',
-          }
+          id: this.section.id,
+          name: this.section.name || 'Unknown section',
+        }
         : null,
 
       contact: this.contact
         ? {
-            id: this.contact.id,
-            first_name: this.contact.first_name || '',
-            last_name: this.contact.last_name || '',
-            email: this.contact.email || null,
-          }
+          id: this.contact.id,
+          first_name: this.contact.first_name || '',
+          last_name: this.contact.last_name || '',
+          email: this.contact.email || null,
+        }
         : null,
 
       recommender: this.recommender
         ? {
-            id: this.recommender.id,
-            first_name: this.recommender.first_name || '',
-            last_name: this.recommender.last_name || '',
-          }
+          id: this.recommender.id,
+          first_name: this.recommender.first_name || '',
+          last_name: this.recommender.last_name || '',
+        }
         : null,
     }
   }
@@ -202,13 +202,13 @@ export default class RecruitmentContact extends BaseModel {
 
   getStatusBadge(): { label: string; color: string; icon: string } {
     const statusConfig = {
-      not_yet_contacted: { label: 'Pas encore contacté', color: 'gray', icon: 'AlertCircle' },
-      awaiting_response: { label: 'En attente de réponse', color: 'blue', icon: 'Clock' },
-      to_follow_up: { label: 'À relancer', color: 'yellow', icon: 'AlertTriangle' },
-      not_available: { label: 'Non disponible', color: 'red', icon: 'XCircle' },
-      pending_validation: { label: 'En validation', color: 'purple', icon: 'Clock' },
-      cancelled: { label: 'Annulé', color: 'gray', icon: 'XCircle' },
-      recruited: { label: 'Recruté', color: 'green', icon: 'CheckCircle' },
+      not_yet_contacted: { label: 'Not yet contacted', color: 'gray', icon: 'AlertCircle' },
+      awaiting_response: { label: 'Awaiting response', color: 'blue', icon: 'Clock' },
+      to_follow_up: { label: 'Follow up', color: 'yellow', icon: 'AlertTriangle' },
+      not_available: { label: 'Not available', color: 'red', icon: 'XCircle' },
+      pending_validation: { label: 'Pending validation', color: 'purple', icon: 'Clock' },
+      cancelled: { label: 'Cancelled', color: 'red', icon: 'XCircle' },
+      recruited: { label: 'Recruited', color: 'green', icon: 'CheckCircle' },
     }
 
     return statusConfig[this.status] || statusConfig['not_yet_contacted']
@@ -216,22 +216,22 @@ export default class RecruitmentContact extends BaseModel {
 
   static getAvailableStatuses(): Array<{ value: RecruitmentStatus; label: string }> {
     return [
-      { value: 'not_yet_contacted', label: 'Pas encore contacté' },
-      { value: 'awaiting_response', label: 'En attente de réponse' },
-      { value: 'to_follow_up', label: 'À relancer' },
-      { value: 'not_available', label: 'Non disponible' },
-      { value: 'pending_validation', label: 'En validation' },
-      { value: 'cancelled', label: 'Annulé' },
-      { value: 'recruited', label: 'Recruté' },
+      { value: 'not_yet_contacted', label: 'Not yet contacted' },
+      { value: 'awaiting_response', label: 'Awaiting response' },
+      { value: 'to_follow_up', label: 'Follow up' },
+      { value: 'not_available', label: 'Not available' },
+      { value: 'pending_validation', label: 'Pending validation' },
+      { value: 'cancelled', label: 'Cancelled' },
+      { value: 'recruited', label: 'Recruited' },
     ]
   }
 
   static getAvailableContactMethods(): Array<{ value: ContactMethod; label: string }> {
     return [
-      { value: 'manual', label: 'Manuel' },
+      { value: 'manual', label: 'Manual' },
       { value: 'email', label: 'Email' },
       { value: 'messenger', label: 'Messenger' },
-      { value: 'phone', label: 'Téléphone' },
+      { value: 'phone', label: 'Phone' },
     ]
   }
 
@@ -255,6 +255,11 @@ export default class RecruitmentContact extends BaseModel {
   async markForFollowUp(): Promise<void> {
     this.status = 'to_follow_up'
     this.last_follow_up = DateTime.now()
+    await this.save()
+  }
+
+  async markAsCancelled(): Promise<void> {
+    this.status = 'cancelled'
     await this.save()
   }
 
@@ -327,5 +332,25 @@ export default class RecruitmentContact extends BaseModel {
     })
 
     return await query
+  }
+
+  static async markAsCancelledByContactId(projectId: number, contactId: number): Promise<boolean> {
+    try {
+      const contact = await this.query()
+        .where('project_id', projectId)
+        .where('contact_id', contactId)
+        .first()
+
+      if (contact) {
+        contact.status = 'cancelled'
+        await contact.save()
+        return true
+      }
+
+      return false
+    } catch (error) {
+      console.error('Error marking contact as cancelled:', error)
+      return false
+    }
   }
 }
