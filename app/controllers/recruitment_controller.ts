@@ -765,36 +765,38 @@ export default class RecruitmentController {
         .where('project_id', projectId)
         .orderBy('created_at', 'desc')
 
-      const serializedRecommendations = recommendations.map((recommendation) => ({
-        id: recommendation.id,
-        project_id: recommendation.project_id,
-        recommender_name: recommendation.recommender_name || 'Unknown',
-        recommender_email: recommendation.recommender_email || null,
-        recommended_first_name: recommendation.recommended_first_name || '',
-        recommended_last_name: recommendation.recommended_last_name || '',
-        recommended_email: recommendation.recommended_email || null,
-        recommended_phone: recommendation.recommended_phone || null,
-        recommended_messenger: recommendation.recommended_messenger || null,
-        recommended_instrument: recommendation.recommended_instrument || null,
-        recommendation_message: recommendation.recommendation_message || null,
-        status: recommendation.status || 'pending',
-        recruitment_contact_id: recommendation.recruitment_contact_id || null,
-        created_at:
-          recommendation.createdAt && recommendation.createdAt.isValid
-            ? recommendation.createdAt.toISO()
-            : new Date().toISOString(),
-        updated_at:
-          recommendation.updatedAt && recommendation.updatedAt.isValid
-            ? recommendation.updatedAt.toISO()
-            : new Date().toISOString(),
+      const serializedRecommendations = recommendations.map((recommendation) => {
+        const createdAt = recommendation.createdAt && recommendation.createdAt.isValid
+          ? recommendation.createdAt
+          : DateTime.now()
 
-        recommended_display_name:
-          `${recommendation.recommended_first_name || ''} ${recommendation.recommended_last_name || ''}`.trim(),
-        formatted_created_at:
-          recommendation.createdAt && recommendation.createdAt.isValid
-            ? recommendation.createdAt.toFormat('dd/MM/yyyy HH:mm')
-            : 'Unknown date',
-      }))
+        const updatedAt = recommendation.updatedAt && recommendation.updatedAt.isValid
+          ? recommendation.updatedAt
+          : DateTime.now()
+
+        return {
+          id: recommendation.id,
+          project_id: recommendation.project_id,
+          recommender_name: recommendation.recommender_name || 'Unknown',
+          recommender_email: recommendation.recommender_email || null,
+          recommended_first_name: recommendation.recommended_first_name || '',
+          recommended_last_name: recommendation.recommended_last_name || '',
+          recommended_email: recommendation.recommended_email || null,
+          recommended_phone: recommendation.recommended_phone || null,
+          recommended_messenger: recommendation.recommended_messenger || null,
+          recommended_instrument: recommendation.recommended_instrument || null,
+          recommendation_message: recommendation.recommendation_message || null,
+          status: recommendation.status || 'pending',
+          recruitment_contact_id: recommendation.recruitment_contact_id || null,
+          created_at: createdAt.toISO(),
+          updated_at: updatedAt.toISO(),
+          createdAt: createdAt.toISO(), // Pour compatibilité avec le frontend
+
+          // Proprietes calculees
+          recommended_display_name: `${recommendation.recommended_first_name || ''} ${recommendation.recommended_last_name || ''}`.trim(),
+          formatted_created_at: createdAt.toFormat('dd/MM/yyyy HH:mm'),
+        }
+      })
 
       return response.json(serializedRecommendations)
     } catch (error) {
@@ -851,6 +853,11 @@ export default class RecruitmentController {
         email: recommendation.recommended_email
       })
 
+      // MODIFICATION: Ajouter le nom du recommandeur dans recommended_by
+      const recommendedByText = recommendation.recommender_name
+        ? `Recommended by ${recommendation.recommender_name}`
+        : 'Recommended by anonymous'
+
       const recruitmentContact = await RecruitmentContact.create({
         project_id: projectId,
         contact_id: null,
@@ -860,7 +867,7 @@ export default class RecruitmentController {
         phone: recommendation.recommended_phone?.trim() || null,
         messenger: recommendation.recommended_messenger?.trim() || null,
         section_id: data.section_id || null,
-        recommended_by: recommendation.recommender_name || null,
+        recommended_by: recommendedByText, // Nouveau format avec "Recommended by"
         source: 'recommendation',
         status: data.action === 'contacted_email' ? 'awaiting_response' : 'not_yet_contacted',
         contact_method: data.action === 'contacted_email' ? 'email' : 'manual',
