@@ -7,11 +7,13 @@ import Project from '#models/project'
 import Section from '#models/section'
 import Responsibles from '#models/responsibles'
 import User from '#models/user'
+import Participant from '#models/participant'
 import { DateTime } from 'luxon'
 import { simpleFilter, advancedFilter } from 'adonisjs-filters'
 import vine from '@vinejs/vine'
 import mail from '@adonisjs/mail/services/main'
 import RecruitmentEmail from '#mails/recruitment_email'
+import RecommendationEmail from '#mails/recommendation_email'
 
 interface ImportResult {
   imported: any[]
@@ -52,10 +54,10 @@ export default class RecruitmentController {
   private async getCurrentUserName(auth: any): Promise<string> {
     try {
       const user = await auth.authenticate()
-      return user.fullName || user.email || 'Utilisateur inconnu'
+      return user.fullName || user.email || 'System user'
     } catch (error) {
       console.error('Error getting current user:', error)
-      return 'Utilisateur inconnu'
+      return 'System user'
     }
   }
 
@@ -84,7 +86,7 @@ export default class RecruitmentController {
           imported: [],
           conflicts: [],
           errors: [],
-          message: 'Aucun participant validé trouvé dans ce projet',
+          message: 'No validated participants found in this project',
           total_contacts: 0,
           new_imports: 0,
           already_imported: 0,
@@ -160,7 +162,7 @@ export default class RecruitmentController {
 
       return response.json({
         ...results,
-        message: `Import automatique terminé: ${results.imported.length} nouveaux contacts importés`,
+        message: `Auto import completed: ${results.imported.length} new contacts imported`,
         total_contacts: projectContacts.length,
         new_imports: results.imported.length,
         already_imported: results.conflicts.length,
@@ -181,18 +183,15 @@ export default class RecruitmentController {
   async getSettings({ params, response }: HttpContext) {
     try {
       const projectId = this.validateProjectId(params.id)
-      console.log('Getting settings for project:', projectId)
 
       const project = await Project.find(projectId)
       if (!project) {
-        console.log('Project not found:', projectId)
         return response.status(404).json({ error: 'Project not found' })
       }
 
       let settings = await RecruitmentSettings.query().where('project_id', projectId).first()
 
       if (!settings) {
-        console.log('Creating default settings for project:', projectId)
         settings = await RecruitmentSettings.create({
           project_id: projectId,
           follow_up_days: 7,
@@ -209,7 +208,6 @@ export default class RecruitmentController {
         updated_at: settings.updatedAt?.toISO() || null,
       }
 
-      console.log('Returning settings:', responseData)
       return response.json(responseData)
     } catch (error) {
       console.error('Error getting settings:', error)
@@ -223,10 +221,8 @@ export default class RecruitmentController {
   async updateSettings({ params, request, response }: HttpContext) {
     try {
       const projectId = this.validateProjectId(params.id)
-      console.log('Updating settings for project:', projectId)
 
       const requestBody = request.body()
-      console.log('Request body received:', requestBody)
 
       if (!requestBody || typeof requestBody !== 'object') {
         return response.status(400).json({
@@ -248,8 +244,6 @@ export default class RecruitmentController {
         auto_follow_up_enabled: autoFollowUpEnabled
       }
 
-      console.log('Validated data:', validatedData)
-
       const project = await Project.find(projectId)
       if (!project) {
         return response.status(404).json({ error: 'Project not found' })
@@ -258,21 +252,18 @@ export default class RecruitmentController {
       let settings = await RecruitmentSettings.query().where('project_id', projectId).first()
 
       if (!settings) {
-        console.log('Creating new settings for project:', projectId)
         settings = await RecruitmentSettings.create({
           project_id: projectId,
           follow_up_days: validatedData.follow_up_days,
           auto_follow_up_enabled: validatedData.auto_follow_up_enabled,
         })
       } else {
-        console.log('Updating existing settings for project:', projectId)
         settings.follow_up_days = validatedData.follow_up_days
         settings.auto_follow_up_enabled = validatedData.auto_follow_up_enabled
         await settings.save()
       }
 
       if (validatedData.auto_follow_up_enabled) {
-        console.log('Updating follow-up statuses with delay:', validatedData.follow_up_days)
         await this.updateFollowUpStatuses(projectId, validatedData.follow_up_days)
       }
 
@@ -285,7 +276,6 @@ export default class RecruitmentController {
         updated_at: settings.updatedAt?.toISO() || null,
       }
 
-      console.log('Settings updated successfully:', responseData)
       return response.json(responseData)
     } catch (error) {
       console.error('Error updating settings:', error)
@@ -423,7 +413,7 @@ export default class RecruitmentController {
 
       if (!data.first_name || !data.last_name) {
         return response.status(400).json({
-          error: 'Le prénom et le nom sont requis et ne peuvent pas être vides',
+          error: 'First name and last name are required',
         })
       }
 
@@ -431,12 +421,12 @@ export default class RecruitmentController {
         const section = await Section.find(data.section_id)
         if (!section) {
           return response.status(400).json({
-            error: "La section spécifiée n'existe pas",
+            error: 'Specified section does not exist',
           })
         }
       }
 
-      const isDuplicate = await this.checkForDuplicates(projectId, data)
+      const duplicateInfo = await this.checkForDuplicatesDetailed(projectId, data)
 
       const contact = await RecruitmentContact.create({
         project_id: projectId,
@@ -451,7 +441,7 @@ export default class RecruitmentController {
         source: 'manual',
         status: 'not_yet_contacted',
         contact_method: 'manual',
-        is_duplicate: isDuplicate,
+        is_duplicate: duplicateInfo.isDuplicate,
         contacted_by: data.contacted_by,
       })
 
@@ -463,7 +453,10 @@ export default class RecruitmentController {
 
       await Promise.all(loadPromises)
 
-      return response.json(contact.serialize())
+      return response.json({
+        ...contact.serialize(),
+        duplicate_matches: duplicateInfo.matches
+      })
     } catch (error) {
       return response.status(400).json({ error: error.message })
     }
@@ -497,7 +490,7 @@ export default class RecruitmentController {
         .preload('contact')
 
       let recruiterInfo = {
-        name: 'Équipe Melomania',
+        name: 'Melomania Team',
         email: 'contact@melomania.com',
       }
 
@@ -539,7 +532,7 @@ export default class RecruitmentController {
               name: project.name,
             },
             recruiterInfo,
-            contact.recommended_by || undefined
+            contact.recommended_by ? this.getRecommenderName(contact.recommended_by) : undefined
           )
 
           await mail.send(recruitmentMail)
@@ -574,17 +567,110 @@ export default class RecruitmentController {
 
       const successMessage =
         results.sent.length > 0
-          ? `${results.sent.length} email(s) envoyé(s) avec succès. Status mis à jour.`
-          : `Aucun email envoyé. Vérifiez les adresses email.`
+          ? `${results.sent.length} email(s) sent successfully. Status updated.`
+          : `No emails sent. Please check email addresses.`
 
       return response.json({
         success: true,
         summary,
         details: results,
-        message: `Emails envoyés: ${results.sent.length}/${data.contact_ids.length}`,
+        message: `Emails sent: ${results.sent.length}/${data.contact_ids.length}`,
         info: successMessage,
         simulation_mode: false,
       })
+    } catch (error) {
+      return response.status(400).json({ error: error.message })
+    }
+  }
+
+  async sendRecommendationEmail({ params, request, response }: HttpContext) {
+    try {
+      const projectId = this.validateProjectId(params.id)
+      const requestBody = request.body()
+
+      const contactId = requestBody.contact_id
+
+      const contact = await RecruitmentContact.query()
+        .where('id', contactId)
+        .where('project_id', projectId)
+        .first()
+
+      if (!contact) {
+        return response.status(404).json({ error: 'Contact not found' })
+      }
+
+      if (!contact.email) {
+        return response.status(400).json({ error: 'Contact has no email address' })
+      }
+
+      if (!contact.recommended_by && contact.source !== 'recommendation') {
+        return response.status(400).json({ error: 'This contact was not recommended' })
+      }
+
+      const project = await Project.find(projectId)
+      if (!project) {
+        return response.status(404).json({ error: 'Project not found' })
+      }
+
+      const responsibles = await Responsibles.query()
+        .where('project_id', projectId)
+        .preload('contact')
+
+      let recruiterInfo = {
+        name: 'Melomania Team',
+        email: 'contact@melomania.com',
+      }
+
+      if (responsibles && responsibles.length > 0) {
+        const firstResponsible = responsibles[0]
+        if (firstResponsible.contact) {
+          recruiterInfo = {
+            name: `${firstResponsible.contact.first_name} ${firstResponsible.contact.last_name}`,
+            email: firstResponsible.contact.email || 'contact@melomania.com',
+          }
+        }
+      }
+
+      const recommenderName = this.getRecommenderName(contact.recommended_by) || 'someone'
+
+      try {
+        const recommendationMail = new RecommendationEmail(
+          {
+            first_name: contact.first_name,
+            last_name: contact.last_name,
+            email: contact.email,
+          },
+          {
+            id: project.id,
+            name: project.name,
+          },
+          recruiterInfo,
+          recommenderName
+        )
+
+        await mail.send(recommendationMail)
+
+        contact.status = 'awaiting_response'
+        contact.contact_method = 'email'
+        contact.contact_date = DateTime.now()
+        await contact.save()
+
+        return response.json({
+          success: true,
+          message: 'Recommendation email sent successfully',
+          contact_id: contact.id,
+          email: contact.email,
+          recommender: recommenderName,
+          sent_at: DateTime.now().toISO(),
+        })
+
+      } catch (error) {
+        return response.status(400).json({
+          error: 'Failed to send recommendation email',
+          details: error.message,
+        })
+      }
+
     } catch (error) {
       return response.status(400).json({ error: error.message })
     }
@@ -637,6 +723,12 @@ export default class RecruitmentController {
             continue
           }
 
+          const duplicateInfo = await this.checkForDuplicatesDetailed(projectId, {
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+            email: contact.email
+          })
+
           const recruitmentContact = await RecruitmentContact.create({
             project_id: projectId,
             contact_id: contactId,
@@ -648,7 +740,7 @@ export default class RecruitmentController {
             source: 'database',
             status: 'not_yet_contacted',
             contact_method: 'manual',
-            is_duplicate: false,
+            is_duplicate: duplicateInfo.isDuplicate,
             contacted_by: currentUserName,
           })
 
@@ -767,36 +859,37 @@ export default class RecruitmentController {
         .where('project_id', projectId)
         .orderBy('created_at', 'desc')
 
-      const serializedRecommendations = recommendations.map((recommendation) => ({
-        id: recommendation.id,
-        project_id: recommendation.project_id,
-        recommender_name: recommendation.recommender_name || 'Unknown',
-        recommender_email: recommendation.recommender_email || null,
-        recommended_first_name: recommendation.recommended_first_name || '',
-        recommended_last_name: recommendation.recommended_last_name || '',
-        recommended_email: recommendation.recommended_email || null,
-        recommended_phone: recommendation.recommended_phone || null,
-        recommended_messenger: recommendation.recommended_messenger || null,
-        recommended_instrument: recommendation.recommended_instrument || null,
-        recommendation_message: recommendation.recommendation_message || null,
-        status: recommendation.status || 'pending',
-        recruitment_contact_id: recommendation.recruitment_contact_id || null,
-        created_at:
-          recommendation.createdAt && recommendation.createdAt.isValid
-            ? recommendation.createdAt.toISO()
-            : new Date().toISOString(),
-        updated_at:
-          recommendation.updatedAt && recommendation.updatedAt.isValid
-            ? recommendation.updatedAt.toISO()
-            : new Date().toISOString(),
+      const serializedRecommendations = recommendations.map((recommendation) => {
+        const createdAt = recommendation.createdAt && recommendation.createdAt.isValid
+          ? recommendation.createdAt
+          : DateTime.now()
 
-        recommended_display_name:
-          `${recommendation.recommended_first_name || ''} ${recommendation.recommended_last_name || ''}`.trim(),
-        formatted_created_at:
-          recommendation.createdAt && recommendation.createdAt.isValid
-            ? recommendation.createdAt.toFormat('dd/MM/yyyy HH:mm')
-            : 'Date inconnue',
-      }))
+        const updatedAt = recommendation.updatedAt && recommendation.updatedAt.isValid
+          ? recommendation.updatedAt
+          : DateTime.now()
+
+        return {
+          id: recommendation.id,
+          project_id: recommendation.project_id,
+          recommender_name: recommendation.recommender_name || 'Unknown',
+          recommender_email: recommendation.recommender_email || null,
+          recommended_first_name: recommendation.recommended_first_name || '',
+          recommended_last_name: recommendation.recommended_last_name || '',
+          recommended_email: recommendation.recommended_email || null,
+          recommended_phone: recommendation.recommended_phone || null,
+          recommended_messenger: recommendation.recommended_messenger || null,
+          recommended_instrument: recommendation.recommended_instrument || null,
+          recommendation_message: recommendation.recommendation_message || null,
+          status: recommendation.status || 'pending',
+          recruitment_contact_id: recommendation.recruitment_contact_id || null,
+          created_at: createdAt.toISO(),
+          updated_at: updatedAt.toISO(),
+          createdAt: createdAt.toISO(),
+
+          recommended_display_name: `${recommendation.recommended_first_name || ''} ${recommendation.recommended_last_name || ''}`.trim(),
+          formatted_created_at: createdAt.toFormat('dd/MM/yyyy HH:mm'),
+        }
+      })
 
       return response.json(serializedRecommendations)
     } catch (error) {
@@ -847,6 +940,16 @@ export default class RecruitmentController {
         return response.status(400).json({ error: 'Recommendation has invalid name fields' })
       }
 
+      const duplicateInfo = await this.checkForDuplicatesDetailed(projectId, {
+        first_name: recommendation.recommended_first_name.trim(),
+        last_name: recommendation.recommended_last_name.trim(),
+        email: recommendation.recommended_email
+      })
+
+      const recommendedByText = recommendation.recommender_name
+        ? recommendation.recommender_name
+        : 'Anonymous'
+
       const recruitmentContact = await RecruitmentContact.create({
         project_id: projectId,
         contact_id: null,
@@ -856,13 +959,13 @@ export default class RecruitmentController {
         phone: recommendation.recommended_phone?.trim() || null,
         messenger: recommendation.recommended_messenger?.trim() || null,
         section_id: data.section_id || null,
-        recommended_by: recommendation.recommender_name || null,
+        recommended_by: `Recommended by ${recommendedByText}`,
         source: 'recommendation',
         status: data.action === 'contacted_email' ? 'awaiting_response' : 'not_yet_contacted',
         contact_method: data.action === 'contacted_email' ? 'email' : 'manual',
         contact_date: data.action === 'contacted_email' ? DateTime.now() : null,
         notes: data.notes || null,
-        is_duplicate: false,
+        is_duplicate: duplicateInfo.isDuplicate,
         contacted_by: currentUserName,
       })
 
@@ -882,7 +985,7 @@ export default class RecruitmentController {
             .preload('contact')
 
           let recruiterInfo = {
-            name: 'Équipe Melomania',
+            name: 'Melomania Team',
             email: 'contact@melomania.com',
           }
 
@@ -912,6 +1015,7 @@ export default class RecruitmentController {
 
           await mail.send(recruitmentMail)
         } catch (emailError) {
+          // Do not fail the entire request if email fails
         }
       }
 
@@ -925,8 +1029,8 @@ export default class RecruitmentController {
         recruitmentContact: recruitmentContact.serialize(),
         message:
           data.action === 'contacted_email'
-            ? 'Email envoyé et contact ajouté au recrutement'
-            : 'Contact ajouté au recrutement',
+            ? 'Email sent and contact added to recruitment'
+            : 'Contact added to recruitment',
       })
     } catch (error) {
       return response.status(400).json({
@@ -1007,6 +1111,12 @@ export default class RecruitmentController {
             continue
           }
 
+          const duplicateInfo = await this.checkForDuplicatesDetailed(projectId, {
+            first_name: sourceContact.first_name,
+            last_name: sourceContact.last_name,
+            email: sourceContact.email
+          })
+
           const newContact = await RecruitmentContact.create({
             project_id: projectId,
             contact_id: sourceContact.contact_id,
@@ -1016,10 +1126,10 @@ export default class RecruitmentController {
             phone: sourceContact.phone,
             messenger: sourceContact.messenger,
             section_id: sourceContact.section_id,
-            source: `Importé depuis "${sourceProjectName}"`,
+            source: `Imported from "${sourceProjectName}"`,
             status: 'not_yet_contacted',
             contact_method: 'manual',
-            is_duplicate: false,
+            is_duplicate: duplicateInfo.isDuplicate,
             contacted_by: currentUserName,
           })
 
@@ -1039,22 +1149,124 @@ export default class RecruitmentController {
     }
   }
 
-  private async checkForDuplicates(projectId: number, contactData: any): Promise<boolean> {
-    const query = RecruitmentContact.query().where('project_id', projectId)
+  async updateRecruitmentOnParticipantDeletion(participantId: number) {
+    try {
+      const participant = await Participant.query()
+        .where('id', participantId)
+        .preload('contact')
+        .first()
 
-    if (contactData.email) {
-      query.orWhere('email', contactData.email)
+      if (!participant || !participant.contact) {
+        return
+      }
+
+      const recruitmentContact = await RecruitmentContact.query()
+        .where('project_id', participant.project_id)
+        .where('contact_id', participant.contact.id)
+        .first()
+
+      if (recruitmentContact) {
+        recruitmentContact.status = 'cancelled'
+        await recruitmentContact.save()
+      }
+    } catch (error) {
+      console.error('Error updating recruitment status on participant deletion:', error)
+    }
+  }
+
+  private getRecommenderName(recommendedBy: string | null): string | null {
+    if (!recommendedBy) return null
+
+    if (recommendedBy.startsWith('Recommended by ')) {
+      return recommendedBy.replace('Recommended by ', '')
     }
 
-    const similarName = await query
-      .orWhere((subQuery) => {
+    return recommendedBy
+  }
+
+  private async checkForDuplicatesDetailed(projectId: number, contactData: any): Promise<{
+    isDuplicate: boolean
+    matches: any[]
+  }> {
+    const query = RecruitmentContact.query().where('project_id', projectId)
+
+    const matches = []
+
+    if (contactData.email) {
+      const emailMatches = await RecruitmentContact.query()
+        .where('project_id', projectId)
+        .where('email', contactData.email)
+
+      matches.push(...emailMatches.map(m => ({
+        type: 'email',
+        contact: m.serialize(),
+        similarity: 1.0
+      })))
+    }
+
+    const nameMatches = await query
+      .where((subQuery) => {
         subQuery
           .where('first_name', 'ilike', `%${contactData.first_name}%`)
           .where('last_name', 'ilike', `%${contactData.last_name}%`)
       })
-      .first()
 
-    return !!similarName
+    for (const match of nameMatches) {
+      const similarity = this.calculateNameSimilarity(
+        `${contactData.first_name} ${contactData.last_name}`,
+        `${match.first_name} ${match.last_name}`
+      )
+
+      if (similarity > 0.8) {
+        matches.push({
+          type: 'name',
+          contact: match.serialize(),
+          similarity
+        })
+      }
+    }
+
+    const uniqueMatches = matches.filter((match, index, self) =>
+      index === self.findIndex(m => m.contact.id === match.contact.id)
+    )
+
+    return {
+      isDuplicate: uniqueMatches.length > 0,
+      matches: uniqueMatches
+    }
+  }
+
+  private calculateNameSimilarity(name1: string, name2: string): number {
+    const longer = name1.length > name2.length ? name1 : name2
+    const shorter = name1.length > name2.length ? name2 : name1
+
+    if (longer.length === 0) return 1.0
+
+    const editDistance = this.getEditDistance(longer.toLowerCase(), shorter.toLowerCase())
+    return (longer.length - editDistance) / longer.length
+  }
+
+  private getEditDistance(s1: string, s2: string): number {
+    const costs = []
+    for (let i = 0; i <= s2.length; i++) {
+      let lastValue = i
+      for (let j = 0; j <= s1.length; j++) {
+        if (i === 0) {
+          costs[j] = j
+        } else if (j > 0) {
+          let newValue = costs[j - 1]
+          if (s1.charAt(j - 1) !== s2.charAt(i - 1)) {
+            newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1
+          }
+          costs[j - 1] = lastValue
+          lastValue = newValue
+        }
+      }
+      if (i > 0) {
+        costs[s1.length] = lastValue
+      }
+    }
+    return costs[s1.length]
   }
 
   private async updateFollowUpStatuses(projectId: number, followUpDays: number) {

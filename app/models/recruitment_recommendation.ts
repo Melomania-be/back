@@ -1,11 +1,10 @@
-// app/models/recruitment_recommendation.ts
 import { DateTime } from 'luxon'
 import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import Project from './project.js'
 import RecruitmentContact from './recruitment_contact.js'
 
-export type RecommendationStatus = 'pending' | 'ignored' | 'contact_email' | 'contact_manual'
+export type RecommendationStatus = 'pending' | 'ignored' | 'contacted_email' | 'contacted_manual'
 
 export default class RecruitmentRecommendation extends BaseModel {
   @column({ isPrimary: true })
@@ -76,9 +75,9 @@ export default class RecruitmentRecommendation extends BaseModel {
   getStatusBadge(): { label: string; color: string } {
     const statusConfig = {
       pending: { label: 'En attente', color: 'yellow' },
-      ignored: { label: 'Ignorée', color: 'gray' },
-      contact_email: { label: 'Contact par email', color: 'blue' },
-      contact_manual: { label: 'Contact manuel', color: 'green' },
+      ignored: { label: 'Ignoree', color: 'gray' },
+      contacted_email: { label: 'Contact par email', color: 'blue' },
+      contacted_manual: { label: 'Contact manuel', color: 'green' },
     }
 
     return statusConfig[this.status] || statusConfig['pending']
@@ -110,9 +109,9 @@ export default class RecruitmentRecommendation extends BaseModel {
   static getAvailableStatuses(): Array<{ value: RecommendationStatus; label: string }> {
     return [
       { value: 'pending', label: 'En attente' },
-      { value: 'ignored', label: 'Ignorée' },
-      { value: 'contact_email', label: 'Contact par email' },
-      { value: 'contact_manual', label: 'Contact manuel' },
+      { value: 'ignored', label: 'Ignoree' },
+      { value: 'contacted_email', label: 'Contact par email' },
+      { value: 'contacted_manual', label: 'Contact manuel' },
     ]
   }
 }

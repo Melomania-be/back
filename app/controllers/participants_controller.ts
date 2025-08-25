@@ -186,7 +186,6 @@ export default class ParticipantsController {
     participant.accepted = true
     await participant.save()
 
-    // Ajouter automatiquement au recrutement si pas déjà présent
     if (participant.contact && participant.contact.id) {
       await this.addToRecruitmentIfNotExists(
         data.params.id,
@@ -204,10 +203,15 @@ export default class ParticipantsController {
     const participant = await Participant.query()
       .where('id', participantId)
       .andWhere('project_id', id)
+      .preload('contact')
       .first()
 
     if (!participant) {
       return response.send("Can't find this participant in this project")
+    }
+
+    if (participant.contact && participant.contact.id) {
+      await this.updateRecruitmentStatusOnDeletion(id, participant.contact.id)
     }
 
     await participant.related('concerts').detach()
@@ -255,9 +259,9 @@ export default class ParticipantsController {
   private async getCurrentUserName(auth: any): Promise<string> {
     try {
       const user = await auth.authenticate()
-      return user.fullName || user.email || 'Système'
+      return user.fullName || user.email || 'System'
     } catch (error) {
-      return 'Système'
+      return 'System'
     }
   }
 
@@ -269,7 +273,6 @@ export default class ParticipantsController {
         .first()
 
       if (existingRecruitment) {
-        // Si déjà présent, mettre à jour le statut vers "recruited"
         if (existingRecruitment.status !== 'recruited') {
           await existingRecruitment.merge({ status: 'recruited' }).save()
         }
@@ -278,7 +281,6 @@ export default class ParticipantsController {
 
       const currentUserName = await this.getCurrentUserName(auth)
 
-      // Créer un nouveau contact de recrutement
       await RecruitmentContact.create({
         project_id: projectId,
         contact_id: contact.id,
@@ -296,6 +298,23 @@ export default class ParticipantsController {
 
     } catch (error) {
       console.error('Error adding to recruitment:', error)
+    }
+  }
+
+  private async updateRecruitmentStatusOnDeletion(projectId: number, contactId: number) {
+    try {
+      const recruitmentContact = await RecruitmentContact.query()
+        .where('project_id', projectId)
+        .where('contact_id', contactId)
+        .first()
+
+      if (recruitmentContact) {
+        recruitmentContact.status = 'cancelled'
+        await recruitmentContact.save()
+        console.log(`Updated recruitment contact ${recruitmentContact.id} status to cancelled`)
+      }
+    } catch (error) {
+      console.error('Error updating recruitment status on participant deletion:', error)
     }
   }
 }

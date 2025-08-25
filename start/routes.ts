@@ -33,7 +33,8 @@ const DefaultTemplatesController = () => import('#controllers/default_templates_
 const FilesystemController = () => import('#controllers/filesystem_controller')
 const SharedFolderController = () => import('#controllers/shared_folder_controller')
 const RecruitmentController = () => import('#controllers/recruitment_controller')
-const RecruitmentRecommendationController = () => import('#controllers/recruitment_recommendation_controller')
+const RecruitmentRecommendationController = () =>
+  import('#controllers/recruitment_recommendation_controller')
 
 router.group(() => {
   // =============================================================================
@@ -98,9 +99,18 @@ router.group(() => {
   // =============================================================================
   // ROUTES PUBLIQUES POUR RECOMMANDATIONS DE RECRUTEMENT
   // =============================================================================
-  router.get('/projects/:id/recommend', [RecruitmentRecommendationController, 'getRecommendationPage'])
-  router.post('/projects/:id/recommend', [RecruitmentRecommendationController, 'submitRecommendation'])
-  router.get('/projects/:id/recommend/success', [RecruitmentRecommendationController, 'confirmationPage'])
+  router.get('/projects/:id/recommend', [
+    RecruitmentRecommendationController,
+    'getRecommendationPage',
+  ])
+  router.post('/projects/:id/recommend', [
+    RecruitmentRecommendationController,
+    'submitRecommendation',
+  ])
+  router.get('/projects/:id/recommend/success', [
+    RecruitmentRecommendationController,
+    'confirmationPage',
+  ])
 
   // =============================================================================
   // ROUTES PROTÉGÉES (AVEC AUTHENTIFICATION)
@@ -240,12 +250,20 @@ router.group(() => {
               router.post('/contacts/manual', [RecruitmentController, 'createManualContact'])
               router.post('/contacts', [RecruitmentController, 'createManualContact']) // Route principale pour création
               router.post('/contacts/import', [RecruitmentController, 'importContacts'])
-              router.put('/contacts/:contactId/status', [RecruitmentController, 'updateContactStatus'])
+              router.put('/contacts/:contactId/status', [
+                RecruitmentController,
+                'updateContactStatus',
+              ])
               router.put('/contacts/:contactId', [RecruitmentController, 'updateContactStatus']) // Alias
               router.delete('/contacts/:contactId', [RecruitmentController, 'deleteContact'])
 
               // Recherche de contacts
               router.post('/search-contacts', [RecruitmentController, 'searchContacts'])
+
+              router.post('/send-recommendation-email', [
+                RecruitmentController,
+                'sendRecommendationEmail',
+              ])
 
               // Envoi d'emails
               router.post('/send-emails', [RecruitmentController, 'sendRecruitmentEmails'])
@@ -256,7 +274,10 @@ router.group(() => {
 
               // Recommandations
               router.get('/recommendations', [RecruitmentController, 'getRecommendations'])
-              router.post('/recommendations/:recommendationId/handle', [RecruitmentController, 'handleRecommendation'])
+              router.post('/recommendations/:recommendationId/handle', [
+                RecruitmentController,
+                'handleRecommendation',
+              ])
 
               // Statistiques
               router.get('/stats', [RecruitmentController, 'getStats'])

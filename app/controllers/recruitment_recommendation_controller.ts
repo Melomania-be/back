@@ -92,21 +92,27 @@ export default class RecruitmentRecommendationController {
           continue
         }
 
-        const recommendation = await RecruitmentRecommendation.create({
-          project_id: Number(params.id),
-          recommender_name: data.recommender_name.trim(),
-          recommender_email: data.recommender_email?.trim() || null,
-          recommended_first_name: rec.first_name.trim(),
-          recommended_last_name: rec.last_name.trim(),
-          recommended_email: rec.email?.trim() || null,
-          recommended_phone: rec.phone?.trim() || null,
-          recommended_messenger: rec.messenger?.trim() || null,
-          recommended_instrument: rec.instrument?.trim() || null,
-          recommendation_message: rec.message?.trim() || null,
-          status: 'pending',
-        })
+        try {
+          const recommendation = await RecruitmentRecommendation.create({
+            project_id: Number(params.id),
+            recommender_name: data.recommender_name.trim(),
+            recommender_email: data.recommender_email?.trim() || null,
+            recommended_first_name: rec.first_name.trim(),
+            recommended_last_name: rec.last_name.trim(),
+            recommended_email: rec.email?.trim() || null,
+            recommended_phone: rec.phone?.trim() || null,
+            recommended_messenger: rec.messenger?.trim() || null,
+            recommended_instrument: rec.instrument?.trim() || null,
+            recommendation_message: rec.message?.trim() || null,
+            status: 'pending',
+          })
 
-        createdRecommendations.push(recommendation)
+          createdRecommendations.push(recommendation)
+        } catch (dbError) {
+          console.error('Database error creating recommendation:', dbError)
+          // Continue avec les autres recommandations même si une échoue
+          continue
+        }
       }
 
       if (createdRecommendations.length > 0) {
@@ -123,6 +129,8 @@ export default class RecruitmentRecommendationController {
         },
       })
     } catch (error) {
+      console.error('Submit recommendation error:', error)
+
       if (error.code === 'E_ROW_NOT_FOUND') {
         return response.status(404).json({
           error: 'Project not found',
@@ -162,7 +170,9 @@ export default class RecruitmentRecommendationController {
   private async notifyProjectAdmins(project: any, recommendations: any[]) {
     try {
       // Ici vous pouvez implémenter la notification des admins
+      console.log(`New recommendations for project ${project.name}:`, recommendations.length)
     } catch (error) {
+      console.error('Error notifying admins:', error)
       // Ne pas faire échouer la requête principale si la notification échoue
     }
   }
