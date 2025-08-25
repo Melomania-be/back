@@ -4,6 +4,7 @@ export default class extends BaseSchema {
   protected tableName = 'accounting'
 
   async up() {
+    // Créer d'abord la table sans la contrainte de clé étrangère
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id')
 
@@ -11,16 +12,12 @@ export default class extends BaseSchema {
       table.date('payment_date').nullable()
       table.string('name').notNullable()
       table.decimal('amount', 12, 2).notNullable()
-      table.string('attachement').nullable()
+      table.string('attachment').nullable()
       table.boolean('is_individual_payment').defaultTo(false)
+      table.boolean('is_musician_fee').defaultTo(false)
 
-      table
-        .integer('category_id')
-        .unsigned()
-        .references('id')
-        .inTable('expense_categories')
-        .onDelete('SET NULL')
-        .nullable()
+      // Colonne category_id sans contrainte pour l'instant
+      table.integer('category_id').unsigned().nullable()
 
       table
         .integer('project_id')

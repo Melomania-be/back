@@ -59,4 +59,26 @@ export default class Accounting extends BaseModel {
 
   @column()
   declare is_musician_fee : boolean
+
+  public serializeExtras() {
+    return {}
+  }
+
+  public serialize() {
+    return {
+      id: this.id,
+      billDate: this.bill_date ? this.bill_date.toFormat('yyyy-MM-dd') : null,
+      paymentDate: this.payment_date ? this.payment_date.toFormat('yyyy-MM-dd') : null,
+      name: this.name,
+      amount: this.amount,
+      attachment: this.attachment,
+      categoryId: this.category_id,
+      projectId: this.project_id,
+      contactId: this.contact_id,
+      isIndividualPayment: this.is_individual_payment,
+      isMusicianFee: this.is_musician_fee,
+      createdAt: this.createdAt.toISO(),
+      updatedAt: this.updatedAt.toISO()
+    }
+  }
 }
