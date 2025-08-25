@@ -13,6 +13,7 @@ import { simpleFilter, advancedFilter } from 'adonisjs-filters'
 import vine from '@vinejs/vine'
 import mail from '@adonisjs/mail/services/main'
 import RecruitmentEmail from '#mails/recruitment_email'
+import RecommendationEmail from '#mails/recommendation_email'
 
 interface ImportResult {
   imported: any[]
@@ -531,7 +532,7 @@ export default class RecruitmentController {
               name: project.name,
             },
             recruiterInfo,
-            contact.recommended_by || undefined
+            contact.recommended_by ? this.getRecommenderName(contact.recommended_by) : undefined
           )
 
           await mail.send(recruitmentMail)
@@ -577,6 +578,99 @@ export default class RecruitmentController {
         info: successMessage,
         simulation_mode: false,
       })
+    } catch (error) {
+      return response.status(400).json({ error: error.message })
+    }
+  }
+
+  async sendRecommendationEmail({ params, request, response }: HttpContext) {
+    try {
+      const projectId = this.validateProjectId(params.id)
+      const requestBody = request.body()
+
+      const contactId = requestBody.contact_id
+
+      const contact = await RecruitmentContact.query()
+        .where('id', contactId)
+        .where('project_id', projectId)
+        .first()
+
+      if (!contact) {
+        return response.status(404).json({ error: 'Contact not found' })
+      }
+
+      if (!contact.email) {
+        return response.status(400).json({ error: 'Contact has no email address' })
+      }
+
+      if (!contact.recommended_by && contact.source !== 'recommendation') {
+        return response.status(400).json({ error: 'This contact was not recommended' })
+      }
+
+      const project = await Project.find(projectId)
+      if (!project) {
+        return response.status(404).json({ error: 'Project not found' })
+      }
+
+      const responsibles = await Responsibles.query()
+        .where('project_id', projectId)
+        .preload('contact')
+
+      let recruiterInfo = {
+        name: 'Melomania Team',
+        email: 'contact@melomania.com',
+      }
+
+      if (responsibles && responsibles.length > 0) {
+        const firstResponsible = responsibles[0]
+        if (firstResponsible.contact) {
+          recruiterInfo = {
+            name: `${firstResponsible.contact.first_name} ${firstResponsible.contact.last_name}`,
+            email: firstResponsible.contact.email || 'contact@melomania.com',
+          }
+        }
+      }
+
+      const recommenderName = this.getRecommenderName(contact.recommended_by) || 'someone'
+
+      try {
+        const recommendationMail = new RecommendationEmail(
+          {
+            first_name: contact.first_name,
+            last_name: contact.last_name,
+            email: contact.email,
+          },
+          {
+            id: project.id,
+            name: project.name,
+          },
+          recruiterInfo,
+          recommenderName
+        )
+
+        await mail.send(recommendationMail)
+
+        contact.status = 'awaiting_response'
+        contact.contact_method = 'email'
+        contact.contact_date = DateTime.now()
+        await contact.save()
+
+        return response.json({
+          success: true,
+          message: 'Recommendation email sent successfully',
+          contact_id: contact.id,
+          email: contact.email,
+          recommender: recommenderName,
+          sent_at: DateTime.now().toISO(),
+        })
+
+      } catch (error) {
+        return response.status(400).json({
+          error: 'Failed to send recommendation email',
+          details: error.message,
+        })
+      }
+
     } catch (error) {
       return response.status(400).json({ error: error.message })
     }
@@ -790,9 +884,8 @@ export default class RecruitmentController {
           recruitment_contact_id: recommendation.recruitment_contact_id || null,
           created_at: createdAt.toISO(),
           updated_at: updatedAt.toISO(),
-          createdAt: createdAt.toISO(), // Pour compatibilité avec le frontend
+          createdAt: createdAt.toISO(),
 
-          // Proprietes calculees
           recommended_display_name: `${recommendation.recommended_first_name || ''} ${recommendation.recommended_last_name || ''}`.trim(),
           formatted_created_at: createdAt.toFormat('dd/MM/yyyy HH:mm'),
         }
@@ -853,10 +946,9 @@ export default class RecruitmentController {
         email: recommendation.recommended_email
       })
 
-      // MODIFICATION: Ajouter le nom du recommandeur dans recommended_by
       const recommendedByText = recommendation.recommender_name
-        ? `Recommended by ${recommendation.recommender_name}`
-        : 'Recommended by anonymous'
+        ? recommendation.recommender_name
+        : 'Anonymous'
 
       const recruitmentContact = await RecruitmentContact.create({
         project_id: projectId,
@@ -867,7 +959,7 @@ export default class RecruitmentController {
         phone: recommendation.recommended_phone?.trim() || null,
         messenger: recommendation.recommended_messenger?.trim() || null,
         section_id: data.section_id || null,
-        recommended_by: recommendedByText, // Nouveau format avec "Recommended by"
+        recommended_by: `Recommended by ${recommendedByText}`,
         source: 'recommendation',
         status: data.action === 'contacted_email' ? 'awaiting_response' : 'not_yet_contacted',
         contact_method: data.action === 'contacted_email' ? 'email' : 'manual',
@@ -1080,6 +1172,16 @@ export default class RecruitmentController {
     } catch (error) {
       console.error('Error updating recruitment status on participant deletion:', error)
     }
+  }
+
+  private getRecommenderName(recommendedBy: string | null): string | null {
+    if (!recommendedBy) return null
+
+    if (recommendedBy.startsWith('Recommended by ')) {
+      return recommendedBy.replace('Recommended by ', '')
+    }
+
+    return recommendedBy
   }
 
   private async checkForDuplicatesDetailed(projectId: number, contactData: any): Promise<{
