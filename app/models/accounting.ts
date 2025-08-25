@@ -25,13 +25,19 @@ export default class Accounting extends BaseModel {
   declare attachment: string | null
 
   @column()
-  declare category_id: number
+  declare category_id: number | null
 
   @column()
   declare project_id: number
 
   @column()
   declare contact_id: number | null
+
+  @column()
+  declare is_individual_payment: boolean
+
+  @column()
+  declare is_musician_fee: boolean
 
   @belongsTo(() => ExpenseCategory, {
     foreignKey: 'category_id',
@@ -53,12 +59,6 @@ export default class Accounting extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
-
-  @column()
-  declare is_individual_payment : boolean
-
-  @column()
-  declare is_musician_fee : boolean
 
   public serializeExtras() {
     return {}

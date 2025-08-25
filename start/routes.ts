@@ -157,7 +157,6 @@ router.group(() => {
       // ============================================================================
       const PieceMaterialsController = () => import('#controllers/piece_materials_controller')
 
-      // ✅ ROUTES POUR LES PIÈCES INDIVIDUELLES (SANS DUPLICATION)
       router
         .group(() => {
           router.post('/:pieceId/select-material', [PieceMaterialsController, 'selectMaterial'])
@@ -200,6 +199,28 @@ router.group(() => {
         .prefix('/filesystem')
 
       // =============================================================================
+      // GESTION DES CATEGORIES DE DEPENSES - POSITION CORRIGÉE
+      // =============================================================================
+      router
+        .group(() => {
+          router.get('/', [ExpenseCategoriesController, 'getAll'])
+          router.post('/', [ExpenseCategoriesController, 'createOrUpdate'])
+          router.delete('/:id', [ExpenseCategoriesController, 'delete'])
+        })
+        .prefix('/expense_categories')
+
+      // =============================================================================
+      // GESTION DES COMPTABILITES GLOBALES - POSITION CORRIGÉE
+      // =============================================================================
+      router
+        .group(() => {
+          router.get('/:contactId', [AccountingsController, 'getContactAccountings'])
+          router.post('/attachment', [AccountingsController, 'uploadAttachment'])
+          router.get('/attachment/:filename', [AccountingsController, 'downloadAttachment'])
+        })
+        .prefix('/accountings')
+
+      // =============================================================================
       // GESTION DES PROJETS
       // =============================================================================
       router
@@ -210,12 +231,14 @@ router.group(() => {
           router.delete('/:id', [ProjectsController, 'delete'])
           router.get('/:id/management', [ProjectsController, 'getDashboard'])
           router.get('/:id/management/attendance', [ProjectsController, 'getAttendance'])
+
+          // ROUTES ACCOUNTING POUR PROJETS SPÉCIFIQUES - POSITION CORRIGÉE
           router.get('/:id/management/accounting', [AccountingsController, 'getAll'])
           router.post('/:id/management/accounting', [AccountingsController, 'createOrUpdate'])
           router.delete('/:id/management/accounting/:accountingId', [AccountingsController, 'delete'])
           router.get('/:id/management/accounting/participant', [AccountingsController, 'getContactAccountingsproject'])
 
-          // ✅ ROUTES MATÉRIELS POUR PROJETS (SANS DUPLICATION)
+          // ROUTES MATÉRIELS POUR PROJETS
           router.get('/:id/material-selections', [
             PieceMaterialsController,
             'getProjectMaterialSelections',
@@ -242,12 +265,12 @@ router.group(() => {
 
               // Contacts de recrutement - Routes principales
               router.get('/contacts', [RecruitmentController, 'getContacts'])
-              router.get('/', [RecruitmentController, 'getContacts']) // Alias pour la liste principale
+              router.get('/', [RecruitmentController, 'getContacts'])
               router.post('/contacts/manual', [RecruitmentController, 'createManualContact'])
-              router.post('/contacts', [RecruitmentController, 'createManualContact']) // Route principale pour création
+              router.post('/contacts', [RecruitmentController, 'createManualContact'])
               router.post('/contacts/import', [RecruitmentController, 'importContacts'])
               router.put('/contacts/:contactId/status', [RecruitmentController, 'updateContactStatus'])
-              router.put('/contacts/:contactId', [RecruitmentController, 'updateContactStatus']) // Alias
+              router.put('/contacts/:contactId', [RecruitmentController, 'updateContactStatus'])
               router.delete('/contacts/:contactId', [RecruitmentController, 'deleteContact'])
 
               // Recherche de contacts
@@ -544,24 +567,6 @@ router.group(() => {
           router.delete('/:id', [TemplateController, 'delete'])
         })
         .prefix('/templates')
-
-      // =============================================================================
-      // GESTION DES CATEGORIES DE DEPENSES
-      // =============================================================================
-      router.group(() => {
-        router.get('/expense_categories', [ExpenseCategoriesController, 'getAll'])
-        router.post('/expense_categories', [ExpenseCategoriesController, 'createOrUpdate'])
-        router.delete('/expense_categories/:id', [ExpenseCategoriesController, 'delete'])
-      })
-
-      // =============================================================================
-      // GESTION DES AUDITIONS
-      // =============================================================================
-      router.group(() => {
-        router.get('/accountings/:contactId' , [AccountingsController , 'getContactAccountings'])
-        router.post('/accountings/attachment', [AccountingsController , 'uploadAttachment'])
-        router.get('/accountings/attachment/:attachmentName', [AccountingsController , 'downloadAttachment'])
-      })
 
     })
     .use(middleware.auth({ guards: ['api'] }))

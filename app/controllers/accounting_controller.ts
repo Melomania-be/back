@@ -4,17 +4,15 @@ import { cuid } from '@adonisjs/core/helpers'
 import { HttpContext } from '@adonisjs/core/http'
 import app from '@adonisjs/core/services/app'
 import { DateTime } from 'luxon'
-import path, { join } from 'path'
-import fs, { createReadStream } from 'fs'
-import * as fss from 'node:fs/promises'
-import { extname } from 'node:path'
-
+import path from 'path'
+import fs from 'fs'
 
 export default class AccountingsController {
   async getAll(ctx: HttpContext) {
     try {
       const data = await Accounting.query()
         .where('project_id', ctx.params.id)
+        .orderBy('id', 'desc')
 
       return data
     } catch (error) {
@@ -42,8 +40,8 @@ export default class AccountingsController {
           contact_id: data.contact_id,
           project_id: data.project.id,
           attachment: data.attachment,
-          is_individual_payment : data.is_individual_payment,
-          is_musician_fee : data.is_musician_fee,
+          is_individual_payment: data.is_individual_payment || false,
+          is_musician_fee: data.is_musician_fee || false,
         })
 
         await accounting.save()
@@ -57,8 +55,8 @@ export default class AccountingsController {
           contact_id: data.contact_id,
           project_id: data.project.id,
           attachment: data.attachment,
-          is_individual_payment : data.is_individual_payment,
-          is_musician_fee : data.is_musician_fee,
+          is_individual_payment: data.is_individual_payment || false,
+          is_musician_fee: data.is_musician_fee || false,
         })
       }
 
@@ -73,29 +71,40 @@ export default class AccountingsController {
     try {
       const id = Number(params.id)
       const accountingId = Number(params.accountingId)
+
+      if (isNaN(id) || isNaN(accountingId)) {
+        return response.status(400).json({ error: 'Invalid parameters' })
+      }
+
       const accounting = await Accounting.query()
         .where('id', accountingId)
         .andWhere('project_id', id)
         .first()
 
       if (!accounting) {
-        return response.send("Can't find this accounting in this project")
+        return response.status(404).json({ error: "Can't find this accounting in this project" })
       }
 
       await accounting.delete()
-      return response.send('Accounting deleted from the project')
+      return response.ok({ message: 'Accounting deleted from the project' })
     } catch (error) {
       console.error('Error in delete accounting:', error)
       return response.status(500).json({ error: 'Failed to delete accounting' })
     }
   }
 
-  async getContactAccountingsproject(ctx : HttpContext){
+  async getContactAccountingsproject(ctx: HttpContext) {
     try {
       const ProjectId = Number(ctx.params.id)
+
+      if (isNaN(ProjectId)) {
+        return ctx.response.status(400).json({ error: 'Invalid project ID' })
+      }
+
       const data = await Accounting.query()
-        .where('project_id' , ProjectId)
+        .where('project_id', ProjectId)
         .whereNotNull('contact_id')
+        .orderBy('id', 'desc')
 
       return data
     } catch (error) {
@@ -104,11 +113,17 @@ export default class AccountingsController {
     }
   }
 
-  async getContactAccountings(ctx : HttpContext){
+  async getContactAccountings(ctx: HttpContext) {
     try {
       const ContactId = Number(ctx.params.contactId)
+
+      if (isNaN(ContactId)) {
+        return ctx.response.status(400).json({ error: 'Invalid contact ID' })
+      }
+
       const data = await Accounting.query()
-        .where('contact_id' , ContactId)
+        .where('contact_id', ContactId)
+        .orderBy('id', 'desc')
 
       return data
     } catch (error) {
@@ -121,7 +136,7 @@ export default class AccountingsController {
     try {
       const file = request.file('file', {
         size: '10mb',
-        extnames: ['jpg', 'jpeg', 'png', 'pdf'],
+        extnames: ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx', 'txt'],
       })
 
       if (!file) {
@@ -130,6 +145,11 @@ export default class AccountingsController {
 
       const fileName = `${cuid()}.${file.extname}`
       const targetDir = app.makePath('uploads/accountingsAttachments')
+
+      // Ensure directory exists
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true })
+      }
 
       await file.move(targetDir, {
         name: fileName,
@@ -148,13 +168,18 @@ export default class AccountingsController {
     }
   }
 
-  public async downloadAttachment({ params, response } : HttpContext) {
+  public async downloadAttachment({ params, response }: HttpContext) {
     try {
       const filename = params.filename
+
+      if (!filename) {
+        return response.status(400).json({ error: 'Filename is required' })
+      }
+
       const filePath = path.join(process.cwd(), 'uploads/accountingsAttachments', filename)
 
       if (!fs.existsSync(filePath)) {
-        return response.status(404).send('Fichier introuvable')
+        return response.status(404).json({ error: 'File not found' })
       }
 
       return response.download(filePath, filename)
