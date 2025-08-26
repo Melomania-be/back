@@ -6,6 +6,9 @@ import Project from '#models/project'
 import Contact from '#models/contact'
 
 export default class Accounting extends BaseModel {
+  // Définir le nom de la table de manière statique
+  static table = 'accounting'
+
   @column({ isPrimary: true })
   declare id: number
 
@@ -70,15 +73,15 @@ export default class Accounting extends BaseModel {
       billDate: this.bill_date ? this.bill_date.toFormat('yyyy-MM-dd') : null,
       paymentDate: this.payment_date ? this.payment_date.toFormat('yyyy-MM-dd') : null,
       name: this.name,
-      amount: this.amount,
+      amount: Number(this.amount),
       attachment: this.attachment,
       categoryId: this.category_id,
       projectId: this.project_id,
       contactId: this.contact_id,
-      isIndividualPayment: this.is_individual_payment,
-      isMusicianFee: this.is_musician_fee,
-      createdAt: this.createdAt.toISO(),
-      updatedAt: this.updatedAt.toISO()
+      isIndividualPayment: Boolean(this.is_individual_payment),
+      isMusicianFee: Boolean(this.is_musician_fee),
+      createdAt: this.createdAt ? this.createdAt.toISO() : null,
+      updatedAt: this.updatedAt ? this.updatedAt.toISO() : null
     }
   }
 }

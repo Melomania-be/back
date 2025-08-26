@@ -14,6 +14,6 @@ export const createAccountingValidator = vine.compile(
     is_musician_fee: vine.boolean().optional(),
     project: vine.object({
       id: vine.number(),
-    }),
+    }).optional(), // Le projet peut être optionnel car on peut utiliser l'ID des params
   })
 )

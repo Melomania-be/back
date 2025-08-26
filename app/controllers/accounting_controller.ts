@@ -10,36 +10,55 @@ import fs from 'fs'
 export default class AccountingsController {
   async getAll(ctx: HttpContext) {
     try {
+      const projectId = Number(ctx.params.id)
+
+      if (isNaN(projectId)) {
+        return ctx.response.status(400).json({ error: 'Invalid project ID' })
+      }
+
       const data = await Accounting.query()
-        .where('project_id', ctx.params.id)
+        .where('project_id', projectId)
         .orderBy('id', 'desc')
 
-      return data
+      // Sérialiser les données pour s'assurer que les dates sont formatées correctement
+      const serializedData = data.map(accounting => accounting.serialize())
+
+      return ctx.response.ok(serializedData)
     } catch (error) {
       console.error('Error in getAll accounting:', error)
-      return ctx.response.status(500).json({ error: 'Failed to fetch accountings' })
+      return ctx.response.status(500).json({
+        error: 'Failed to fetch accountings',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      })
     }
   }
 
-  async createOrUpdate({ request, response }: HttpContext) {
+  async createOrUpdate({ request, response, params }: HttpContext) {
     try {
       const data = await request.validateUsing(createAccountingValidator)
+      const projectId = Number(params.id)
+
+      if (isNaN(projectId)) {
+        return response.status(400).json({ error: 'Invalid project ID' })
+      }
 
       let accounting: Accounting | null = null
 
       if (data.id) {
         accounting = await Accounting.find(data.id)
-        if (!accounting) return response.abort('Accounting record not found')
+        if (!accounting) {
+          return response.status(404).json({ error: 'Accounting record not found' })
+        }
 
         accounting.merge({
           name: data.name,
           amount: data.amount,
           bill_date: data.bill_date ? DateTime.fromJSDate(new Date(data.bill_date)) : null,
           payment_date: data.payment_date ? DateTime.fromJSDate(new Date(data.payment_date)) : null,
-          category_id: data.category_id,
-          contact_id: data.contact_id,
-          project_id: data.project.id,
-          attachment: data.attachment,
+          category_id: data.category_id || null,
+          contact_id: data.contact_id || null,
+          project_id: data.project?.id || projectId,
+          attachment: data.attachment || null,
           is_individual_payment: data.is_individual_payment || false,
           is_musician_fee: data.is_musician_fee || false,
         })
@@ -51,34 +70,46 @@ export default class AccountingsController {
           amount: data.amount,
           bill_date: data.bill_date ? DateTime.fromJSDate(new Date(data.bill_date)) : null,
           payment_date: data.payment_date ? DateTime.fromJSDate(new Date(data.payment_date)) : null,
-          category_id: data.category_id,
-          contact_id: data.contact_id,
-          project_id: data.project.id,
-          attachment: data.attachment,
+          category_id: data.category_id || null,
+          contact_id: data.contact_id || null,
+          project_id: data.project?.id || projectId,
+          attachment: data.attachment || null,
           is_individual_payment: data.is_individual_payment || false,
           is_musician_fee: data.is_musician_fee || false,
         })
       }
 
-      return response.ok(accounting)
+      return response.ok(accounting.serialize())
     } catch (error) {
       console.error('Error in createOrUpdate accounting:', error)
-      return response.status(500).json({ error: 'Failed to create or update accounting' })
+
+      // Gestion plus précise des erreurs de validation
+      if (error.messages) {
+        return response.status(422).json({
+          error: 'Validation failed',
+          messages: error.messages
+        })
+      }
+
+      return response.status(500).json({
+        error: 'Failed to create or update accounting',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      })
     }
   }
 
   async delete({ params, response }: HttpContext) {
     try {
-      const id = Number(params.id)
+      const projectId = Number(params.id)
       const accountingId = Number(params.accountingId)
 
-      if (isNaN(id) || isNaN(accountingId)) {
+      if (isNaN(projectId) || isNaN(accountingId)) {
         return response.status(400).json({ error: 'Invalid parameters' })
       }
 
       const accounting = await Accounting.query()
         .where('id', accountingId)
-        .andWhere('project_id', id)
+        .andWhere('project_id', projectId)
         .first()
 
       if (!accounting) {
@@ -89,46 +120,57 @@ export default class AccountingsController {
       return response.ok({ message: 'Accounting deleted from the project' })
     } catch (error) {
       console.error('Error in delete accounting:', error)
-      return response.status(500).json({ error: 'Failed to delete accounting' })
+      return response.status(500).json({
+        error: 'Failed to delete accounting',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      })
     }
   }
 
   async getContactAccountingsproject(ctx: HttpContext) {
     try {
-      const ProjectId = Number(ctx.params.id)
+      const projectId = Number(ctx.params.id)
 
-      if (isNaN(ProjectId)) {
+      if (isNaN(projectId)) {
         return ctx.response.status(400).json({ error: 'Invalid project ID' })
       }
 
       const data = await Accounting.query()
-        .where('project_id', ProjectId)
+        .where('project_id', projectId)
         .whereNotNull('contact_id')
         .orderBy('id', 'desc')
 
-      return data
+      const serializedData = data.map(accounting => accounting.serialize())
+      return ctx.response.ok(serializedData)
     } catch (error) {
       console.error('Error in getContactAccountingsproject:', error)
-      return ctx.response.status(500).json({ error: 'Failed to fetch contact accountings' })
+      return ctx.response.status(500).json({
+        error: 'Failed to fetch contact accountings',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      })
     }
   }
 
   async getContactAccountings(ctx: HttpContext) {
     try {
-      const ContactId = Number(ctx.params.contactId)
+      const contactId = Number(ctx.params.contactId)
 
-      if (isNaN(ContactId)) {
+      if (isNaN(contactId)) {
         return ctx.response.status(400).json({ error: 'Invalid contact ID' })
       }
 
       const data = await Accounting.query()
-        .where('contact_id', ContactId)
+        .where('contact_id', contactId)
         .orderBy('id', 'desc')
 
-      return data
+      const serializedData = data.map(accounting => accounting.serialize())
+      return ctx.response.ok(serializedData)
     } catch (error) {
       console.error('Error in getContactAccountings:', error)
-      return ctx.response.status(500).json({ error: 'Failed to fetch contact accountings' })
+      return ctx.response.status(500).json({
+        error: 'Failed to fetch contact accountings',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      })
     }
   }
 
@@ -185,7 +227,10 @@ export default class AccountingsController {
       return response.download(filePath, filename)
     } catch (error) {
       console.error('Error in downloadAttachment:', error)
-      return response.status(500).json({ error: 'Failed to download attachment' })
+      return response.status(500).json({
+        error: 'Failed to download attachment',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      })
     }
   }
 }
