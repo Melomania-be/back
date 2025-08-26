@@ -13,19 +13,23 @@ export default class FilesController {
   async upload({ request }: HttpContext) {
     const { file, files } = await request.validateUsing(filesUploadValidator)
 
+    const createdFiles = []
+
     if (files) {
       for (const fileElement of files) {
         await fileElement.move(app.makePath('uploads'), {
           name: `${cuid()}.${fileElement.extname}`,
         })
 
-        await File.create({
+        const createdFile = await File.create({
           name: fileElement.clientName,
           type: fileElement.type,
           content: '',
           path: fileElement.filePath,
           size: fileElement.size || 0,
         })
+
+        createdFiles.push(createdFile)
       }
     }
 
@@ -34,16 +38,18 @@ export default class FilesController {
         name: `${cuid()}.${file.extname}`,
       })
 
-      await File.create({
+      const createdFile = await File.create({
         name: file.clientName,
         type: file.type,
         content: '',
         path: file.filePath,
         size: file.size || 0,
       })
+
+      createdFiles.push(createdFile)
     }
 
-    return 'file uploaded'
+    return createdFiles
   }
 
   async getAll() {
