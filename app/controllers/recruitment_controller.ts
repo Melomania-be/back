@@ -521,6 +521,9 @@ export default class RecruitmentController {
         }
 
         try {
+          // Fix Error 1: Handle null case properly
+          const recommenderName = contact.recommended_by ? this.getRecommenderName(contact.recommended_by) || undefined : undefined
+
           const recruitmentMail = new RecruitmentEmail(
             {
               first_name: contact.first_name,
@@ -532,7 +535,7 @@ export default class RecruitmentController {
               name: project.name,
             },
             recruiterInfo,
-            contact.recommended_by ? this.getRecommenderName(contact.recommended_by) : undefined
+            recommenderName
           )
 
           await mail.send(recruitmentMail)
@@ -664,10 +667,10 @@ export default class RecruitmentController {
           sent_at: DateTime.now().toISO(),
         })
 
-      } catch (error) {
+      } catch (emailError) {
         return response.status(400).json({
           error: 'Failed to send recommendation email',
-          details: error.message,
+          details: emailError.message,
         })
       }
 
@@ -1226,9 +1229,12 @@ export default class RecruitmentController {
       }
     }
 
-    const uniqueMatches = matches.filter((match, index, self) =>
-      index === self.findIndex(m => m.contact.id === match.contact.id)
-    )
+    // Fix Error 2 & 3: Access the id property correctly from serialized contact
+    const uniqueMatches = matches.filter((match, index, self) => {
+      // The serialized contact object should have an id property at the root level
+      const currentId = match.contact?.id
+      return index === self.findIndex(m => m.contact?.id === currentId)
+    })
 
     return {
       isDuplicate: uniqueMatches.length > 0,
