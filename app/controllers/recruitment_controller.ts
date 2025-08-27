@@ -521,7 +521,6 @@ export default class RecruitmentController {
         }
 
         try {
-          // Fix Error 1: Handle null case properly
           const recommenderName = contact.recommended_by ? this.getRecommenderName(contact.recommended_by) || undefined : undefined
 
           const recruitmentMail = new RecruitmentEmail(
@@ -1203,6 +1202,7 @@ export default class RecruitmentController {
       matches.push(...emailMatches.map(m => ({
         type: 'email',
         contact: m.serialize(),
+        match_id: m.id, // Store the original ID before serialization
         similarity: 1.0
       })))
     }
@@ -1224,16 +1224,15 @@ export default class RecruitmentController {
         matches.push({
           type: 'name',
           contact: match.serialize(),
+          match_id: match.id, // Store the original ID before serialization
           similarity
         })
       }
     }
 
-    // Fix Error 2 & 3: Access the id property correctly from serialized contact
+    // Remove duplicates using the stored original ID
     const uniqueMatches = matches.filter((match, index, self) => {
-      // The serialized contact object should have an id property at the root level
-      const currentId = match.contact?.id
-      return index === self.findIndex(m => m.contact?.id === currentId)
+      return index === self.findIndex(m => m.match_id === match.match_id)
     })
 
     return {
