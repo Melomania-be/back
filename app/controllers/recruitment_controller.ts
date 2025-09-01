@@ -521,6 +521,8 @@ export default class RecruitmentController {
         }
 
         try {
+          const recommenderName = contact.recommended_by ? this.getRecommenderName(contact.recommended_by) || undefined : undefined
+
           const recruitmentMail = new RecruitmentEmail(
             {
               first_name: contact.first_name,
@@ -532,7 +534,7 @@ export default class RecruitmentController {
               name: project.name,
             },
             recruiterInfo,
-            contact.recommended_by ? this.getRecommenderName(contact.recommended_by) : undefined
+            recommenderName
           )
 
           await mail.send(recruitmentMail)
@@ -664,10 +666,10 @@ export default class RecruitmentController {
           sent_at: DateTime.now().toISO(),
         })
 
-      } catch (error) {
+      } catch (emailError) {
         return response.status(400).json({
           error: 'Failed to send recommendation email',
-          details: error.message,
+          details: emailError.message,
         })
       }
 
@@ -1200,6 +1202,7 @@ export default class RecruitmentController {
       matches.push(...emailMatches.map(m => ({
         type: 'email',
         contact: m.serialize(),
+        match_id: m.id, // Store the original ID before serialization
         similarity: 1.0
       })))
     }
@@ -1221,14 +1224,16 @@ export default class RecruitmentController {
         matches.push({
           type: 'name',
           contact: match.serialize(),
+          match_id: match.id, // Store the original ID before serialization
           similarity
         })
       }
     }
 
-    const uniqueMatches = matches.filter((match, index, self) =>
-      index === self.findIndex(m => m.contact.id === match.contact.id)
-    )
+    // Remove duplicates using the stored original ID
+    const uniqueMatches = matches.filter((match, index, self) => {
+      return index === self.findIndex(m => m.match_id === match.match_id)
+    })
 
     return {
       isDuplicate: uniqueMatches.length > 0,
