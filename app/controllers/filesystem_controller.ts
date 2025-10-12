@@ -476,6 +476,23 @@ export default class FilesystemController {
     await folder.delete()
   }
 
+  async checkFileDeletion(ctx: HttpContext) {
+    const fileId = ctx.params.id
+
+    const file = await File.findOrFail(fileId)
+
+    return ctx.response.json({
+      file: {
+        id: file.id,
+        name: file.name,
+        projectId: file.project_id,
+        pieceId: file.piece_id,
+        folderId: file.folder_id,
+      },
+      canDelete: true,
+    })
+  }
+
   async deleteFile(ctx: HttpContext) {
     const fileId = ctx.params.id
 
