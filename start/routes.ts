@@ -197,6 +197,7 @@ router.group(() => {
 
           // Files
           router.post('/upload', [FilesystemController, 'uploadFiles'])
+          router.get('/files/:id/check-deletion', [FilesystemController, 'checkFileDeletion'])
           router.delete('/files/:id', [FilesystemController, 'deleteFile'])
           router.patch('/files/:id', [FilesystemController, 'renameFile'])
 

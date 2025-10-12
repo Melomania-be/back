@@ -20,7 +20,7 @@ export const submitAuditionValidator = vine.compile(
 export const uploadAuditionFileValidator = vine.compile(
   vine.object({
     file: vine.file({
-      size: '50mb',
+      size: '2gb',
       extnames: [
         // ✅ VIDÉO SEULEMENT
         'mp4',

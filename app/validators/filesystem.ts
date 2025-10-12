@@ -5,7 +5,7 @@ export const filesystemUploadValidator = vine.compile(
     files: vine
       .array(
         vine.file({
-          size: '100mb',
+          size: '2gb',
           extnames: [
             // Images
             'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tiff',
@@ -26,7 +26,7 @@ export const filesystemUploadValidator = vine.compile(
       .optional(),
     file: vine
       .file({
-        size: '100mb',
+        size: '2gb',
         extnames: [
           'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tiff',
           'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf',
