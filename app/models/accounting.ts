@@ -5,9 +5,13 @@ import ExpenseCategory from '#models/expense_category'
 import Project from '#models/project'
 import Contact from '#models/contact'
 
+/**
+ * @deprecated Use AccountingEntry instead
+ * This model is kept for backward compatibility only
+ */
 export default class Accounting extends BaseModel {
   // Définir le nom de la table de manière statique
-  static table = 'accounting'
+  static table = 'accounting_entries'
 
   @column({ isPrimary: true })
   declare id: number

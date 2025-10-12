@@ -30,7 +30,7 @@ const FormsController = () => import('#controllers/forms_controller')
 const SectionsController = () => import('#controllers/sections_controller')
 const TemplateController = () => import('#controllers/template_controller')
 const DefaultTemplatesController = () => import('#controllers/default_templates_controller')
-const ExpenseCategoriesController = () => import('#controllers/expenses_categories_controller')
+const AccountingCategoriesController = () => import('#controllers/accounting_categories_controller')
 const AccountingsController = () => import('#controllers/accounting_controller')
 const FilesystemController = () => import('#controllers/filesystem_controller')
 const SharedFolderController = () => import('#controllers/shared_folder_controller')
@@ -209,18 +209,29 @@ router.group(() => {
         .prefix('/filesystem')
 
       // =============================================================================
-      // GESTION DES CATEGORIES DE DEPENSES - POSITION CORRIGÉE
+      // GESTION DES CATEGORIES COMPTABLES
       // =============================================================================
       router
         .group(() => {
-          router.get('/', [ExpenseCategoriesController, 'getAll'])
-          router.post('/', [ExpenseCategoriesController, 'createOrUpdate'])
-          router.delete('/:id', [ExpenseCategoriesController, 'delete'])
+          router.get('/', [AccountingCategoriesController, 'getAll'])
+          router.post('/', [AccountingCategoriesController, 'createOrUpdate'])
+          router.delete('/:id', [AccountingCategoriesController, 'delete'])
+        })
+        .prefix('/accounting_categories')
+
+      // =============================================================================
+      // ROUTE DE COMPATIBILITÉ POUR EXPENSE_CATEGORIES (DÉPRÉCIÉ)
+      // =============================================================================
+      router
+        .group(() => {
+          router.get('/', [AccountingCategoriesController, 'getAll'])
+          router.post('/', [AccountingCategoriesController, 'createOrUpdate'])
+          router.delete('/:id', [AccountingCategoriesController, 'delete'])
         })
         .prefix('/expense_categories')
 
       // =============================================================================
-      // GESTION DES COMPTABILITES GLOBALES - POSITION CORRIGÉE
+      // GESTION DES COMPTABILITES GLOBALES
       // =============================================================================
       router
         .group(() => {
@@ -242,11 +253,33 @@ router.group(() => {
           router.get('/:id/management', [ProjectsController, 'getDashboard'])
           router.get('/:id/management/attendance', [ProjectsController, 'getAttendance'])
 
-          // ROUTES ACCOUNTING POUR PROJETS SPÉCIFIQUES - POSITION CORRIGÉE
-          router.get('/:id/management/accounting', [AccountingsController, 'getAll'])
-          router.post('/:id/management/accounting', [AccountingsController, 'createOrUpdate'])
-          router.delete('/:id/management/accounting/:accountingId', [AccountingsController, 'delete'])
-          router.get('/:id/management/accounting/participant', [AccountingsController, 'getContactAccountingsproject'])
+          // =============================================================================
+          // GESTION DE LA COMPTABILITÉ
+          // =============================================================================
+          router
+            .group(() => {
+              // Paramètres de comptabilité
+              router.get('/settings', [AccountingsController, 'getSettings'])
+              router.put('/settings', [AccountingsController, 'updateSettings'])
+
+              // Entrées comptables - Routes principales
+              router.get('/', [AccountingsController, 'getAll'])
+              router.post('/', [AccountingsController, 'createOrUpdate'])
+              router.delete('/:accountingId', [AccountingsController, 'delete'])
+              router.put('/entries/:entryId/status', [AccountingsController, 'updateStatus'])
+
+              // Catégories comptables
+              router.get('/categories', [AccountingsController, 'getCategories'])
+              router.post('/categories', [AccountingsController, 'createOrUpdateCategory'])
+              router.delete('/categories/:categoryId', [AccountingsController, 'deleteCategory'])
+
+              // Statistiques
+              router.get('/stats', [AccountingsController, 'getStats'])
+
+              // Routes spécifiques aux contacts
+              router.get('/participant', [AccountingsController, 'getContactAccountingsproject'])
+            })
+            .prefix('/:id/management/accounting')
 
           // ROUTES MATÉRIELS POUR PROJETS
           router.get('/:id/material-selections', [
