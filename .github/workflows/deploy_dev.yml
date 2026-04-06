@@ -13,22 +13,9 @@ permissions:
   packages: read
 
 jobs:
-  build:
-    name: Build
-    uses: ./.github/workflows/_build.yml
-    with:
-      environment: deploy_dev_back
-
   deploy:
     runs-on: ubuntu-latest
-    needs: build
     steps:
-      - name: Download Build Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: build
-          path: build
-
       - name: Get runner's public IP
         id: ip
         uses: haythem/public-ip@v1.3
@@ -55,19 +42,23 @@ jobs:
 
       # Run rsync twice to see if it solves my issue. I have an issue where rsync is hanging randomly.
       # It might be related to the Imunify360 firewall. When this occurs, Imunify seems to be reloading the ipset list.
-      # I need to investigate further.
       - name: Sending data with RSYNC
         run: |
           sleep 2
           rsync --timeout=60 -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa" \
-            --exclude=".git" -av --delete build/ \
-            ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }}:/home/${{ secrets.CPANEL_LOGIN }}/app/back || true
+          --exclude ".git" \
+          --exclude "node_modules" \
+          --exclude "build" \
+          -av --delete ./ \
+          ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }}:/home/${{ secrets.CPANEL_LOGIN }}/app/back || true
+
           sleep 2
           rsync --timeout=60 -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa" \
-            --exclude=".git" -av --delete build/ \
-            ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }}:/home/${{ secrets.CPANEL_LOGIN }}/app/back
-
-      # SUPPRIMÉ : L'étape "Create .env file" qui causait le problème
+          --exclude ".git" \
+          --exclude "node_modules" \
+          --exclude "build" \
+          -av --delete ./ \
+          ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }}:/home/${{ secrets.CPANEL_LOGIN }}/app/back
 
       - name: Restarting NodeJS application via ssh
         run: |
@@ -76,9 +67,15 @@ jobs:
             '/usr/sbin/cloudlinux-selector stop --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
             /usr/sbin/cloudlinux-selector start --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
             /usr/sbin/cloudlinux-selector install-modules --json --interpreter nodejs --user ${{ secrets.CPANEL_LOGIN }} --app-root app/back && \
-            source /home/${{ secrets.CPANEL_LOGIN }}/nodevenv/app/back/20/bin/activate && cd /home/${{ secrets.CPANEL_LOGIN }}/app/back/build && npm ci --omit="dev" && \
-            cd .. && npm run migrate-prod && \
-            npm run seed-prod'
+            source /home/${{ secrets.CPANEL_LOGIN }}/nodevenv/app/back/20/bin/activate && \
+            cd /home/${{ secrets.CPANEL_LOGIN }}/app/back && \
+            npm run save-uploads && \
+            npm run build -- --ignore-ts-errors && \
+            npm run load-uploads && \
+            npm run migrate-prod && \
+            npm run seed-prod && \
+            cd build && \
+            npm ci --omit="dev"'
       
       - name: Cleaning SSH keys
         if: always()

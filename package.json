@@ -19,7 +19,9 @@
     "build:check": "tsc --noEmit && node ace build",
     "lint:strict": "eslint . --max-warnings 0",
     "validate": "npm run typecheck:strict && npm run lint:strict",
-    "pre-deploy": "npm run validate && npm run build:check"
+    "pre-deploy": "npm run validate && npm run build:check",
+    "save-uploads": "node ./bin/preserve.cjs",
+    "load-uploads": "node ./bin/restore.cjs"
   },
   "imports": {
     "#controllers/*": "./app/controllers/*.js",
