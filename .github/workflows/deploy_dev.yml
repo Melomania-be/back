@@ -50,7 +50,7 @@ jobs:
           --exclude "node_modules" \
           --exclude "build" \
           -av --delete ./ \
-          ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }}:/home/${{ secrets.CPANEL_LOGIN }}/app/back || true
+          ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }}:/home/${{ secrets.CPANEL_LOGIN }}/app/back/ || true
 
           sleep 2
           rsync --timeout=60 -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa" \
@@ -58,7 +58,7 @@ jobs:
           --exclude "node_modules" \
           --exclude "build" \
           -av --delete ./ \
-          ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }}:/home/${{ secrets.CPANEL_LOGIN }}/app/back
+          ${{ secrets.CPANEL_LOGIN }}@${{ secrets.CPANEL_SERVER }}:/home/${{ secrets.CPANEL_LOGIN }}/app/back/
 
       - name: Restarting NodeJS application via ssh
         run: |
