@@ -464,7 +464,7 @@ Messenger: ${this.responsible.messenger || 'No messenger provided'}`
 
     // Charger le template
     let htmlContent = ''
-    const template = await MailTemplate.query().where('name', 'audition_request.html').first()
+    const template = await MailTemplate.query().where('name', 'Audition Request').where('is_default', true).first()
 
     if (template) {
       htmlContent = template.content

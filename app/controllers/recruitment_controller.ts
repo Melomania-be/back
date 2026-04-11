@@ -788,14 +788,6 @@ export default class RecruitmentController {
       const contactId = this.validateProjectId(params.contactId)
       const requestBody = request.body()
 
-      const data = {
-        status: requestBody.status,
-        contact_method: requestBody.contact_method || null,
-        notes: requestBody.notes?.trim() || null,
-        contact_date: requestBody.contact_date ? new Date(requestBody.contact_date) : null,
-        contacted_by: requestBody.contacted_by?.trim() || null,
-      }
-
       const contact = await RecruitmentContact.query()
         .where('id', contactId)
         .where('project_id', projectId)
@@ -805,13 +797,15 @@ export default class RecruitmentController {
         return response.status(404).json({ error: 'Contact not found' })
       }
 
-      const updateData: any = { ...data }
+      if (requestBody.status !== undefined) contact.status = requestBody.status
+      if (requestBody.contact_method !== undefined) contact.contact_method = requestBody.contact_method || null
+      if (requestBody.notes !== undefined) contact.notes = requestBody.notes?.trim() || null
+      if (requestBody.contact_date !== undefined) contact.contact_date = requestBody.contact_date ? DateTime.fromISO(new Date(requestBody.contact_date).toISOString()) : null
+      if (requestBody.contacted_by !== undefined) contact.contacted_by = requestBody.contacted_by?.trim() || null
 
-      if (data.status === 'awaiting_response' && !contact.contact_date) {
-        updateData.contact_date = DateTime.now()
+      if (requestBody.status === 'awaiting_response' && !contact.contact_date) {
+        contact.contact_date = DateTime.now()
       }
-
-      Object.assign(contact, updateData)
       await contact.save()
 
       const loadPromises = []
