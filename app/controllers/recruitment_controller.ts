@@ -409,6 +409,7 @@ export default class RecruitmentController {
         section_id: requestBody.section_id ? Number(requestBody.section_id) : null,
         notes: requestBody.notes?.trim() || null,
         contacted_by: requestBody.contacted_by?.trim() || currentUserName,
+        allow_duplicate_name: Boolean(requestBody.allow_duplicate_name),
       }
 
       if (!data.first_name || !data.last_name) {
@@ -427,6 +428,17 @@ export default class RecruitmentController {
       }
 
       const duplicateInfo = await this.checkForDuplicatesDetailed(projectId, data)
+
+      if (duplicateInfo.isDuplicate && !data.allow_duplicate_name) {
+        return response.status(409).json({
+          code: 'POTENTIAL_DUPLICATE_RECRUITMENT_CONTACT',
+          error: 'A contact with an identical or similar name already exists in this recruitment list.',
+          duplicate_warnings: [{
+            contact: data,
+            matches: duplicateInfo.matches,
+          }],
+        })
+      }
 
       const contact = await RecruitmentContact.create({
         project_id: projectId,
@@ -687,6 +699,7 @@ export default class RecruitmentController {
       const data = {
         contact_ids: requestBody.contact_ids || [],
         from_project_id: requestBody.from_project_id ? Number(requestBody.from_project_id) : null,
+        allow_duplicate_name: Boolean(requestBody.allow_duplicate_name),
       }
 
       const results: ContactResult = {
@@ -694,6 +707,15 @@ export default class RecruitmentController {
         conflicts: [],
         errors: [],
       }
+
+      const duplicateWarnings: any[] = []
+      const contactsToImport: Array<{
+        contact: Contact
+        contactId: number
+        firstName: string
+        lastName: string
+        duplicateInfo: { isDuplicate: boolean; matches: any[] }
+      }> = []
 
       for (const contactId of data.contact_ids) {
         try {
@@ -725,17 +747,95 @@ export default class RecruitmentController {
             continue
           }
 
-          const duplicateInfo = await this.checkForDuplicatesDetailed(projectId, {
+          let duplicateInfo = await this.checkForDuplicatesDetailed(projectId, {
             first_name: firstName.trim(),
             last_name: lastName.trim(),
             email: contact.email
           })
 
+          const pendingMatches = contactsToImport
+            .filter((item) => this.arePotentialDuplicateContacts(
+              {
+                first_name: firstName.trim(),
+                last_name: lastName.trim(),
+                email: contact.email,
+              },
+              {
+                first_name: item.firstName,
+                last_name: item.lastName,
+                email: item.contact.email,
+              }
+            ))
+            .map((item) => ({
+              type: 'pending_import',
+              contact: {
+                id: item.contactId,
+                first_name: item.firstName,
+                last_name: item.lastName,
+                email: item.contact.email || null,
+                phone: item.contact.phone || null,
+                messenger: item.contact.messenger || null,
+                source: 'Pending import',
+                status: 'Selected for import',
+              },
+              match_id: item.contactId,
+              similarity: this.calculateNameSimilarity(
+                this.normalizeName(`${firstName.trim()} ${lastName.trim()}`),
+                this.normalizeName(`${item.firstName} ${item.lastName}`)
+              ),
+            }))
+
+          if (pendingMatches.length > 0) {
+            duplicateInfo = {
+              isDuplicate: true,
+              matches: [...duplicateInfo.matches, ...pendingMatches],
+            }
+          }
+
+          if (duplicateInfo.isDuplicate && !data.allow_duplicate_name) {
+            duplicateWarnings.push({
+              contact: {
+                id: contact.id,
+                first_name: firstName.trim(),
+                last_name: lastName.trim(),
+                email: contact.email || null,
+                phone: contact.phone || null,
+                messenger: contact.messenger || null,
+              },
+              matches: duplicateInfo.matches,
+            })
+            continue
+          }
+
+          contactsToImport.push({
+            contact,
+            contactId,
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
+            duplicateInfo,
+          })
+        } catch (error) {
+          results.errors.push(`Error preparing contact ${contactId}: ${error.message}`)
+        }
+      }
+
+      if (duplicateWarnings.length > 0) {
+        return response.status(409).json({
+          code: 'POTENTIAL_DUPLICATE_RECRUITMENT_CONTACT',
+          error: 'Some contacts have identical or similar names to contacts already in this recruitment list.',
+          duplicate_warnings: duplicateWarnings,
+        })
+      }
+
+      for (const item of contactsToImport) {
+        try {
+          const { contact, contactId, firstName, lastName, duplicateInfo } = item
+
           const recruitmentContact = await RecruitmentContact.create({
             project_id: projectId,
             contact_id: contactId,
-            first_name: firstName.trim(),
-            last_name: lastName.trim(),
+            first_name: firstName,
+            last_name: lastName,
             email: contact.email || null,
             phone: contact.phone || null,
             messenger: contact.messenger || null,
@@ -757,7 +857,7 @@ export default class RecruitmentController {
 
           results.imported.push(recruitmentContact.serialize())
         } catch (error) {
-          results.errors.push(`Error importing contact ${contactId}: ${error.message}`)
+          results.errors.push(`Error importing contact ${item.contactId}: ${error.message}`)
         }
       }
 
@@ -1060,6 +1160,7 @@ export default class RecruitmentController {
       const data = {
         source_project_id: Number(requestBody.source_project_id),
         include_statuses: requestBody.include_statuses || null,
+        allow_duplicate_name: Boolean(requestBody.allow_duplicate_name),
       }
 
       const sourceProject = await Project.find(data.source_project_id)
@@ -1078,6 +1179,12 @@ export default class RecruitmentController {
         conflicts: [],
         errors: [],
       }
+
+      const duplicateWarnings: any[] = []
+      const contactsToImport: Array<{
+        sourceContact: RecruitmentContact
+        duplicateInfo: { isDuplicate: boolean; matches: any[] }
+      }> = []
 
       for (const sourceContact of sourceContacts) {
         try {
@@ -1107,11 +1214,76 @@ export default class RecruitmentController {
             continue
           }
 
-          const duplicateInfo = await this.checkForDuplicatesDetailed(projectId, {
+          let duplicateInfo = await this.checkForDuplicatesDetailed(projectId, {
             first_name: sourceContact.first_name,
             last_name: sourceContact.last_name,
             email: sourceContact.email
           })
+
+          const pendingMatches = contactsToImport
+            .filter((item) => this.arePotentialDuplicateContacts(
+              {
+                first_name: sourceContact.first_name,
+                last_name: sourceContact.last_name,
+                email: sourceContact.email,
+              },
+              {
+                first_name: item.sourceContact.first_name,
+                last_name: item.sourceContact.last_name,
+                email: item.sourceContact.email,
+              }
+            ))
+            .map((item) => ({
+              type: 'pending_import',
+              contact: {
+                id: item.sourceContact.id,
+                first_name: item.sourceContact.first_name || '',
+                last_name: item.sourceContact.last_name || '',
+                email: item.sourceContact.email || null,
+                phone: item.sourceContact.phone || null,
+                messenger: item.sourceContact.messenger || null,
+                source: 'Pending import',
+                status: 'Selected for import',
+              },
+              match_id: item.sourceContact.id,
+              similarity: this.calculateNameSimilarity(
+                this.normalizeName(`${sourceContact.first_name} ${sourceContact.last_name}`),
+                this.normalizeName(`${item.sourceContact.first_name} ${item.sourceContact.last_name}`)
+              ),
+            }))
+
+          if (pendingMatches.length > 0) {
+            duplicateInfo = {
+              isDuplicate: true,
+              matches: [...duplicateInfo.matches, ...pendingMatches],
+            }
+          }
+
+          if (duplicateInfo.isDuplicate && !data.allow_duplicate_name) {
+            duplicateWarnings.push({
+              contact: sourceContact.serialize(),
+              matches: duplicateInfo.matches,
+            })
+            continue
+          }
+
+          contactsToImport.push({ sourceContact, duplicateInfo })
+        } catch (error) {
+          results.errors.push(`Error preparing contact ${sourceContact.id}: ${error.message}`)
+        }
+      }
+
+      if (duplicateWarnings.length > 0) {
+        return response.status(409).json({
+          code: 'POTENTIAL_DUPLICATE_RECRUITMENT_CONTACT',
+          error: 'Some contacts have identical or similar names to contacts already in this recruitment list.',
+          duplicate_warnings: duplicateWarnings,
+        })
+      }
+
+      for (const item of contactsToImport) {
+        try {
+          const { sourceContact, duplicateInfo } = item
 
           const newContact = await RecruitmentContact.create({
             project_id: projectId,
@@ -1135,7 +1307,7 @@ export default class RecruitmentController {
 
           results.imported.push(newContact.serialize())
         } catch (error) {
-          results.errors.push(`Error importing contact ${sourceContact.id}: ${error.message}`)
+          results.errors.push(`Error importing contact ${item.sourceContact.id}: ${error.message}`)
         }
       }
 
@@ -1184,41 +1356,34 @@ export default class RecruitmentController {
     isDuplicate: boolean
     matches: any[]
   }> {
-    const query = RecruitmentContact.query().where('project_id', projectId)
+    const targetFullName = this.normalizeName(`${contactData.first_name} ${contactData.last_name}`)
+    const projectContacts = await RecruitmentContact.query()
+      .where('project_id', projectId)
+      .select([
+        'id',
+        'first_name',
+        'last_name',
+        'email',
+        'phone',
+        'messenger',
+        'status',
+        'source',
+      ])
 
     const matches = []
 
-    if (contactData.email) {
-      const emailMatches = await RecruitmentContact.query()
-        .where('project_id', projectId)
-        .where('email', contactData.email)
-
-      matches.push(...emailMatches.map(m => ({
-        type: 'email',
-        contact: m.serialize(),
-        match_id: m.id, // Store the original ID before serialization
-        similarity: 1.0
-      })))
-    }
-
-    const nameMatches = await query
-      .where((subQuery) => {
-        subQuery
-          .where('first_name', 'ilike', `%${contactData.first_name}%`)
-          .where('last_name', 'ilike', `%${contactData.last_name}%`)
-      })
-
-    for (const match of nameMatches) {
+    for (const match of projectContacts) {
+      const candidateFullName = this.normalizeName(`${match.first_name} ${match.last_name}`)
       const similarity = this.calculateNameSimilarity(
-        `${contactData.first_name} ${contactData.last_name}`,
-        `${match.first_name} ${match.last_name}`
+        targetFullName,
+        candidateFullName
       )
 
-      if (similarity > 0.8) {
+      if (similarity >= 0.82) {
         matches.push({
-          type: 'name',
+          type: similarity === 1 ? 'exact_name' : 'similar_name',
           contact: match.serialize(),
-          match_id: match.id, // Store the original ID before serialization
+          match_id: match.id,
           similarity
         })
       }
@@ -1233,6 +1398,35 @@ export default class RecruitmentController {
       isDuplicate: uniqueMatches.length > 0,
       matches: uniqueMatches
     }
+  }
+
+  private normalizeName(value: string | null | undefined): string {
+    return (value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s'-]/g, '')
+      .replace(/\s+/g, ' ')
+  }
+
+  private arePotentialDuplicateContacts(firstContact: any, secondContact: any): boolean {
+    if (
+      firstContact.email &&
+      secondContact.email &&
+      firstContact.email.toLowerCase().trim() === secondContact.email.toLowerCase().trim()
+    ) {
+      return true
+    }
+
+    const firstFullName = this.normalizeName(`${firstContact.first_name || ''} ${firstContact.last_name || ''}`)
+    const secondFullName = this.normalizeName(`${secondContact.first_name || ''} ${secondContact.last_name || ''}`)
+
+    if (!firstFullName || !secondFullName) {
+      return false
+    }
+
+    return this.calculateNameSimilarity(firstFullName, secondFullName) >= 0.82
   }
 
   private calculateNameSimilarity(name1: string, name2: string): number {
