@@ -29,6 +29,9 @@ export default class CallsheetsController {
               folderQuery.preload('files')
             })
             pieceQuery.preload('files')
+            pieceQuery.preload('selectedMaterial', (materialQuery) => {
+              materialQuery.preload('files')
+            })
           })
           .preload('sectionGroup', (sectionGroupQuery) => {
             sectionGroupQuery.preload('sections', (sectionQuery) => {
