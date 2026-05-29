@@ -15,7 +15,7 @@ export default class CallsheetsController {
     const { params } = await ctx.request.validateUsing(getCallsheetValidator)
 
     const callsheet = await Callsheet.query()
-      .where('project_id', params.id)
+      .where('id', params.id)
       .orderBy('updated_at', 'desc')
       .preload('contents')
       .preload('project', (projectQuery) => {
@@ -29,6 +29,9 @@ export default class CallsheetsController {
               folderQuery.preload('files')
             })
             pieceQuery.preload('files')
+            pieceQuery.preload('selectedMaterial', (materialQuery) => {
+              materialQuery.preload('files')
+            })
           })
           .preload('sectionGroup', (sectionGroupQuery) => {
             sectionGroupQuery.preload('sections', (sectionQuery) => {
