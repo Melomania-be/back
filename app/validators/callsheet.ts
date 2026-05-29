@@ -10,11 +10,11 @@ export const createCallsheetValidator = vine.compile(
         id: vine.number().optional(),
         title: vine.string(),
         text: vine.string(),
+        showOnRegistration: vine.boolean().optional(),
       })
     ),
   })
 )
-
 export const getCallsheetValidator = vine.compile(
   vine.object({
     params: vine.object({

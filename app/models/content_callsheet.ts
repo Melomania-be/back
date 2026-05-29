@@ -8,6 +8,9 @@ export default class ContentCallsheet extends BaseModel {
   declare id: number
 
   @column()
+  declare showOnRegistration: boolean
+
+  @column()
   declare callsheet_id: number
 
   @column()
