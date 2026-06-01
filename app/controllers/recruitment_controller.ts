@@ -29,11 +29,62 @@ interface EmailResult {
 
 interface ContactResult {
   imported: any[]
+  replaced?: any[]
   conflicts: any[]
   errors: string[]
 }
 
 export default class RecruitmentController {
+  private normalizeEmail(value: string | null | undefined): string {
+    return (value || '').trim().toLowerCase()
+  }
+
+  private normalizePhone(value: string | null | undefined): string {
+    return (value || '')
+      .replace(/\s|\/|\.|-/g, '')
+      .replace(/^\+32/, '0')
+      .replace(/^0032/, '0')
+      .trim()
+  }
+
+  private normalizeMessenger(value: string | null | undefined): string {
+    return (value || '').trim().toLowerCase()
+  }
+
+  private hasIdenticalCommunicationDetails(contactData: {
+    email?: string | null
+    phone?: string | null
+    messenger?: string | null
+  }, existingData: {
+    email?: string | null
+    phone?: string | null
+    messenger?: string | null
+  }): boolean {
+    return (
+      this.normalizeEmail(contactData.email) === this.normalizeEmail(existingData.email) &&
+      this.normalizePhone(contactData.phone) === this.normalizePhone(existingData.phone) &&
+      this.normalizeMessenger(contactData.messenger) === this.normalizeMessenger(existingData.messenger)
+    )
+  }
+
+  private isRecruitmentContactUniqueConstraintError(error: any): boolean {
+    const message = String(error?.message || '')
+    const constraint = String(error?.constraint || '')
+
+    return (
+      constraint === 'recruitment_contacts_project_id_contact_id_unique' ||
+      message.includes('recruitment_contacts_project_id_contact_id_unique')
+    )
+  }
+
+  private getImportContactErrorMessage(error: any): string {
+    if (this.isRecruitmentContactUniqueConstraintError(error)) {
+      return 'This contact is already in the recruitment contact list.'
+    }
+
+    return error.message
+  }
+
   private validateProjectId(projectId: string | undefined): number {
     if (!projectId) {
       throw new Error('Project ID is required')
@@ -145,8 +196,8 @@ export default class RecruitmentController {
             })
 
             results.imported.push(recruitmentContact.serialize())
-          } catch (error) {
-            results.errors.push(`Error importing contact ${contact.id}: ${error.message}`)
+        } catch (error) {
+          results.errors.push(`Error importing contact ${contact.id}: ${this.getImportContactErrorMessage(error)}`)
           }
         }
       }
@@ -401,6 +452,7 @@ export default class RecruitmentController {
       const requestBody = request.body()
 
       const data = {
+        contact_id: requestBody.contact_id ? Number(requestBody.contact_id) : null,
         first_name: requestBody.first_name?.trim(),
         last_name: requestBody.last_name?.trim(),
         email: requestBody.email?.trim() || null,
@@ -427,6 +479,31 @@ export default class RecruitmentController {
         }
       }
 
+      const exactExistingMatch = await this.findExactRecruitmentMatch(projectId, {
+        contact_id: data.contact_id,
+        first_name: data.first_name,
+        last_name: data.last_name,
+        email: data.email,
+        phone: data.phone,
+        messenger: data.messenger,
+      })
+
+      if (exactExistingMatch && !data.allow_duplicate_name) {
+        return response.status(409).json({
+          code: 'EXACT_RECRUITMENT_CONTACT_ALREADY_EXISTS',
+          error: 'This contact already exists in this recruitment list.',
+          duplicate_warnings: [{
+            warning_type: 'exact_existing_contact',
+            contact: data,
+            matches: [{
+              type: 'exact_contact',
+              contact: exactExistingMatch.serialize(),
+              match_id: exactExistingMatch.id,
+            }],
+          }],
+        })
+      }
+
       const duplicateInfo = await this.checkForDuplicatesDetailed(projectId, data)
 
       if (duplicateInfo.isDuplicate && !data.allow_duplicate_name) {
@@ -434,6 +511,9 @@ export default class RecruitmentController {
           code: 'POTENTIAL_DUPLICATE_RECRUITMENT_CONTACT',
           error: 'A contact with an identical or similar name already exists in this recruitment list.',
           duplicate_warnings: [{
+            warning_type: duplicateInfo.matches.some((match) => match.type === 'exact_contact')
+              ? 'exact_existing_contact'
+              : 'similar_contact',
             contact: data,
             matches: duplicateInfo.matches,
           }],
@@ -442,7 +522,7 @@ export default class RecruitmentController {
 
       const contact = await RecruitmentContact.create({
         project_id: projectId,
-        contact_id: null,
+        contact_id: data.contact_id,
         first_name: data.first_name,
         last_name: data.last_name,
         email: data.email,
@@ -700,15 +780,18 @@ export default class RecruitmentController {
         contact_ids: requestBody.contact_ids || [],
         from_project_id: requestBody.from_project_id ? Number(requestBody.from_project_id) : null,
         allow_duplicate_name: Boolean(requestBody.allow_duplicate_name),
+        replace_existing: Boolean(requestBody.replace_existing),
       }
 
       const results: ContactResult = {
         imported: [],
+        replaced: [],
         conflicts: [],
         errors: [],
       }
 
       const duplicateWarnings: any[] = []
+      const exactConflictWarnings: any[] = []
       const contactsToImport: Array<{
         contact: Contact
         contactId: number
@@ -725,22 +808,59 @@ export default class RecruitmentController {
             continue
           }
 
-          const existing = await RecruitmentContact.query()
-            .where('project_id', projectId)
-            .where('contact_id', contactId)
-            .first()
-
-          if (existing) {
-            results.conflicts.push({
-              contact,
-              existing_status: existing.status,
-              recruitment_id: existing.id,
-            })
-            continue
-          }
-
           const firstName = contact.firstName || contact.first_name || ''
           const lastName = contact.lastName || contact.last_name || ''
+
+          const existing = await this.findExactRecruitmentMatch(projectId, {
+            contact_id: contactId,
+            first_name: firstName,
+            last_name: lastName,
+            email: contact.email,
+            phone: contact.phone,
+            messenger: contact.messenger,
+          })
+
+          if (existing) {
+            if (data.replace_existing) {
+              existing.first_name = firstName.trim()
+              existing.last_name = lastName.trim()
+              existing.email = contact.email || null
+              existing.phone = contact.phone || null
+              existing.messenger = contact.messenger || null
+              existing.source = 'database'
+              existing.is_duplicate = false
+              existing.contacted_by = existing.contacted_by || currentUserName
+              await existing.save()
+
+              await existing.load('contact')
+              if (existing.section_id) {
+                await existing.load('section')
+              }
+
+              results.replaced!.push(existing.serialize())
+              continue
+            }
+
+            if (!data.allow_duplicate_name) {
+              exactConflictWarnings.push({
+                warning_type: 'exact_existing_contact',
+                contact: {
+                  id: contact.id,
+                  first_name: firstName,
+                  last_name: lastName,
+                  email: contact.email || null,
+                  phone: contact.phone || null,
+                  messenger: contact.messenger || null,
+                },
+                matches: [{
+                  type: 'exact_contact',
+                  match_id: existing.id,
+                  contact: existing.serialize(),
+                }],
+              })
+              continue
+            }
+          }
 
           if (!firstName.trim() || !lastName.trim()) {
             results.errors.push(`Contact ${contactId} has empty name fields`)
@@ -748,9 +868,12 @@ export default class RecruitmentController {
           }
 
           let duplicateInfo = await this.checkForDuplicatesDetailed(projectId, {
+            contact_id: contact.id,
             first_name: firstName.trim(),
             last_name: lastName.trim(),
-            email: contact.email
+            email: contact.email,
+            phone: contact.phone,
+            messenger: contact.messenger,
           })
 
           const pendingMatches = contactsToImport
@@ -793,7 +916,10 @@ export default class RecruitmentController {
           }
 
           if (duplicateInfo.isDuplicate && !data.allow_duplicate_name) {
-            duplicateWarnings.push({
+            const warning = {
+              warning_type: duplicateInfo.matches.some((match) => match.type === 'exact_contact')
+                ? 'exact_existing_contact'
+                : 'similar_contact',
               contact: {
                 id: contact.id,
                 first_name: firstName.trim(),
@@ -803,7 +929,13 @@ export default class RecruitmentController {
                 messenger: contact.messenger || null,
               },
               matches: duplicateInfo.matches,
-            })
+            }
+
+            if (warning.warning_type === 'exact_existing_contact') {
+              exactConflictWarnings.push(warning)
+            } else {
+              duplicateWarnings.push(warning)
+            }
             continue
           }
 
@@ -817,6 +949,14 @@ export default class RecruitmentController {
         } catch (error) {
           results.errors.push(`Error preparing contact ${contactId}: ${error.message}`)
         }
+      }
+
+      if (exactConflictWarnings.length > 0) {
+        return response.status(409).json({
+          code: 'EXACT_RECRUITMENT_CONTACT_ALREADY_EXISTS',
+          error: 'Some contacts are already in this recruitment list.',
+          duplicate_warnings: [...exactConflictWarnings, ...duplicateWarnings],
+        })
       }
 
       if (duplicateWarnings.length > 0) {
@@ -857,7 +997,7 @@ export default class RecruitmentController {
 
           results.imported.push(recruitmentContact.serialize())
         } catch (error) {
-          results.errors.push(`Error importing contact ${item.contactId}: ${error.message}`)
+          results.errors.push(`Error importing contact ${item.contactId}: ${this.getImportContactErrorMessage(error)}`)
         }
       }
 
@@ -1161,6 +1301,7 @@ export default class RecruitmentController {
         source_project_id: Number(requestBody.source_project_id),
         include_statuses: requestBody.include_statuses || null,
         allow_duplicate_name: Boolean(requestBody.allow_duplicate_name),
+        replace_existing: Boolean(requestBody.replace_existing),
       }
 
       const sourceProject = await Project.find(data.source_project_id)
@@ -1176,11 +1317,13 @@ export default class RecruitmentController {
 
       const results: ContactResult = {
         imported: [],
+        replaced: [],
         conflicts: [],
         errors: [],
       }
 
       const duplicateWarnings: any[] = []
+      const exactConflictWarnings: any[] = []
       const contactsToImport: Array<{
         sourceContact: RecruitmentContact
         duplicateInfo: { isDuplicate: boolean; matches: any[] }
@@ -1188,36 +1331,58 @@ export default class RecruitmentController {
 
       for (const sourceContact of sourceContacts) {
         try {
-          const existing = await RecruitmentContact.query()
-            .where('project_id', projectId)
-            .where((query) => {
-              if (sourceContact.contact_id) {
-                query.where('contact_id', sourceContact.contact_id)
-              } else if (sourceContact.email) {
-                query
-                  .where('first_name', sourceContact.first_name)
-                  .where('last_name', sourceContact.last_name)
-                  .where('email', sourceContact.email)
-              } else {
-                query
-                  .where('first_name', sourceContact.first_name)
-                  .where('last_name', sourceContact.last_name)
-              }
-            })
-            .first()
+          const existing = await this.findExactRecruitmentMatch(projectId, {
+            contact_id: sourceContact.contact_id,
+            first_name: sourceContact.first_name || '',
+            last_name: sourceContact.last_name || '',
+            email: sourceContact.email,
+            phone: sourceContact.phone,
+            messenger: sourceContact.messenger,
+          })
 
           if (existing) {
-            results.conflicts.push({
-              source_contact: sourceContact.serialize(),
-              existing_contact: existing.serialize(),
-            })
-            continue
+            if (data.replace_existing) {
+              existing.contact_id = sourceContact.contact_id
+              existing.first_name = sourceContact.first_name || ''
+              existing.last_name = sourceContact.last_name || ''
+              existing.email = sourceContact.email
+              existing.phone = sourceContact.phone
+              existing.messenger = sourceContact.messenger
+              existing.section_id = sourceContact.section_id
+              existing.source = `Imported from "${sourceProjectName}"`
+              existing.is_duplicate = false
+              existing.contacted_by = existing.contacted_by || currentUserName
+              await existing.save()
+
+              if (existing.section_id) {
+                await existing.load('section')
+              }
+
+              results.replaced!.push(existing.serialize())
+              continue
+            }
+
+            if (!data.allow_duplicate_name) {
+              exactConflictWarnings.push({
+                warning_type: 'exact_existing_contact',
+                contact: sourceContact.serialize(),
+                matches: [{
+                  type: 'exact_contact',
+                  match_id: existing.id,
+                  contact: existing.serialize(),
+                }],
+              })
+              continue
+            }
           }
 
           let duplicateInfo = await this.checkForDuplicatesDetailed(projectId, {
+            contact_id: sourceContact.contact_id,
             first_name: sourceContact.first_name,
             last_name: sourceContact.last_name,
-            email: sourceContact.email
+            email: sourceContact.email,
+            phone: sourceContact.phone,
+            messenger: sourceContact.messenger,
           })
 
           const pendingMatches = contactsToImport
@@ -1260,10 +1425,19 @@ export default class RecruitmentController {
           }
 
           if (duplicateInfo.isDuplicate && !data.allow_duplicate_name) {
-            duplicateWarnings.push({
+            const warning = {
+              warning_type: duplicateInfo.matches.some((match) => match.type === 'exact_contact')
+                ? 'exact_existing_contact'
+                : 'similar_contact',
               contact: sourceContact.serialize(),
               matches: duplicateInfo.matches,
-            })
+            }
+
+            if (warning.warning_type === 'exact_existing_contact') {
+              exactConflictWarnings.push(warning)
+            } else {
+              duplicateWarnings.push(warning)
+            }
             continue
           }
 
@@ -1271,6 +1445,14 @@ export default class RecruitmentController {
         } catch (error) {
           results.errors.push(`Error preparing contact ${sourceContact.id}: ${error.message}`)
         }
+      }
+
+      if (exactConflictWarnings.length > 0) {
+        return response.status(409).json({
+          code: 'EXACT_RECRUITMENT_CONTACT_ALREADY_EXISTS',
+          error: 'Some contacts are already in this recruitment list.',
+          duplicate_warnings: [...exactConflictWarnings, ...duplicateWarnings],
+        })
       }
 
       if (duplicateWarnings.length > 0) {
@@ -1307,7 +1489,7 @@ export default class RecruitmentController {
 
           results.imported.push(newContact.serialize())
         } catch (error) {
-          results.errors.push(`Error importing contact ${item.sourceContact.id}: ${error.message}`)
+          results.errors.push(`Error importing contact ${item.sourceContact.id}: ${this.getImportContactErrorMessage(error)}`)
         }
       }
 
@@ -1357,10 +1539,11 @@ export default class RecruitmentController {
     matches: any[]
   }> {
     const targetFullName = this.normalizeName(`${contactData.first_name} ${contactData.last_name}`)
-    const projectContacts = await RecruitmentContact.query()
+      const projectContacts = await RecruitmentContact.query()
       .where('project_id', projectId)
       .select([
         'id',
+        'contact_id',
         'first_name',
         'last_name',
         'email',
@@ -1380,8 +1563,16 @@ export default class RecruitmentController {
       )
 
       if (similarity >= 0.82) {
+        const hasExactCommunicationMatch = this.hasIdenticalCommunicationDetails(contactData, {
+          email: match.email,
+          phone: match.phone,
+          messenger: match.messenger,
+        })
+
         matches.push({
-          type: similarity === 1 ? 'exact_name' : 'similar_name',
+          type: similarity === 1 && hasExactCommunicationMatch
+            ? 'exact_contact'
+            : 'similar_name',
           contact: match.serialize(),
           match_id: match.id,
           similarity
@@ -1398,6 +1589,41 @@ export default class RecruitmentController {
       isDuplicate: uniqueMatches.length > 0,
       matches: uniqueMatches
     }
+  }
+
+  private async findExactRecruitmentMatch(projectId: number, contactData: {
+    contact_id?: number | null
+    first_name: string
+    last_name: string
+    email?: string | null
+    phone?: string | null
+    messenger?: string | null
+  }): Promise<RecruitmentContact | null> {
+    const normalizedTargetName = this.normalizeName(
+      `${contactData.first_name || ''} ${contactData.last_name || ''}`
+    )
+
+    const projectContacts = await RecruitmentContact.query().where('project_id', projectId)
+
+    for (const projectContact of projectContacts) {
+      const normalizedCandidateName = this.normalizeName(
+        `${projectContact.first_name || ''} ${projectContact.last_name || ''}`
+      )
+
+      if (!normalizedTargetName || normalizedCandidateName !== normalizedTargetName) {
+        continue
+      }
+
+      if (this.hasIdenticalCommunicationDetails(contactData, {
+        email: projectContact.email,
+        phone: projectContact.phone,
+        messenger: projectContact.messenger,
+      })) {
+        return projectContact
+      }
+    }
+
+    return null
   }
 
   private normalizeName(value: string | null | undefined): string {
