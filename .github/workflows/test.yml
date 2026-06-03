@@ -1,0 +1,61 @@
+name: Run Tests
+
+on:
+  pull_request:
+    branches:
+      - dev
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_USER: admin123
+          POSTGRES_PASSWORD: admin123
+          POSTGRES_DB: melomania
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Setup environment
+        run: |
+          cp .env.example .env
+          echo "DB_HOST=127.0.0.1" >> .env
+          echo "DB_PORT=5432" >> .env
+          echo "DB_USER=admin123" >> .env
+          echo "DB_PASSWORD=admin123" >> .env
+          echo "DB_DATABASE=melomania" >> .env
+          echo "ADMIN_EMAIL=admin@admin.admin" >> .env
+          echo "ADMIN_PASSWORD=admin" >> .env
+          echo "SMTP_HOST=localhost" >> .env
+          echo "SMTP_PORT=1025" >> .env
+          echo "SMTP_USERNAME=local" >> .env
+          echo "SMTP_PASSWORD=local" >> .env
+          echo "URL=http://localhost:3333" >> .env
+
+      - name: Run migrations
+        run: node ace migration:run
+
+      - name: Run seeds
+        run: node ace db:seed
+
+      - name: Run tests
+        run: node ace test functional
