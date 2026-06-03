@@ -6,9 +6,12 @@ import { HttpContext } from '@adonisjs/core/http'
 
 export default class ContactsController {
   async getAll(ctx: HttpContext) {
-    let baseQuery = Contact.query().preload('instruments', (instrumentsQuery) => {
-      instrumentsQuery.pivotColumns(['proficiency_level'])
-    })
+   let baseQuery = Contact.query()
+  .preload('instruments', (instrumentsQuery) => {
+    instrumentsQuery.pivotColumns(['proficiency_level'])
+  })
+  .preload('projects')
+  .preload('participants')
 
     return await simpleFilter(
       ctx,
