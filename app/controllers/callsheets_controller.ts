@@ -40,9 +40,9 @@ export default class CallsheetsController {
           })
           .preload('registration')
       })
-      .firstOrFail()
+      .first()
 
-    if (!callsheet) return ctx.response.notFound()
+    if (!callsheet) return ctx.response.notFound({ message: 'Callsheet not found' })
 
     if (params.visitorId) {
       const contact = await Contact.find(params.visitorId)
