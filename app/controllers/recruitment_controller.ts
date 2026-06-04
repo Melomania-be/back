@@ -841,25 +841,23 @@ export default class RecruitmentController {
               continue
             }
 
-            if (!data.allow_duplicate_name) {
-              exactConflictWarnings.push({
-                warning_type: 'exact_existing_contact',
-                contact: {
-                  id: contact.id,
-                  first_name: firstName,
-                  last_name: lastName,
-                  email: contact.email || null,
-                  phone: contact.phone || null,
-                  messenger: contact.messenger || null,
-                },
-                matches: [{
-                  type: 'exact_contact',
-                  match_id: existing.id,
-                  contact: existing.serialize(),
-                }],
-              })
-              continue
-            }
+            exactConflictWarnings.push({
+              warning_type: 'exact_existing_contact',
+              contact: {
+                id: contact.id,
+                first_name: firstName,
+                last_name: lastName,
+                email: contact.email || null,
+                phone: contact.phone || null,
+                messenger: contact.messenger || null,
+              },
+              matches: [{
+                type: 'exact_contact',
+                match_id: existing.id,
+                contact: existing.serialize(),
+              }],
+            })
+            continue
           }
 
           if (!firstName.trim() || !lastName.trim()) {
@@ -915,11 +913,9 @@ export default class RecruitmentController {
             }
           }
 
-          if (duplicateInfo.isDuplicate && !data.allow_duplicate_name) {
+          if (duplicateInfo.matches.some((match) => match.type === 'exact_contact')) {
             const warning = {
-              warning_type: duplicateInfo.matches.some((match) => match.type === 'exact_contact')
-                ? 'exact_existing_contact'
-                : 'similar_contact',
+              warning_type: 'exact_existing_contact',
               contact: {
                 id: contact.id,
                 first_name: firstName.trim(),
@@ -931,11 +927,25 @@ export default class RecruitmentController {
               matches: duplicateInfo.matches,
             }
 
-            if (warning.warning_type === 'exact_existing_contact') {
-              exactConflictWarnings.push(warning)
-            } else {
-              duplicateWarnings.push(warning)
+            exactConflictWarnings.push(warning)
+            continue
+          }
+
+          if (duplicateInfo.isDuplicate && !data.allow_duplicate_name) {
+            const warning = {
+              warning_type: 'similar_contact',
+              contact: {
+                id: contact.id,
+                first_name: firstName.trim(),
+                last_name: lastName.trim(),
+                email: contact.email || null,
+                phone: contact.phone || null,
+                messenger: contact.messenger || null,
+              },
+              matches: duplicateInfo.matches,
             }
+
+            duplicateWarnings.push(warning)
             continue
           }
 
@@ -1362,18 +1372,16 @@ export default class RecruitmentController {
               continue
             }
 
-            if (!data.allow_duplicate_name) {
-              exactConflictWarnings.push({
-                warning_type: 'exact_existing_contact',
-                contact: sourceContact.serialize(),
-                matches: [{
-                  type: 'exact_contact',
-                  match_id: existing.id,
-                  contact: existing.serialize(),
-                }],
-              })
-              continue
-            }
+            exactConflictWarnings.push({
+              warning_type: 'exact_existing_contact',
+              contact: sourceContact.serialize(),
+              matches: [{
+                type: 'exact_contact',
+                match_id: existing.id,
+                contact: existing.serialize(),
+              }],
+            })
+            continue
           }
 
           let duplicateInfo = await this.checkForDuplicatesDetailed(projectId, {
@@ -1424,20 +1432,25 @@ export default class RecruitmentController {
             }
           }
 
-          if (duplicateInfo.isDuplicate && !data.allow_duplicate_name) {
+          if (duplicateInfo.matches.some((match) => match.type === 'exact_contact')) {
             const warning = {
-              warning_type: duplicateInfo.matches.some((match) => match.type === 'exact_contact')
-                ? 'exact_existing_contact'
-                : 'similar_contact',
+              warning_type: 'exact_existing_contact',
               contact: sourceContact.serialize(),
               matches: duplicateInfo.matches,
             }
 
-            if (warning.warning_type === 'exact_existing_contact') {
-              exactConflictWarnings.push(warning)
-            } else {
-              duplicateWarnings.push(warning)
+            exactConflictWarnings.push(warning)
+            continue
+          }
+
+          if (duplicateInfo.isDuplicate && !data.allow_duplicate_name) {
+            const warning = {
+              warning_type: 'similar_contact',
+              contact: sourceContact.serialize(),
+              matches: duplicateInfo.matches,
             }
+
+            duplicateWarnings.push(warning)
             continue
           }
 
@@ -1539,7 +1552,7 @@ export default class RecruitmentController {
     matches: any[]
   }> {
     const targetFullName = this.normalizeName(`${contactData.first_name} ${contactData.last_name}`)
-      const projectContacts = await RecruitmentContact.query()
+    const projectContacts = await RecruitmentContact.query()
       .where('project_id', projectId)
       .select([
         'id',
