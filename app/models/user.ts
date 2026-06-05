@@ -4,6 +4,9 @@ import { compose } from '@adonisjs/core/helpers'
 import { BaseModel, column } from '@adonisjs/lucid/orm'
 import { withAuthFinder } from '@adonisjs/auth/mixins/lucid'
 import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
+import { hasMany } from '@adonisjs/lucid/orm'
+import type { HasMany } from '@adonisjs/lucid/types/relations'
+import ActivityLog from '#models/activity_log'
 
 const AuthFinder = withAuthFinder(() => hash.use('scrypt'), {
   uids: ['email'],
@@ -16,6 +19,12 @@ export default class User extends compose(BaseModel, AuthFinder) {
 
   @column()
   declare fullName: string | null
+
+  @column()
+  declare phone: string | null
+
+  @column()
+  declare avatarUrl: string | null
 
   @column()
   declare email: string
@@ -36,4 +45,7 @@ export default class User extends compose(BaseModel, AuthFinder) {
     type: 'auth_token',
     tokenSecretLength: 40,
   })
+
+  @hasMany(() => ActivityLog)
+  declare activityLogs: HasMany<typeof ActivityLog>
 }
