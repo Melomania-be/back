@@ -17,413 +17,253 @@ import RecruitmentNotification from '#mails/recruitment_notification'
 import UniquePreparation from '#mails/unique_preparation'
 import Participant from '#models/participant'
 import Audition from '#models/audition'
+import ProjectPolicy from '#policies/project_policy'
 
 export default class MailingsController {
-  async sendUnique({ request, response }: HttpContext) {
-    console.log('sendUnique called')
+
+  private async getAuthorizedProject(bouncer: any, projectId: number, action: 'view' | 'update' | 'delete' = 'update') {
+    const project = await Project.findOrFail(projectId)
+    await bouncer.with(ProjectPolicy).authorize(action, project)
+    return project
+  }
+
+  async sendUnique({ request, response, bouncer }: HttpContext) {
+    await (bouncer as any).authorize('adminRights')
     const { listContacts, subject, content } = request.only(['listContacts', 'subject', 'content'])
 
     let listDb = await List.find(listContacts.id)
     let allContacts = await listDb?.related('contacts').query()
 
-    console.log('listDb', listDb)
-    console.log('allContacts', allContacts)
-
-    if (allContacts !== null && allContacts !== undefined) {
+    if (allContacts) {
       for (let contact of allContacts) {
-        console.log('contact', contact)
         if (contact.email && contact.subscribed === true && contact.validated === true) {
           const uniqueMail = new UniquePreparation(content, subject, contact)
-
-          const outgoingMail = new OutgoingMail()
-          outgoingMail.type = 'unique'
-          outgoingMail.receiver_id = contact.id
-          outgoingMail.sent = false
-          outgoingMail.createdAt = DateTime.local()
-          outgoingMail.updatedAt = DateTime.local()
-
-          await OutgoingMail.create(outgoingMail)
-
+          const outgoingMail = await OutgoingMail.create({ type: 'unique', receiver_id: contact.id, sent: false, createdAt: DateTime.local(), updatedAt: DateTime.local() })
           await mail.send(uniqueMail)
           await this.updateOutgoingMail(outgoingMail)
         }
       }
       return response.json({ message: 'Email sent successfully' })
-    } else {
-      return response.json({ message: 'List not found' })
     }
+    return response.json({ message: 'List not found' })
   }
 
-  async sendMailToParticipants({ request, response }: HttpContext) {
-    console.log('sendMailToParticipants called')
-    const { projectId, type, templateId, subject, content } = request.only([
-      'projectId',
-      'type',
-      'templateId',
-      'subject',
-      'content',
-    ])
+  async sendMailToParticipants({ request, response, bouncer }: HttpContext) {
+    const { projectId, type, templateId, subject, content } = request.only(['projectId', 'type', 'templateId', 'subject', 'content'])
+    const project = await this.getAuthorizedProject(bouncer, projectId, 'update')
 
-    let project = await Project.find(projectId)
-    let participants = await project?.related('participants').query().where('accepted', true)
+    let participants = await project.related('participants').query().where('accepted', true)
 
     if (type === 'template') {
       let templateDb = await mail_template.find(templateId)
       let htmlFromDb = templateDb?.content || ''
-      let callsheet = await Callsheet.query()
-        .where('project_id', projectId)
-        .orderBy('created_at', 'desc')
-        .first()
+      let callsheet = await Callsheet.query().where('project_id', project.id).orderBy('created_at', 'desc').first()
+      let responsibles = await Responsibles.query().where('project_id', project.id).preload('contact')
 
-      let responsibles = await Responsibles.query()
-        .where('project_id', projectId)
-        .preload('contact')
+      let toContact = responsibles.map(r => ({ firstName: r.contact.first_name, lastName: r.contact.last_name, email: r.contact.email, phone: r.contact.phone, messenger: r.contact.messenger }))
 
-      let toContact: Array<{
-        firstName: string
-        lastName: string
-        email: string
-        phone: string
-        messenger: string
-      }> = []
+      // CORRECTION DU TYPAGE ICI
+      let registrationId = (project as any).registration_id || (project as any).registration?.id || null
 
-      for (let responsible of responsibles) {
-        toContact.push({
-          firstName: responsible.contact.first_name,
-          lastName: responsible.contact.last_name,
-          email: responsible.contact.email,
-          phone: responsible.contact.phone,
-          messenger: responsible.contact.messenger,
-        })
-      }
-
-      let registrationId = project?.registration
-
-      if (participants !== null && participants !== undefined) {
-        for (let participant of participants) {
-          if (participant.accepted === true) {
-            let contact = await Contact.find(participant.contact_id)
-            if (contact?.email && contact?.subscribed === true && contact?.validated === true) {
-              const templatePreparation = new TemplatePreparation(
-                htmlFromDb,
-                contact,
-                project,
-                callsheet,
-                toContact[0],
-                registrationId
-              )
-
-              const outgoingMail = new OutgoingMail()
-              outgoingMail.type = 'template'
-              outgoingMail.receiver_id = contact.id
-              outgoingMail.project_id = project?.id
-              outgoingMail.mail_template_id = templateId
-              outgoingMail.sent = false
-              outgoingMail.createdAt = DateTime.local()
-              outgoingMail.updatedAt = DateTime.local()
-
-              await OutgoingMail.create(outgoingMail)
-
-              await mail.send(templatePreparation)
-              await this.updateOutgoingMail(outgoingMail)
-            }
-          }
+      for (let participant of participants) {
+        let contact = await Contact.find(participant.contact_id)
+        if (contact?.email && contact?.subscribed === true && contact?.validated === true) {
+          const templatePreparation = new TemplatePreparation(htmlFromDb, contact, project, callsheet, toContact[0], registrationId)
+          const outgoingMail = await OutgoingMail.create({ type: 'template', receiver_id: contact.id, project_id: project.id, mail_template_id: templateId, sent: false, createdAt: DateTime.local(), updatedAt: DateTime.local() })
+          await mail.send(templatePreparation)
+          await this.updateOutgoingMail(outgoingMail)
         }
-      } else {
-        return response.json({ message: 'No participants found' })
+      }
+    } else if (type === 'unique') {
+      for (let participant of participants) {
+        let contact = await Contact.find(participant.contact_id)
+        if (contact?.email && contact?.subscribed === true && contact?.validated === true) {
+          const uniqueMail = new UniquePreparation(content, subject, contact)
+          const outgoingMail = await OutgoingMail.create({ type: 'unique', receiver_id: contact.id, project_id: project.id, sent: false, createdAt: DateTime.local(), updatedAt: DateTime.local() })
+          await mail.send(uniqueMail)
+          await this.updateOutgoingMail(outgoingMail)
+        }
       }
     }
-
-    if (type === 'unique') {
-      if (participants !== null && participants !== undefined) {
-        for (let participant of participants) {
-          if (participant.accepted === true) {
-            let contact = await Contact.find(participant.contact_id)
-            if (contact?.email && contact?.subscribed === true && contact?.validated === true) {
-              const uniqueMail = new UniquePreparation(content, subject, contact)
-
-              const outgoingMail = new OutgoingMail()
-              outgoingMail.type = 'unique'
-              outgoingMail.receiver_id = contact.id
-              outgoingMail.project_id = project?.id
-              outgoingMail.mail_template_id = null
-              outgoingMail.sent = false
-              outgoingMail.createdAt = DateTime.local()
-              outgoingMail.updatedAt = DateTime.local()
-
-              await OutgoingMail.create(outgoingMail)
-
-              await mail.send(uniqueMail)
-              await this.updateOutgoingMail(outgoingMail)
-            }
-          }
-        }
-        return response.json({ message: 'Email sent successfully' })
-      } else {
-        return response.json({ message: 'No participants found' })
-      }
-    }
+    return response.json({ message: 'Email sent successfully' })
   }
 
-  // ✅ FONCTION CORRIGÉE : sendAuditionRequest - Version simplifiée sans preload
-  async sendAuditionRequest({ request, response }: HttpContext) {
-    console.log('📧 sendAuditionRequest called')
+  async sendAuditionRequest({ request, response, bouncer }: HttpContext) {
+    const { projectId, participantId, auditionId } = request.only(['projectId', 'participantId', 'auditionId'])
+    if (!projectId || !participantId) return response.status(400).json({ error: 'Missing required fields' })
 
-    const { projectId, participantId, auditionId } = request.only([
-      'projectId',
-      'participantId',
-      'auditionId',
-    ])
-
-    if (!projectId || !participantId) {
-      return response.status(400).json({
-        error: 'Missing required fields',
-        received: { projectId, participantId, auditionId },
-      })
-    }
+    const project = await this.getAuthorizedProject(bouncer, projectId, 'update')
 
     try {
-      // ✅ SOLUTION SIMPLE : Charger le projet sans preload
-      let project = await Project.find(projectId)
+      let participant = await Participant.query().where('id', participantId).where('project_id', project.id).preload('contact').preload('section').first()
+      if (!participant || !participant.contact || !participant.section) return response.status(404).json({ error: 'Participant/Contact not found' })
 
-      let participant = await Participant.query()
-        .where('id', participantId)
-        .preload('contact')
-        .preload('section')
-        .first()
+      let audition = auditionId ? await Audition.query().where('id', auditionId).first() : await Audition.query().where('participant_id', participantId).where('project_id', project.id).orderBy('created_at', 'desc').first()
+      if (!audition) return response.status(404).json({ error: 'No audition found' })
 
-      let audition = null
-      if (auditionId) {
-        audition = await Audition.query().where('id', auditionId).first()
-      }
+      let responsibles = await Responsibles.query().where('project_id', project.id).preload('contact')
+      let responsibleContact = responsibles.length > 0 ? { first_name: responsibles[0].contact.first_name, last_name: responsibles[0].contact.last_name, email: responsibles[0].contact.email, phone: responsibles[0].contact.phone, messenger: responsibles[0].contact.messenger } : null
 
-      if (!project || !participant) {
-        return response.status(404).json({ error: 'Project or participant not found' })
-      }
-
-      // Vérifier que le contact et la section sont bien chargés
-      if (!participant.contact || !participant.section) {
-        return response.status(404).json({ error: 'Participant contact or section not found' })
-      }
-
-      // ✅ SOLUTION SIMPLE : Charger les responsables séparément
-      let responsibles = await Responsibles.query()
-        .where('project_id', projectId)
-        .preload('contact')
-
-      let responsibleContact = null
-      if (responsibles && responsibles.length > 0) {
-        const firstResponsible = responsibles[0]
-        if (firstResponsible.contact) {
-          responsibleContact = {
-            first_name: firstResponsible.contact.first_name,
-            last_name: firstResponsible.contact.last_name,
-            email: firstResponsible.contact.email,
-            phone: firstResponsible.contact.phone,
-            messenger: firstResponsible.contact.messenger,
-          }
-        }
-      }
-
-      // Si pas d'audition spécifique fournie, essayer de la trouver
-      if (!audition) {
-        audition = await Audition.query()
-          .where('participant_id', participantId)
-          .where('project_id', projectId)
-          .orderBy('created_at', 'desc')
-          .first()
-      }
-
-      if (!audition) {
-        return response.status(404).json({ error: 'No audition found for this participant' })
-      }
-
-      // Créer et envoyer l'email d'audition
       const AuditionRequest = (await import('#mails/audition_request')).default
-      const auditionRequestMail = new AuditionRequest(
-        participant.contact,
-        project,
-        participant.section,
-        audition,
-        responsibleContact
-      )
+      const auditionRequestMail = new AuditionRequest(participant.contact, project, participant.section, audition, responsibleContact)
 
       await mail.send(auditionRequestMail)
+      await OutgoingMail.create({ type: 'audition_request', receiver_id: participant.contact.id, project_id: project.id, sent: true, createdAt: DateTime.local(), updatedAt: DateTime.local() })
 
-      // Créer une trace de l'envoi
-      const outgoingMail = new OutgoingMail()
-      outgoingMail.type = 'audition_request'
-      outgoingMail.receiver_id = participant.contact.id
-      outgoingMail.project_id = projectId
-      outgoingMail.mail_template_id = null
-      outgoingMail.sent = true
-      outgoingMail.createdAt = DateTime.local()
-      outgoingMail.updatedAt = DateTime.local()
-      await outgoingMail.save()
-
-      return response.ok({
-        message: "Email d'audition envoyé avec succès",
-        audition_id: audition.id,
-        participant_email: participant.contact.email,
-      })
+      return response.ok({ message: "Email d'audition envoyé avec succès", audition_id: audition.id })
     } catch (error) {
-      console.error("❌ Erreur lors de l'envoi de l'email d'audition :", error)
-      return response.status(500).json({
-        error: "Erreur serveur lors de l'envoi de l'email d'audition",
-        details: error.message || 'Erreur inconnue',
-      })
+      return response.status(500).json({ error: "Erreur serveur", details: error.message })
     }
   }
 
-  async sendTemplateToList({ request, response }: HttpContext) {
-    console.log('sendTemplateToList called')
-    const { template, listContacts, hasProject, hasCallsheet, project, toContact } = request.only([
-      'template',
-      'listContacts',
-      'hasProject',
-      'hasCallsheet',
-      'project',
-      'toContact',
-    ])
+  async sendTemplateToList({ request, response, bouncer }: HttpContext) {
+    const { template, listContacts, hasProject, hasCallsheet, project, toContact } = request.only(['template', 'listContacts', 'hasProject', 'hasCallsheet', 'project', 'toContact'])
+
+    if (hasProject) {
+      await this.getAuthorizedProject(bouncer, project.id, 'update')
+    } else {
+      await (bouncer as any).authorize('adminRights')
+    }
 
     let templateDb = await mail_template.find(template.id)
     let listDb = await List.find(listContacts.id)
     let allContacts = await listDb?.related('contacts').query()
     let htmlFromDb = templateDb?.content || ''
-    let projectDb = project
-    let callsheet = null
-    let registrationId = null
 
-    console.log('templateDb', templateDb)
-    console.log('listDb', listDb)
-    console.log('allContacts', allContacts)
+    let projectDb = hasProject ? await Project.find(project.id) : project
+    let callsheet = (hasProject && hasCallsheet && projectDb?.callsheet_id) ? await Callsheet.find(projectDb.callsheet_id) : null
 
-    if (hasProject) {
-      projectDb = await Project.find(project.id)
-      registrationId = projectDb.registration_id
-    }
+    // CORRECTION DU TYPAGE ICI
+    let registrationId = projectDb ? ((projectDb as any).registration_id || (projectDb as any).registration?.id || null) : null
 
-    if (hasCallsheet) {
-      if (projectDb.callsheet_id) callsheet = await Callsheet.find(projectDb.callsheet_id)
-    }
-
-    if (allContacts !== null && allContacts !== undefined) {
+    if (allContacts) {
       for (let contact of allContacts) {
-        console.log('contact', contact)
         let contactDb = await Contact.find(contact.id)
-        if (htmlFromDb !== '') {
-          if (contactDb?.email && contactDb?.subscribed === true && contactDb?.validated === true) {
-            const templatePreparation = new TemplatePreparation(
-              htmlFromDb,
-              contact,
-              projectDb,
-              callsheet,
-              toContact,
-              registrationId
-            )
-
-            const outgoingMail = new OutgoingMail()
-            outgoingMail.type = 'template'
-            outgoingMail.receiver_id = contact.id
-            if (hasProject) {
-              outgoingMail.project_id = project.id
-            } else {
-              outgoingMail.project_id = null
-            }
-            outgoingMail.mail_template_id = template.id
-            outgoingMail.sent = false
-            outgoingMail.createdAt = DateTime.local()
-            outgoingMail.updatedAt = DateTime.local()
-
-            await OutgoingMail.create(outgoingMail)
-
-            await mail.send(templatePreparation)
-            await this.updateOutgoingMail(outgoingMail)
-          }
+        if (htmlFromDb !== '' && contactDb?.email && contactDb?.subscribed === true && contactDb?.validated === true) {
+          const templatePreparation = new TemplatePreparation(htmlFromDb, contact, projectDb, callsheet, toContact, registrationId)
+          const outgoingMail = await OutgoingMail.create({ type: 'template', receiver_id: contact.id, project_id: hasProject ? project.id : null, mail_template_id: template.id, sent: false, createdAt: DateTime.local(), updatedAt: DateTime.local() })
+          await mail.send(templatePreparation)
+          await this.updateOutgoingMail(outgoingMail)
         }
       }
       return response.json({ message: 'Email sent successfully' })
-    } else {
-      return response.json({ message: 'List not found' })
+    }
+    return response.json({ message: 'List not found' })
+  }
+
+  async sendRefusalEmailToParticipant({ request, response, bouncer }: HttpContext) {
+    const { projectId, participantId, customMessage } = request.only(['projectId', 'participantId', 'customMessage'])
+    if (!projectId || !participantId) return response.status(400).json({ error: 'Missing required fields' })
+
+    const project = await this.getAuthorizedProject(bouncer, projectId, 'update')
+
+    try {
+      let participant = await Participant.query().where('id', participantId).where('project_id', project.id).preload('contact').preload('section').first()
+      if (!participant || !participant.contact || !participant.section) return response.status(404).json({ error: 'Participant/Contact not found' })
+
+      let responsibles = await Responsibles.query().where('project_id', project.id).preload('contact')
+      let responsibleContact = responsibles.length > 0 ? { first_name: responsibles[0].contact.first_name, last_name: responsibles[0].contact.last_name, email: responsibles[0].contact.email, phone: responsibles[0].contact.phone, messenger: responsibles[0].contact.messenger } : null
+
+      const refusalMail = new RefusalNotification(participant.contact, project, participant.section, customMessage, responsibleContact)
+      await mail.send(refusalMail)
+
+      await OutgoingMail.create({ type: 'refusal', receiver_id: participant.contact.id, project_id: project.id, sent: true, createdAt: DateTime.local(), updatedAt: DateTime.local() })
+      return response.ok({ message: 'Email de refus envoyé' })
+    } catch (error) {
+      return response.status(500).json({ error: "Erreur serveur", details: error.message })
     }
   }
 
-  async sendRefusalEmailToParticipant({ request, response }: HttpContext) {
-    const { projectId, participantId, customMessage } = request.only([
-      'projectId',
-      'participantId',
-      'customMessage',
-    ])
+  async sendCallsheetNotification({ request, response, bouncer }: HttpContext) {
+    const { projectId } = request.only(['projectId'])
+    const project = await this.getAuthorizedProject(bouncer, projectId, 'update')
 
-    if (!projectId || !participantId) {
-      return response.status(400).json({
-        error: 'Missing required fields',
-        received: { projectId, participantId, customMessage },
-      })
+    await project.load('participants', q => q.where('accepted', true))
+    let callsheet = await Callsheet.query().where('project_id', project.id).orderBy('created_at', 'desc').first()
+    let responsibles = await Responsibles.query().where('project_id', project.id).preload('contact')
+
+    if (!callsheet || !responsibles || !project.participants) return response.status(400).json({ message: 'Missing data' })
+
+    let toContact = responsibles.map(r => ({ first_name: r.contact.first_name, last_name: r.contact.last_name, email: r.contact.email, phone: r.contact.phone, messenger: r.contact.messenger }))
+
+    for (let participant of project.participants) {
+      let contact = await Contact.find(participant.contact_id)
+      if (contact?.email && contact?.subscribed === true && contact?.validated === true) {
+        const callsheetNotificationMail = new CallsheetNotification(contact, project, callsheet, toContact)
+        const outgoingMail = await OutgoingMail.create({ type: 'callsheet_notification', receiver_id: contact.id, project_id: project.id, sent: false, createdAt: DateTime.local(), updatedAt: DateTime.local() })
+        await mail.send(callsheetNotificationMail)
+        await this.updateOutgoingMail(outgoingMail)
+      }
     }
+    return response.json({ message: 'Email sent successfully' })
+  }
 
-    try {
-      // Récupérer les données nécessaires
-      let project = await Project.find(projectId)
-      let participant = await Participant.query()
-        .where('id', participantId)
-        .preload('contact')
-        .preload('section')
-        .first()
+  async sendRecruitmentNotification({ request, response, bouncer }: HttpContext) {
+    const { projectId } = request.only(['projectId'])
+    const project = await this.getAuthorizedProject(bouncer, projectId, 'update')
 
-      if (!project || !participant) {
-        return response.status(404).json({ error: 'Project or participant not found' })
+    let contacts = await Contact.query().where('subscribed', true).where('validated', true)
+    let registration = await project.related('registration').query().orderBy('created_at', 'desc').first()
+    let responsibles = await Responsibles.query().where('project_id', project.id).preload('contact')
+
+    if (!responsibles || !contacts || !registration) return response.status(400).json({ message: 'Missing data' })
+
+    let toContact = responsibles.map(r => ({ first_name: r.contact.first_name, last_name: r.contact.last_name, email: r.contact.email, phone: r.contact.phone, messenger: r.contact.messenger }))
+
+    for (let contact of contacts) {
+      if (contact?.email) {
+        const recruitmentNotification = new RecruitmentNotification(contact, registration, project, toContact)
+        const outgoingMail = await OutgoingMail.create({ type: 'recruitment_notification', receiver_id: contact.id, project_id: project.id, sent: false, createdAt: DateTime.local(), updatedAt: DateTime.local() })
+        await mail.send(recruitmentNotification)
+        await this.updateOutgoingMail(outgoingMail)
       }
+    }
+    return response.json({ message: 'Email sent successfully' })
+  }
 
-      // Vérifier que le contact et la section sont bien chargés
-      if (!participant.contact || !participant.section) {
-        return response.status(404).json({ error: 'Participant contact or section not found' })
-      }
+  async sendRecommendedNotification({ request, response, bouncer }: HttpContext) {
+    const { projectId, recommendedId } = request.only(['projectId', 'recommendedId'])
+    const project = await this.getAuthorizedProject(bouncer, projectId, 'update')
+    await project.load('registration')
 
-      let responsibles = await Responsibles.query()
-        .where('project_id', projectId)
-        .preload('contact')
+    let recommended = await Contact.findOrFail(recommendedId)
+    let responsibles = await Responsibles.query().where('project_id', project.id).preload('contact')
 
-      let responsibleContact = null
-      if (responsibles && responsibles.length > 0) {
-        responsibleContact = {
-          first_name: responsibles[0].contact.first_name,
-          last_name: responsibles[0].contact.last_name,
-          email: responsibles[0].contact.email,
-          phone: responsibles[0].contact.phone,
-          messenger: responsibles[0].contact.messenger,
-        }
-      }
+    let toContact = responsibles.map(r => ({ first_name: r.contact.first_name, last_name: r.contact.last_name, email: r.contact.email, phone: r.contact.phone, messenger: r.contact.messenger }))
 
-      // Créer et envoyer l'email avec le template
-      const refusalMail = new RefusalNotification(
-        participant.contact,
-        project,
-        participant.section,
-        customMessage,
-        responsibleContact
-      )
+    const recommendedNotification = new RecommendedNotification(recommended, project.registration, project, toContact)
+    const outgoingMail = await OutgoingMail.create({ type: 'recommendation_notification', receiver_id: recommended.id, sent: false, createdAt: DateTime.local(), updatedAt: DateTime.local() })
+    await mail.send(recommendedNotification)
+    await this.updateOutgoingMail(outgoingMail)
+    return response.json({ message: 'Email sent' })
+  }
 
-      await mail.send(refusalMail)
+  async sendParticipationValidationNotification({ request, response, bouncer }: HttpContext) {
+    const { projectId, contactId } = request.only(['projectId', 'contactId'])
+    const project = await this.getAuthorizedProject(bouncer, projectId, 'update')
 
-      // Créer une trace de l'envoi
-      const outgoingMail = new OutgoingMail()
-      outgoingMail.type = 'refusal'
-      outgoingMail.receiver_id = participant.contact.id
-      outgoingMail.project_id = projectId
-      outgoingMail.mail_template_id = null
-      outgoingMail.sent = true
-      outgoingMail.createdAt = DateTime.local()
-      outgoingMail.updatedAt = DateTime.local()
-      await outgoingMail.save()
+    let contact = await Contact.findOrFail(contactId)
+    let responsibles = await Responsibles.query().where('project_id', project.id).preload('contact')
+    let callsheet = await Callsheet.query().where('project_id', project.id).orderBy('created_at', 'desc').firstOrFail()
 
-      return response.ok({ message: 'Email de refus envoyé avec succès' })
-    } catch (error) {
-      console.error("Erreur lors de l'envoi de l'email :", error)
-      return response.status(500).json({
-        error: "Erreur serveur lors de l'envoi de l'email",
-        details: error.message || 'Erreur inconnue',
-      })
+    let toContact = responsibles.map(r => ({ first_name: r.contact.first_name, last_name: r.contact.last_name, email: r.contact.email, phone: r.contact.phone, messenger: r.contact.messenger }))
+
+    const participationValidationNotification = new ParticipationValidationNotification(contact, project, callsheet, toContact)
+    const outgoingMail = await OutgoingMail.create({ type: 'participation_validation_notification', receiver_id: contact.id, sent: false, createdAt: DateTime.local(), updatedAt: DateTime.local() })
+    await mail.send(participationValidationNotification)
+    await this.updateOutgoingMail(outgoingMail)
+    return response.json({ message: 'Email sent' })
+  }
+
+  async getOutgoing({ params, bouncer }: HttpContext) {
+    const project = await this.getAuthorizedProject(bouncer, params.id, 'view')
+
+    let lastCallsheetNotificationSent = await OutgoingMail.query().where('type', 'callsheet_notification').where('project_id', project.id).where('sent', true).orderBy('created_at', 'desc').first()
+    let lastRecruitmentNotificationSent = await OutgoingMail.query().where('type', 'recruitment_notification').where('project_id', project.id).where('sent', true).orderBy('created_at', 'desc').first()
+
+    return {
+      lastCallsheetNotificationSent: lastCallsheetNotificationSent ? lastCallsheetNotificationSent.createdAt.toISO() : null,
+      lastRecruitmentNotificationSent: lastRecruitmentNotificationSent ? lastRecruitmentNotificationSent.createdAt.toISO() : null,
     }
   }
 
@@ -433,337 +273,6 @@ export default class MailingsController {
       updateMail.sent = true
       updateMail.updatedAt = DateTime.local()
       await updateMail.save()
-      console.log('updateMail AFTER', updateMail)
-    } catch (error) {
-      console.log('error', error)
-    }
-
-    return
-  }
-
-  async sendCallsheetNotification({ request, response }: HttpContext) {
-    console.log('sendCallsheetNotification called')
-    const { projectId } = request.only(['projectId'])
-
-    let project = await Project.query()
-      .where('id', projectId)
-      .preload('participants', (participantQuery) => {
-        participantQuery.where('accepted', true)
-      })
-      .first()
-
-    const acceptedParticipants = project?.participants
-
-    if (!project) {
-      return { status: 400, message: 'No project found' }
-    }
-    let callsheet = await Callsheet.query()
-      .where('project_id', projectId)
-      .orderBy('created_at', 'desc')
-      .first()
-    let responsibles = await Responsibles.query().where('project_id', projectId).preload('contact')
-    let toContact: Array<{
-      first_name: string
-      last_name: string
-      email: string
-      phone: string
-      messenger: string
-    }> = []
-
-    if (!callsheet) {
-      return response.status(400).json({ message: 'No callsheet found' })
-    }
-    if (!project) {
-      return response.status(400).json({ message: 'No project found' })
-    }
-    if (!responsibles) {
-      return response.status(400).json({ message: 'No responsibles found' })
-    }
-    if (!acceptedParticipants) {
-      return response.status(400).json({ message: 'No participants found' })
-    }
-
-    for (let responsible of responsibles) {
-      toContact.push({
-        first_name: responsible.contact.first_name,
-        last_name: responsible.contact.last_name,
-        email: responsible.contact.email,
-        phone: responsible.contact.phone,
-        messenger: responsible.contact.messenger,
-      })
-    }
-
-    if (acceptedParticipants !== null && acceptedParticipants !== undefined) {
-      for (let participant of acceptedParticipants) {
-        let contact = await Contact.find(participant.contact_id)
-        if (contact?.email && contact?.subscribed === true && contact?.validated === true) {
-          const callsheetNotificationMail = new CallsheetNotification(
-            contact,
-            project,
-            callsheet,
-            toContact
-          )
-          const outgoingMail = new OutgoingMail()
-          outgoingMail.type = 'callsheet_notification'
-          outgoingMail.receiver_id = contact.id
-          if (project) {
-            outgoingMail.project_id = project.id
-          } else {
-            outgoingMail.project_id = null
-          }
-          outgoingMail.mail_template_id = null
-          outgoingMail.sent = false
-          outgoingMail.createdAt = DateTime.local()
-          outgoingMail.updatedAt = DateTime.local()
-
-          await OutgoingMail.create(outgoingMail)
-          await mail.send(callsheetNotificationMail)
-          await this.updateOutgoingMail(outgoingMail)
-        }
-      }
-    } else {
-      return response.status(400).json({ message: 'No participants found' })
-    }
-
-    return response.json({ message: 'Email sent successfully' })
-  }
-
-  async sendRecruitmentNotification({ request, response }: HttpContext) {
-    console.log('sendRecruitmentNotification called')
-    const { projectId } = request.only(['projectId'])
-    let project = await Project.query().where('id', projectId).first()
-
-    let contacts = await Contact.query().where('subscribed', true).where('validated', true)
-    let registrationQuery = await project
-      ?.related('registration')
-      .query()
-      .orderBy('created_at', 'desc')
-      .first()
-    let registration = {
-      id: registrationQuery?.id,
-      project_id: registrationQuery?.project_id,
-    }
-    let responsibles = await Responsibles.query().where('project_id', projectId).preload('contact')
-    let toContact: Array<{
-      first_name: string
-      last_name: string
-      email: string
-      phone: string
-      messenger: string
-    }> = []
-
-    if (!project) {
-      return response.status(400).json({ message: 'No project found' })
-    }
-    if (!responsibles) {
-      return response.status(400).json({ message: 'No responsibles found' })
-    }
-    if (!contacts) {
-      return response.status(400).json({ message: 'No validated and subscribed contacts found' })
-    }
-    if (!registration) {
-      return response.status(400).json({ message: 'No registration form found' })
-    }
-
-    for (let responsible of responsibles) {
-      toContact.push({
-        first_name: responsible.contact.first_name,
-        last_name: responsible.contact.last_name,
-        email: responsible.contact.email,
-        phone: responsible.contact.phone,
-        messenger: responsible.contact.messenger,
-      })
-    }
-    if (contacts !== null && contacts !== undefined) {
-      if (registration.id !== null && registration.id !== undefined) {
-        for (let contact of contacts) {
-          if (contact?.email && contact?.subscribed === true && contact?.validated === true) {
-            const recruitmentNotification = new RecruitmentNotification(
-              contact,
-              registration,
-              project,
-              toContact
-            )
-            const outgoingMail = new OutgoingMail()
-            outgoingMail.type = 'recruitment_notification'
-            outgoingMail.receiver_id = contact.id
-            if (project) {
-              outgoingMail.project_id = project.id
-            } else {
-              outgoingMail.project_id = null
-            }
-            outgoingMail.mail_template_id = null
-            outgoingMail.sent = false
-            outgoingMail.createdAt = DateTime.local()
-            outgoingMail.updatedAt = DateTime.local()
-
-            await OutgoingMail.create(outgoingMail)
-            await mail.send(recruitmentNotification)
-            this.updateOutgoingMail(outgoingMail)
-          }
-        }
-      } else {
-        return response.status(400).json({ message: 'No registration form found' })
-      }
-    } else {
-      return response.status(400).json({ message: 'No contacts found' })
-    }
-
-    return response.json({ message: 'Email sent successfully' })
-  }
-
-  async sendRecommendedNotification({ request, response }: HttpContext) {
-    //function to send a mail to a recommended person (recommendeds) to join a project
-    console.log('sendRecommendedNotification called')
-    const { projectId, recommendedId } = request.only(['projectId', 'recommendedId'])
-
-    let project = await Project.query().where('id', projectId).preload('registration').first()
-    let recommended = await Contact.find(recommendedId)
-    let responsibles = await Responsibles.query().where('project_id', projectId).preload('contact')
-    if (!project) {
-      return response.status(400).json({ message: 'No project found' })
-    }
-    if (!recommended) {
-      return response.status(400).json({ message: 'No recommended contact found' })
-    }
-
-    let toContact: Array<{
-      first_name: string
-      last_name: string
-      email: string
-      phone: string
-      messenger: string
-    }> = []
-
-    for (let responsible of responsibles) {
-      toContact.push({
-        first_name: responsible.contact.first_name,
-        last_name: responsible.contact.last_name,
-        email: responsible.contact.email,
-        phone: responsible.contact.phone,
-        messenger: responsible.contact.messenger,
-      })
-    }
-
-    const recommendedNotification = new RecommendedNotification(
-      recommended,
-      project.registration,
-      project,
-      toContact
-    )
-
-    const outgoingMail = new OutgoingMail()
-    outgoingMail.type = 'recommendation_notification'
-    outgoingMail.receiver_id = recommended.id
-    outgoingMail.mail_template_id = null
-    outgoingMail.sent = false
-    outgoingMail.createdAt = DateTime.local()
-    outgoingMail.updatedAt = DateTime.local()
-
-    await OutgoingMail.create(outgoingMail)
-
-    await mail.send(recommendedNotification)
-    await this.updateOutgoingMail(outgoingMail)
-
-    return response.json({
-      message: 'Email ' + outgoingMail.type + ' sent successfully to' + recommended.email,
-    })
-  }
-
-  async sendParticipationValidationNotification({ request, response }: HttpContext) {
-    console.log('sendParticipationValidationNotification called')
-    const { projectId, contactId } = request.only(['projectId', 'contactId'])
-
-    let project = await Project.query().where('id', projectId).preload('callsheets').first()
-    let contact = await Contact.find(contactId)
-    let responsibles = await Responsibles.query().where('project_id', projectId).preload('contact')
-    let callsheet = await Callsheet.query()
-      .where('project_id', projectId)
-      .orderBy('created_at', 'desc')
-      .first()
-
-    if (!project) {
-      return response.status(400).json({ message: 'No project found' })
-    }
-    if (!contact) {
-      return response.status(400).json({ message: 'No contact found' })
-    }
-    if (!callsheet) {
-      return response.status(400).json({ message: 'No callsheet found' })
-    }
-
-    let toContact: Array<{
-      first_name: string
-      last_name: string
-      email: string
-      phone: string
-      messenger: string
-    }> = []
-
-    for (let responsible of responsibles) {
-      toContact.push({
-        first_name: responsible.contact.first_name,
-        last_name: responsible.contact.last_name,
-        email: responsible.contact.email,
-        phone: responsible.contact.phone,
-        messenger: responsible.contact.messenger,
-      })
-    }
-
-    const participationValidationNotification = new ParticipationValidationNotification(
-      contact,
-      project,
-      callsheet,
-      toContact
-    )
-
-    const outgoingMail = new OutgoingMail()
-    outgoingMail.type = 'participation_validation_notification'
-    outgoingMail.receiver_id = contact.id
-    outgoingMail.mail_template_id = null
-    outgoingMail.sent = false
-    outgoingMail.createdAt = DateTime.local()
-    outgoingMail.updatedAt = DateTime.local()
-
-    await OutgoingMail.create(outgoingMail)
-
-    await mail.send(participationValidationNotification)
-    await this.updateOutgoingMail(outgoingMail)
-
-    return response.json({
-      message: 'Email ' + outgoingMail.type + ' sent successfully to' + contact.email,
-    })
-  }
-
-  async getOutgoing(ctx: HttpContext) {
-    let data: {
-      lastCallsheetNotificationSent: string | null
-      lastRecruitmentNotificationSent: string | null
-    }
-    console.log('getOutgoing called')
-    let lastCallsheetNotificationSent = await OutgoingMail.query()
-      .where('type', 'callsheet_notification')
-      .where('project_id', ctx.params.id)
-      .where('sent', true)
-      .orderBy('created_at', 'desc')
-      .first()
-
-    let lastRecruitmentNotificationSent = await OutgoingMail.query()
-      .where('type', 'recruitment_notification')
-      .where('project_id', ctx.params.id)
-      .where('sent', true)
-      .orderBy('created_at', 'desc')
-      .first()
-
-    data = {
-      lastCallsheetNotificationSent: lastCallsheetNotificationSent
-        ? lastCallsheetNotificationSent.createdAt.toISO()
-        : null,
-      lastRecruitmentNotificationSent: lastRecruitmentNotificationSent
-        ? lastRecruitmentNotificationSent.createdAt.toISO()
-        : null,
-    }
-
-    return data
+    } catch (error) {}
   }
 }

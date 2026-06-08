@@ -32,6 +32,15 @@
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+
+    "paths": {
+      "#models/*": ["./app/models/*"],
+      "#controllers/*": ["./app/controllers/*"],
+      "#policies/*": ["./app/policies/*"],
+      "#validators/*": ["./app/validators/*"],
+      "#mails/*": ["./app/mails/*"],
+      "#start/*": ["./start/*"]
+    }
   }
 }

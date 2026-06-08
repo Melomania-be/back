@@ -1,12 +1,12 @@
-// import type { HttpContext } from '@adonisjs/core/http'
-
-import Composer from '#models/composer'
 import { HttpContext } from '@adonisjs/core/http'
+import Composer from '#models/composer'
 import { createComposerValidator } from '#validators/composer'
 import { simpleFilter } from 'adonisjs-filters'
 
 export default class ComposersController {
+
   async getAll(ctx: HttpContext) {
+    // Les listes globales peuvent être lues sans droit d'écriture admin
     let baseQuery = Composer.query()
 
     let res = await simpleFilter(
@@ -14,18 +14,16 @@ export default class ComposersController {
       baseQuery,
       ['short_name', 'long_name', 'birth_date', 'death_date', 'country', 'main_style'],
       [],
-      {
-        filtered: true,
-        paginated: true,
-        ordered: true,
-      }
+      { filtered: true, paginated: true, ordered: true }
     )
-    console.log(res)
     return res
   }
 
-  async createOrUpdate(ctx: HttpContext) {
-    const data = await ctx.request.validateUsing(createComposerValidator)
+  async createOrUpdate({ request, bouncer, response }: HttpContext) {
+    // SÉCURITÉ : Action globale, réservée aux administrateurs
+    await (bouncer as any).authorize('adminRights')
+
+    const data = await request.validateUsing(createComposerValidator)
 
     if (data.id === undefined) {
       return await Composer.create(data)
@@ -42,7 +40,10 @@ export default class ComposersController {
     return composer
   }
 
-  async delete({ params, response }: HttpContext) {
+  async delete({ params, response, bouncer }: HttpContext) {
+    // SÉCURITÉ : Action globale, réservée aux administrateurs
+    await (bouncer as any).authorize('adminRights')
+
     const composerId = params.id
     const composer = await Composer.findOrFail(composerId)
     await composer.delete()
@@ -50,6 +51,7 @@ export default class ComposersController {
   }
 
   async getPieces({ params, response }: HttpContext) {
+    // Lecture de ressource
     const composer = await Composer.query().where('id', params.id).preload('pieces').first()
 
     if (!composer) {

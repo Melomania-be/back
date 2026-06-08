@@ -2,15 +2,18 @@ import MailTemplate from '#models/mail_template'
 import { HttpContext } from '@adonisjs/core/http'
 
 export default class DefaultTemplatesController {
-  async getDefaultTemplates() {
-    let templates = await MailTemplate.query().where('is_default', true).select('*')
-    return templates
+
+  async getDefaultTemplates({ bouncer }: HttpContext) {
+    await (bouncer as any).authorize('adminRights')
+    return await MailTemplate.query().where('is_default', true).select('*')
   }
 
-  async editDefaultTemplate({ request }: HttpContext) {
-    const { id, name, content } = request.only(['id', 'name', 'content'])
+  async editDefaultTemplate({ request, bouncer }: HttpContext) {
+    await (bouncer as any).authorize('adminRights')
 
+    const { id, name, content } = request.only(['id', 'name', 'content'])
     let template = await MailTemplate.find(id)
+
     if (template) {
       template.name = name
       template.content = content

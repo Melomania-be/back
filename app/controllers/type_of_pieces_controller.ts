@@ -5,34 +5,25 @@ import { simpleFilter } from 'adonisjs-filters'
 
 export default class TypeOfPiecesController {
   async getAll(ctx: HttpContext) {
+    await (ctx.bouncer as any).authorize('adminRights')
     let baseQuery = TypeOfPiece.query()
-
-    return await simpleFilter(ctx, baseQuery, ['name'], [], {
-      filtered: true,
-      paginated: true,
-      ordered: true,
-    })
+    return await simpleFilter(ctx, baseQuery, ['name'], [], { filtered: true, paginated: true, ordered: true })
   }
 
   async createOrUpdate(ctx: HttpContext) {
+    await (ctx.bouncer as any).authorize('adminRights')
     const data = await ctx.request.validateUsing(createTypeOfPieceValidator)
 
-    if (data.id === undefined) {
-      return await TypeOfPiece.create(data)
-    }
-
+    if (data.id === undefined) return await TypeOfPiece.create(data)
     const type = await TypeOfPiece.firstOrCreate({ id: data.id }, data)
+    if (type.$isLocal) return type
 
-    if (type.$isLocal) {
-      return type
-    }
-
-    type.merge(data)
-    await type.save()
+    type.merge(data); await type.save()
     return type
   }
 
-  async delete({ params, response }: HttpContext) {
+  async delete({ params, response, bouncer }: HttpContext) {
+    await (bouncer as any).authorize('adminRights')
     let type = await TypeOfPiece.find(params.id)
     type?.delete()
     return response.send('Type deleted')

@@ -11,5 +11,9 @@
 | templates.
 |
 */
-
-export const policies = {}
+import  ProjectPolicy  from '#policies/project_policy'
+import  AdminPolicy  from '#policies/admin_policy'
+export const policies = {
+  ProjectPolicy,
+  AdminPolicy,
+}

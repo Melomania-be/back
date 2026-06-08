@@ -1,22 +1,24 @@
-// import type { HttpContext } from '@adonisjs/core/http'
-
 import Folder from '#models/folder'
 import File from '#models/file'
 import { folderCreationValidator, folderUpdateValidator } from '#validators/folder'
 import { HttpContext } from '@adonisjs/core/http'
 
 export default class FoldersController {
-  async getAll() {
+
+  async getAll({ bouncer }: HttpContext) {
+    await (bouncer as any).authorize('adminRights')
     return await Folder.query().preload('files')
   }
 
-  async create(ctx: HttpContext) {
-    const data = await ctx.request.validateUsing(folderCreationValidator)
+  async create({ request, bouncer }: HttpContext) {
+    await (bouncer as any).authorize('adminRights')
+    const data = await request.validateUsing(folderCreationValidator)
     return await Folder.create(data)
   }
 
-  async update(ctx: HttpContext) {
-    const data = await ctx.request.validateUsing(folderUpdateValidator)
+  async update({ request, bouncer }: HttpContext) {
+    await (bouncer as any).authorize('adminRights')
+    const data = await request.validateUsing(folderUpdateValidator)
     let folder = await Folder.findOrFail(data.id)
 
     folder.merge(data)
@@ -30,9 +32,10 @@ export default class FoldersController {
     return folder
   }
 
-  async delete({ params, response }: HttpContext) {
+  async delete({ params, response, bouncer }: HttpContext) {
+    await (bouncer as any).authorize('adminRights')
     let folder = await Folder.findOrFail(params.id)
-    folder.delete()
+    await folder.delete()
     return response.send('folder deleted')
   }
 }
