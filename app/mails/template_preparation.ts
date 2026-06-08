@@ -3,6 +3,7 @@ import { BaseMail } from '@adonisjs/mail'
 import Callsheet from '#models/callsheet'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import app from '@adonisjs/core/services/app'
 
 export default class TemplatePreparation extends BaseMail {
   contact: {
@@ -13,9 +14,9 @@ export default class TemplatePreparation extends BaseMail {
   }
   project:
     | {
-        id: number
-        name: string
-      }
+    id: number
+    name: string
+  }
     | null
     | undefined
   toContact: {
@@ -27,9 +28,9 @@ export default class TemplatePreparation extends BaseMail {
   }
   registration:
     | {
-        id: number
-        project_id: number
-      }
+    id: number
+    project_id: number
+  }
     | null
     | undefined
   from: string
@@ -68,30 +69,34 @@ export default class TemplatePreparation extends BaseMail {
       .replace(/\${NAME}/g, this.contact.first_name + ' ' + this.contact.last_name)
       .replace(/\${URL}/g, url)
       .replace(/\${PROJECT}/g, this.project?.name ?? '')
+      // CORRECTION DU BUG DES LIENS CASSÉS (URL -> url)
       .replace(
         /\${CALLSHEET}/g,
-        this.callsheet ? `${URL}/call_sheets/${this.callsheet.id}/${this.contact.id}` : ''
+        this.callsheet ? `${url}/call_sheets/${this.callsheet.id}/${this.contact.id}` : ''
       )
       .replace(
         /\${TO_CONTACT}/g,
         '<br>' +
-          this.toContact.firstName +
-          ' ' +
-          this.toContact.lastName +
-          '<br> mail : ' +
-          this.toContact.email +
-          '<br> phone : ' +
-          this.toContact.phone +
-          '<br> messenger :  ' +
-          this.toContact.messenger
+        this.toContact.firstName +
+        ' ' +
+        this.toContact.lastName +
+        '<br> mail : ' +
+        this.toContact.email +
+        '<br> phone : ' +
+        this.toContact.phone +
+        '<br> messenger :  ' +
+        this.toContact.messenger
       )
+
     if (this.registration) {
+      // correction du lien casse
       htmlContent = htmlContent.replace(
         /\${REGISTRATION}/g,
-        `${URL}/registration/${this.registration.id}`
+        `${url}/registration/${this.registration.id}`
       )
     } else {
-      htmlContent = htmlContent.replace(/\${REGISTRATION}/g, `${URL}/registration/default_value`)
+      // correction du lien casse
+      htmlContent = htmlContent.replace(/\${REGISTRATION}/g, `${url}/registration/default_value`)
     }
 
     const matches = htmlContent.match(imageFileRegex)
@@ -101,7 +106,17 @@ export default class TemplatePreparation extends BaseMail {
         const pathMatch = match.match(/file=([^\s>]+)/)
         if (pathMatch) {
           const filePath = pathMatch[1]
-          const fileURL = pathToFileURL(filePath).href
+
+          // patch de securite
+          const baseUploadDir = path.resolve(app.makePath('uploads'))
+          const resolvedPath = path.resolve(baseUploadDir, filePath)
+
+          // obligation de pointer STRICTEMENT vers le dossier uploads
+          if (!resolvedPath.startsWith(baseUploadDir)) {
+            throw new Error('Tentative d\'accès non autorisé à un fichier système.')
+          }
+
+          const fileURL = pathToFileURL(resolvedPath).href
           const cid = `image-${Date.now()}`
           htmlContent = htmlContent.replace(
             match,
@@ -109,7 +124,7 @@ export default class TemplatePreparation extends BaseMail {
           )
           this.message.attach(fileURLToPath(fileURL), {
             contentType: 'image/png',
-            filename: path.basename(filePath),
+            filename: path.basename(resolvedPath),
             headers: { 'Content-ID': cid },
           })
         }

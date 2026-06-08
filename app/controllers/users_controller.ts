@@ -16,7 +16,7 @@ export default class UsersController {
 
       const plainUser = user.serialize()
 
-      let userWithoutPassword = { ...plainUser, password: 'hidden', token: tokens[0] }
+      let userWithoutPassword = { ...plainUser }
 
       reworkedUsers.push(userWithoutPassword)
     }

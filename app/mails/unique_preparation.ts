@@ -2,6 +2,7 @@ import env from '#start/env'
 import { BaseMail } from '@adonisjs/mail'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import app from '@adonisjs/core/services/app'
 
 export default class UniquePreparation extends BaseMail {
   contact: {
@@ -41,7 +42,17 @@ export default class UniquePreparation extends BaseMail {
         const pathMatch = match.match(/file=([^\s>]+)/)
         if (pathMatch) {
           const filePath = pathMatch[1]
-          const fileURL = pathToFileURL(filePath).href
+
+          // patch de securite
+          const baseUploadDir = path.resolve(app.makePath('uploads'))
+          const resolvedPath = path.resolve(baseUploadDir, filePath)
+
+          // obligation de pointer STRICTEMENT vers le dossier uploads
+          if (!resolvedPath.startsWith(baseUploadDir)) {
+            throw new Error('Tentative d\'accès non autorisé à un fichier système.')
+          }
+
+          const fileURL = pathToFileURL(resolvedPath).href
           const cid = `image-${Date.now()}`
           htmlContent = htmlContent.replace(
             match,
@@ -49,7 +60,7 @@ export default class UniquePreparation extends BaseMail {
           )
           this.message.attach(fileURLToPath(fileURL), {
             contentType: 'image/png',
-            filename: path.basename(filePath),
+            filename: path.basename(resolvedPath),
             headers: { 'Content-ID': cid },
           })
         }

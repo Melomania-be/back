@@ -4,6 +4,7 @@ import type Contact from '#models/contact'
 import type Project from '#models/project'
 import type Section from '#models/section'
 import MailTemplate from '#models/mail_template'
+import he from 'he'
 
 export default class RefusalNotification extends BaseMail {
   from = env.get('SMTP_USERNAME') || 'benskotlemogo@gmail.com'
@@ -78,13 +79,11 @@ export default class RefusalNotification extends BaseMail {
 <body style="margin: 0; padding: 0; background-color: #f9f9f9; font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
   <div class="container" style="max-width: 600px; width: 100%; margin: 20px auto; background-color: #ffffff; border-radius: 10px; padding: 20px; color: #333333; box-shadow: 0 0 10px rgba(0,0,0,0.05); box-sizing: border-box;">
 
-    <!-- En-tête sans logo -->
     <div class="header-flex" style="text-align: center; margin-bottom: 30px;">
       <h1 class="title" style="margin: 0; font-size: 40px; color: #333; line-height: 1.2;">🎵 Melomania</h1>
       <p class="subtitle" style="font-size: 18px; margin-top: 8px; color: #666; line-height: 1.3;">La plateforme collaborative des musiciens</p>
     </div>
 
-    <!-- Contenu principal -->
     <div class="content-padding" style="padding: 0 10px;">
       <p style="margin-bottom: 15px; line-height: 1.5;">Bonjour <strong>\${PARTICIPANT_FIRSTNAME} \${PARTICIPANT_LASTNAME}</strong>,</p>
 
@@ -92,7 +91,6 @@ export default class RefusalNotification extends BaseMail {
 
       <p style="margin-bottom: 20px; line-height: 1.5;">Après avoir bien lu votre profil, nous avons le regret de vous annoncer que votre candidature n'a pas été retenue.</p>
 
-      <!-- Bloc de message personnalisé du recruteur -->
       \${CUSTOM_MESSAGE_BLOCK}
 
       <p style="margin-bottom: 20px; line-height: 1.5;">Nous vous encourageons à postuler pour nos prochains projets. Votre profil pourrait parfaitement convenir à d'autres opportunités.</p>
@@ -103,7 +101,6 @@ export default class RefusalNotification extends BaseMail {
       <strong>L'équipe du projet \${PROJECT_NAME}</strong></p>
     </div>
 
-    <!-- Pied de page -->
     <hr style="margin-top: 40px; border: none; border-top: 1px solid #ddd;" />
     <div class="content-padding" style="padding: 0 10px;">
       <p style="font-size: 12px; color: #888; line-height: 1.4; margin-bottom: 10px;">Cet email a été envoyé automatiquement. Si vous avez des questions, n'hésitez pas à nous contacter.</p>
@@ -114,12 +111,14 @@ export default class RefusalNotification extends BaseMail {
 </html>`
     }
 
-    // Préparer le bloc de message personnalisé
+    // --- DÉBUT CORRECTION DE SÉCURITÉ (ANTI-PHISHING/XSS) ---
+
     const customMessageBlock = this.customMessage && this.customMessage.trim() !== ''
       ? `<div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #007bff;">
-          ${this.customMessage}
+          ${he.encode(this.customMessage)}
          </div>`
       : ''
+    // --- FIN CORRECTION ---
 
     // Préparer le bloc de contact
     const contactEmailBlock = this.responsible?.email
@@ -141,6 +140,6 @@ export default class RefusalNotification extends BaseMail {
       .from(this.from)
       .subject(this.subject)
       .html(htmlContent)
-    // ❌ LOGO SUPPRIMÉ : .attach(logoPath, { cid: 'logoMelomania.png' } as any)
+    
   }
 }

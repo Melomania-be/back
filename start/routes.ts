@@ -54,9 +54,7 @@ router.group(() => {
   router.post('/sign_in', [UsersController, 'signIn'])
 
   // Routes fichiers publiques étendues
-  router.get('/files/download/:id', [FilesController, 'download'])
-  router.get('/files/stream/:id', [FilesController, 'stream'])
-  router.get('/files/info/:id', [FilesController, 'info'])
+
 
   // Routes publiques pour dossiers partagés
   router
@@ -601,6 +599,16 @@ router.group(() => {
         })
         .prefix('/sectionGroups')
 
+      // =============================================================================
+      // GESTION DES FICHIERS (PROTÉGÉE)
+      // =============================================================================
+      router
+        .group(() => {
+          router.get('/download/:id', [FilesController, 'download'])
+          router.get('/stream/:id', [FilesController, 'stream'])
+          router.get('/info/:id', [FilesController, 'info'])
+        })
+        .prefix('/files')
       // =============================================================================
       // GESTION DES SECTIONS
       // =============================================================================
