@@ -19,9 +19,12 @@ export default class ContactsController {
   }
 
   async getAll(ctx: HttpContext) {
-    let baseQuery = Contact.query().preload('instruments', (instrumentsQuery) => {
-      instrumentsQuery.pivotColumns(['proficiency_level'])
-    })
+   let baseQuery = Contact.query()
+  .preload('instruments', (instrumentsQuery) => {
+    instrumentsQuery.pivotColumns(['proficiency_level'])
+  })
+  .preload('projects')
+  .preload('participants')
 
     return await simpleFilter(
       ctx,
@@ -162,11 +165,12 @@ export default class ContactsController {
 
     const data = await ctx.request.validateUsing(createContactValidator)
 
+    let contact
     if (!data.id) {
-      return await Contact.create({ ...data, validated: true })
+      contact = await Contact.create({ ...data, validated: true })
+    } else {
+      contact = await Contact.updateOrCreate({ id: data.id }, { ...data, validated: true })
     }
-
-    const contact = await Contact.updateOrCreate({ id: data.id }, { ...data, validated: true })
 
     if (data.instruments) {
       let toSync = Object.assign(

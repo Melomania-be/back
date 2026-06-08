@@ -165,6 +165,79 @@ export default class MailingsController {
     }
   }
 
+  async sendMailToIndividualContacts({ request, response }: HttpContext) {
+  console.log('sendMailToIndividualContacts called')
+  const { contactIds, type, templateId, subject, content } = request.only([
+    'contactIds',
+    'type',
+    'templateId',
+    'subject',
+    'content',
+  ])
+
+  if (!contactIds || !Array.isArray(contactIds) || contactIds.length === 0) {
+    return response.status(400).json({ message: 'No contact IDs provided' })
+  }
+
+  const contacts = await Contact.query().whereIn('id', contactIds)
+
+  if (type === 'unique') {
+    for (let contact of contacts) {
+      if (contact?.email && contact?.subscribed === true && contact?.validated === true) {
+        const uniqueMail = new UniquePreparation(content, subject, contact)
+
+        const outgoingMail = new OutgoingMail()
+        outgoingMail.type = 'unique'
+        outgoingMail.receiver_id = contact.id
+        outgoingMail.project_id = null
+        outgoingMail.mail_template_id = null
+        outgoingMail.sent = false
+        outgoingMail.createdAt = DateTime.local()
+        outgoingMail.updatedAt = DateTime.local()
+
+        await OutgoingMail.create(outgoingMail)
+        await mail.send(uniqueMail)
+        await this.updateOutgoingMail(outgoingMail)
+      }
+    }
+    return response.json({ message: 'Email sent successfully' })
+  }
+
+  if (type === 'template') {
+    let templateDb = await mail_template.find(templateId)
+    let htmlFromDb = templateDb?.content || ''
+
+    for (let contact of contacts) {
+      if (contact?.email && contact?.subscribed === true && contact?.validated === true) {
+        const templatePreparation = new TemplatePreparation(
+          htmlFromDb,
+          contact,
+          null,
+          null,
+          { firstName: '', lastName: '', email: '', phone: '', messenger: '' },
+          null
+        )
+
+        const outgoingMail = new OutgoingMail()
+        outgoingMail.type = 'template'
+        outgoingMail.receiver_id = contact.id
+        outgoingMail.project_id = null
+        outgoingMail.mail_template_id = templateId
+        outgoingMail.sent = false
+        outgoingMail.createdAt = DateTime.local()
+        outgoingMail.updatedAt = DateTime.local()
+
+        await OutgoingMail.create(outgoingMail)
+        await mail.send(templatePreparation)
+        await this.updateOutgoingMail(outgoingMail)
+      }
+    }
+    return response.json({ message: 'Email sent successfully' })
+  }
+
+  return response.status(400).json({ message: 'Invalid type' })
+}
+
   // ✅ FONCTION CORRIGÉE : sendAuditionRequest - Version simplifiée sans preload
   async sendAuditionRequest({ request, response }: HttpContext) {
     console.log('📧 sendAuditionRequest called')

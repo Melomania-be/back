@@ -5,15 +5,7 @@ import Project from './project.js'
 import Contact from './contact.js'
 import Section from './section.js'
 
-export type RecruitmentStatus =
-  | 'not_yet_contacted'
-  | 'awaiting_response'
-  | 'to_follow_up'
-  | 'not_available'
-  | 'pending_validation'
-  | 'cancelled'
-  | 'recruited'
-
+export type RecruitmentStatus = string
 export type ContactMethod = 'manual' | 'email' | 'messenger' | 'phone'
 
 export default class RecruitmentContact extends BaseModel {
@@ -45,7 +37,7 @@ export default class RecruitmentContact extends BaseModel {
   declare section_id: number | null
 
   @column()
-  declare status: RecruitmentStatus
+  declare status: string
 
   @column()
   declare contact_method: ContactMethod
@@ -211,10 +203,16 @@ export default class RecruitmentContact extends BaseModel {
       recruited: { label: 'Recruited', color: 'green', icon: 'CheckCircle' },
     }
 
-    return statusConfig[this.status] || statusConfig['not_yet_contacted']
+   return (
+  statusConfig[this.status as keyof typeof statusConfig] || {
+    label: this.status,
+    color: 'gray',
+    icon: 'Circle'
+  }
+)
   }
 
-  static getAvailableStatuses(): Array<{ value: RecruitmentStatus; label: string }> {
+  static getAvailableStatuses(): Array<{ value: string; label: string }> {
     return [
       { value: 'not_yet_contacted', label: 'Not yet contacted' },
       { value: 'awaiting_response', label: 'Awaiting response' },

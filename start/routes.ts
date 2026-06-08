@@ -568,6 +568,8 @@ router.group(() => {
           ])
           router.post('/sendMailToParticipants', [MailingsController, 'sendMailToParticipants'])
 
+          router.post('/sendMailToIndividualContacts', [MailingsController, 'sendMailToIndividualContacts'])
+
           router
             .group(() => {
               router.get('/default', [DefaultTemplatesController, 'getDefaultTemplates'])
