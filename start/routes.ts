@@ -38,17 +38,19 @@ const RecruitmentController = () => import('#controllers/recruitment_controller'
 const ContractorsController = () => import('#controllers/contractors_controller')
 const RecruitmentRecommendationController = () =>
   import('#controllers/recruitment_recommendation_controller')
+
 const AppSettingsController = () => import('#controllers/app_settings_controller')
+
 const OrganizationsController = () =>
   import('#controllers/organizations_controller')
 
 const ContractorCategoriesController = () =>
   import('#controllers/contractor_categories_controller')
+
 const ContractorInteractionsController = () =>
   import('#controllers/contractor_interactions_controller')
 const ContractorParticipantsController = () =>
   import('#controllers/contractor_participants_controller')
-
 
 router.group(() => {
   // =============================================================================
@@ -569,6 +571,7 @@ router
   router
   .group(() => {
     router.get('/', [OrganizationsController, 'getAll'])
+
     router.post('/create', [OrganizationsController, 'create'])
   })
   .prefix('/organization')
@@ -614,6 +617,7 @@ router.get(
 )
   })
   .prefix('/contractor-interaction')
+
       // =============================================================================
       // GESTION DES INSTRUMENTS
       // =============================================================================
