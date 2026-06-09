@@ -35,8 +35,15 @@ const AccountingsController = () => import('#controllers/accounting_controller')
 const FilesystemController = () => import('#controllers/filesystem_controller')
 const SharedFolderController = () => import('#controllers/shared_folder_controller')
 const RecruitmentController = () => import('#controllers/recruitment_controller')
+const ContractorsController = () => import('#controllers/contractors_controller')
 const RecruitmentRecommendationController = () =>
   import('#controllers/recruitment_recommendation_controller')
+const OrganizationsController = () =>
+  import('#controllers/organizations_controller')
+
+const ContractorCategoriesController = () =>
+  import('#controllers/contractor_categories_controller')
+
 
 router.group(() => {
   // =============================================================================
@@ -49,7 +56,6 @@ router.group(() => {
       henlo: 'monde',
     }
   })
-
   // Authentication
   router.post('/sign_in', [UsersController, 'signIn'])
 
@@ -503,6 +509,31 @@ router.group(() => {
           router.post('/', [ContactsController, 'advancedSearch'])
         })
         .prefix('/contact')
+
+// =============================================================================
+// GESTION DES CONTRACTORS
+// =============================================================================
+router
+  .group(() => {
+    router.get('/', [ContractorsController, 'getAll'])
+    router.get('/:id', [ContractorsController, 'getOne'])
+    router.post('/', [ContractorsController, 'create'])
+    router.put('/:id', [ContractorsController, 'update'])
+    router.delete('/:id', [ContractorsController, 'delete'])
+  })
+  .prefix('/contractor')
+
+  router
+  .group(() => {
+    router.get('/', [OrganizationsController, 'getAll'])
+  })
+  .prefix('/organization')
+
+router
+  .group(() => {
+    router.get('/', [ContractorCategoriesController, 'getAll'])
+  })
+  .prefix('/contractor-category')
 
       // =============================================================================
       // GESTION DES INSTRUMENTS
