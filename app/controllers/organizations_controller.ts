@@ -1,7 +1,8 @@
 import Organization from '#models/organization'
+import type { HttpContext } from '@adonisjs/core/http'
 
 export default class OrganizationsController {
-  async getAll() {
-    return await Organization.query()
+  async getAll({}: HttpContext) {
+    return await Organization.all()
   }
 }
