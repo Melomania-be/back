@@ -6,33 +6,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import app from '@adonisjs/core/services/app'
 
 export default class TemplatePreparation extends BaseMail {
-  contact: {
-    id: number
-    first_name: string
-    last_name: string
-    email: string
-  }
-  project:
-    | {
-    id: number
-    name: string
-  }
-    | null
-    | undefined
-  toContact: {
-    firstName: string
-    lastName: string
-    email: string
-    phone: string
-    messenger: string
-  }
-  registration:
-    | {
-    id: number
-    project_id: number
-  }
-    | null
-    | undefined
+  contact: { id: number; first_name: string; last_name: string; email: string }
+  project: { id: number; name: string } | null | undefined
+  toContact: { firstName: string; lastName: string; email: string; phone: string; messenger: string }
+  registration: { id: number; project_id: number } | null | undefined
   from: string
   htmlFromDb: string
   callsheet: Callsheet | null | undefined
@@ -42,13 +19,7 @@ export default class TemplatePreparation extends BaseMail {
     contact: { id: number; first_name: string; last_name: string; email: string },
     project: { id: number; name: string } | null | undefined,
     callsheet: Callsheet | null,
-    to_contact: {
-      firstName: string
-      lastName: string
-      email: string
-      phone: string
-      messenger: string
-    },
+    to_contact: { firstName: string; lastName: string; email: string; phone: string; messenger: string },
     registration: { id: number; project_id: number } | null | undefined
   ) {
     super()
@@ -62,14 +33,15 @@ export default class TemplatePreparation extends BaseMail {
   }
 
   prepare() {
+    // CORRECTION V-11 : Utilisation cohérente de 'url' (en minuscule)
     const url = env.get('URL') || ''
     const imageFileRegex = /<img\s+file=([^>]+\.(jpg|png))\s*\/?>/g
 
     let htmlContent = this.htmlFromDb
       .replace(/\${NAME}/g, this.contact.first_name + ' ' + this.contact.last_name)
-      .replace(/\${URL}/g, url)
+      .replace(/\${URL}/g, url) // Remplace les balises de template
+      .replace(/\${url}/g, url) // Supporte aussi les minuscules par sécurité
       .replace(/\${PROJECT}/g, this.project?.name ?? '')
-      // CORRECTION DU BUG DES LIENS CASSÉS (URL -> url)
       .replace(
         /\${CALLSHEET}/g,
         this.callsheet ? `${url}/call_sheets/${this.callsheet.id}/${this.contact.id}` : ''
@@ -77,25 +49,15 @@ export default class TemplatePreparation extends BaseMail {
       .replace(
         /\${TO_CONTACT}/g,
         '<br>' +
-        this.toContact.firstName +
-        ' ' +
-        this.toContact.lastName +
-        '<br> mail : ' +
-        this.toContact.email +
-        '<br> phone : ' +
-        this.toContact.phone +
-        '<br> messenger :  ' +
-        this.toContact.messenger
+        this.toContact.firstName + ' ' + this.toContact.lastName +
+        '<br> mail : ' + this.toContact.email +
+        '<br> phone : ' + this.toContact.phone +
+        '<br> messenger :  ' + this.toContact.messenger
       )
 
     if (this.registration) {
-      // correction du lien casse
-      htmlContent = htmlContent.replace(
-        /\${REGISTRATION}/g,
-        `${url}/registration/${this.registration.id}`
-      )
+      htmlContent = htmlContent.replace(/\${REGISTRATION}/g, `${url}/registration/${this.registration.id}`)
     } else {
-      // correction du lien casse
       htmlContent = htmlContent.replace(/\${REGISTRATION}/g, `${url}/registration/default_value`)
     }
 
@@ -105,15 +67,19 @@ export default class TemplatePreparation extends BaseMail {
       for (const match of matches) {
         const pathMatch = match.match(/file=([^\s>]+)/)
         if (pathMatch) {
-          const filePath = pathMatch[1]
+          const rawFilePath = pathMatch[1]
 
-          // patch de securite
+          // CORRECTION V-01 (Path Traversal / LFI) : Sécurité Absolue
           const baseUploadDir = path.resolve(app.makePath('uploads'))
-          const resolvedPath = path.resolve(baseUploadDir, filePath)
 
-          // obligation de pointer STRICTEMENT vers le dossier uploads
+          // On force l'extraction du nom de fichier pur, ignorant toute tentative de "../"
+          const safeBaseName = path.basename(rawFilePath)
+          const resolvedPath = path.resolve(baseUploadDir, safeBaseName)
+
+          // Double vérification paranoiaque
           if (!resolvedPath.startsWith(baseUploadDir)) {
-            throw new Error('Tentative d\'accès non autorisé à un fichier système.')
+            console.error(`Alerte de sécurité LFI : tentative bloquée pour ${rawFilePath}`)
+            continue // On ignore cette image silencieusement plutôt que de faire crasher le mail
           }
 
           const fileURL = pathToFileURL(resolvedPath).href
@@ -123,8 +89,8 @@ export default class TemplatePreparation extends BaseMail {
             match.replace(/file=([^\s>]+)/, `src="cid:${cid}"`)
           )
           this.message.attach(fileURLToPath(fileURL), {
-            contentType: 'image/png',
-            filename: path.basename(resolvedPath),
+            contentType: 'image/png', // Idéalement, devrait être dynamique (image/jpeg etc.)
+            filename: safeBaseName,
             headers: { 'Content-ID': cid },
           })
         }
@@ -133,7 +99,7 @@ export default class TemplatePreparation extends BaseMail {
 
     this.message
       .to(this.contact.email)
-      .from(`Melomania <${env.get('SMTP_USERNAME')}>`)
+      .from(`Melomania <${this.from}>`)
       .subject('Notification')
       .html(htmlContent)
   }

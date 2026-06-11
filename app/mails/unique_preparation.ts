@@ -5,12 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import app from '@adonisjs/core/services/app'
 
 export default class UniquePreparation extends BaseMail {
-  contact: {
-    id: number
-    first_name: string
-    last_name: string
-    email: string
-  }
+  contact: { id: number; first_name: string; last_name: string; email: string }
   from: string
   content: string
   subject: string
@@ -28,12 +23,14 @@ export default class UniquePreparation extends BaseMail {
   }
 
   prepare() {
+    // CORRECTION V-11 : Utilisation cohérente de 'url'
     const url = env.get('URL') || ''
     const imageFileRegex = /<img\s+file=([^>]+\.(jpg|png))\s*\/?>/g
 
     let htmlContent = this.content
       .replace(/\${NAME}/g, this.contact.first_name + ' ' + this.contact.last_name)
       .replace(/\${URL}/g, url)
+      .replace(/\${url}/g, url)
 
     const matches = htmlContent.match(imageFileRegex)
 
@@ -41,15 +38,19 @@ export default class UniquePreparation extends BaseMail {
       for (const match of matches) {
         const pathMatch = match.match(/file=([^\s>]+)/)
         if (pathMatch) {
-          const filePath = pathMatch[1]
+          const rawFilePath = pathMatch[1]
 
-          // patch de securite
+          // CORRECTION V-01 (Path Traversal / LFI) : Sécurité Absolue
           const baseUploadDir = path.resolve(app.makePath('uploads'))
-          const resolvedPath = path.resolve(baseUploadDir, filePath)
 
-          // obligation de pointer STRICTEMENT vers le dossier uploads
+          // On ne garde que le nom du fichier, on jette toute l'arborescence injectée
+          const safeBaseName = path.basename(rawFilePath)
+          const resolvedPath = path.resolve(baseUploadDir, safeBaseName)
+
+          // Double vérification
           if (!resolvedPath.startsWith(baseUploadDir)) {
-            throw new Error('Tentative d\'accès non autorisé à un fichier système.')
+            console.error(`Alerte de sécurité LFI : tentative bloquée pour ${rawFilePath}`)
+            continue // On ignore l'image malveillante
           }
 
           const fileURL = pathToFileURL(resolvedPath).href
@@ -60,7 +61,7 @@ export default class UniquePreparation extends BaseMail {
           )
           this.message.attach(fileURLToPath(fileURL), {
             contentType: 'image/png',
-            filename: path.basename(resolvedPath),
+            filename: safeBaseName,
             headers: { 'Content-ID': cid },
           })
         }
@@ -69,7 +70,7 @@ export default class UniquePreparation extends BaseMail {
 
     this.message
       .to(this.contact.email)
-      .from(`Melomania <${env.get('SMTP_USERNAME')}>`)
+      .from(`Melomania <${this.from}>`)
       .subject(this.subject)
       .html(htmlContent)
   }
