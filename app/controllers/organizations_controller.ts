@@ -6,6 +6,7 @@ import hash from '@adonisjs/core/services/hash'
 export default class OrganizationsController {
   async getAll({}: HttpContext) {
     return await Organization.all()
+
   }
 
   async create({ request, response }: HttpContext) {

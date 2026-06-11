@@ -8,9 +8,7 @@ export default class ContractorCategoriesController {
   }
 
   async create({ request }: HttpContext) {
-    const data = await request.validateUsing(
-      createContractorCategoryValidator
-    )
+    const data = await request.validateUsing(createContractorCategoryValidator)
 
     return await ContractorCategory.create({
       name: data.name,
@@ -20,9 +18,7 @@ export default class ContractorCategoriesController {
   async update({ params, request }: HttpContext) {
     const category = await ContractorCategory.findOrFail(params.id)
 
-    const data = await request.validateUsing(
-      createContractorCategoryValidator
-    )
+    const data = await request.validateUsing(createContractorCategoryValidator)
 
     category.merge({
       name: data.name,
