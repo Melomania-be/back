@@ -4,6 +4,7 @@ import { execSync } from 'node:child_process'
 import { unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import mail from '@adonisjs/mail/services/main'
+import Save from '#models/save'
 
 export default class BackupDatabase extends BaseCommand {
   static commandName = 'backup:database'
@@ -27,14 +28,30 @@ export default class BackupDatabase extends BaseCommand {
 
     this.logger.info('Sending backup by email...')
 
+    // Récupère l'email de destination depuis les réglages ou le .env
+    const emailSetting = await Save.findBy('variable', 'backup_email')
+    const destinationEmail = emailSetting?.value ?? process.env.BACKUP_EMAIL!
+
     await mail.send((message) => {
       message
-        .to(process.env.BACKUP_EMAIL!)
+        .to(destinationEmail)
         .from(process.env.SMTP_USERNAME!)
         .subject(`[Melomania] Database backup - ${date}`)
         .text(`Please find attached the weekly database backup for ${date}.`)
         .attach(filepath, { filename })
     })
+
+    // Enregistre la date du dernier envoi
+    let lastBackup = await Save.findBy('variable', 'backup_last_sent')
+    if (lastBackup) {
+      lastBackup.value = new Date().toISOString()
+      await lastBackup.save()
+    } else {
+      await Save.create({
+        variable: 'backup_last_sent',
+        value: new Date().toISOString(),
+      })
+    }
 
     unlinkSync(filepath)
     this.logger.success('Backup sent successfully!')

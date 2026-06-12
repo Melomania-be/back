@@ -37,6 +37,7 @@ const SharedFolderController = () => import('#controllers/shared_folder_controll
 const RecruitmentController = () => import('#controllers/recruitment_controller')
 const RecruitmentRecommendationController = () =>
   import('#controllers/recruitment_recommendation_controller')
+const SettingsController = () => import('#controllers/settings_controller')
 
 router.group(() => {
   // =============================================================================
@@ -624,6 +625,18 @@ router.group(() => {
         .prefix('/templates')
 
     })
+
+// =============================================================================
+      // GESTION DES RÉGLAGES
+      // =============================================================================
+      router
+        .group(() => {
+          router.get('/', [SettingsController, 'index'])
+          router.post('/', [SettingsController, 'store'])
+          router.post('/backup/now', [SettingsController, 'backupNow'])
+        })
+        .prefix('/settings')
+
     .use(middleware.auth({ guards: ['api'] }))
     .use(middleware.routeLogger())
 })
