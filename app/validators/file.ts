@@ -4,6 +4,7 @@ export const filesUploadValidator = vine.compile(
   vine.object({
     file: vine
       .file({
+        size: '3500mb',
         extnames: [
           'jpg',
           'png',
@@ -26,6 +27,7 @@ export const filesUploadValidator = vine.compile(
     files: vine
       .array(
         vine.file({
+          size:'3500 mb',
           extnames: [
             'jpg',
             'png',
