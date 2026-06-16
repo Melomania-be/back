@@ -1,5 +1,6 @@
 import { HttpContext } from '@adonisjs/core/http'
 import ContractorContact from '#models/contractor_contact'
+import { createContractorValidator } from '#validators/contractor'
 
 export default class ContractorsController {
   async getAll() {
@@ -17,7 +18,7 @@ export default class ContractorsController {
   }
 
   async create({ request }: HttpContext) {
-    const data = request.all()
+    const data = await request.validateUsing(createContractorValidator)
 
     const contractor = await ContractorContact.create({
       first_name: data.first_name,
@@ -42,7 +43,7 @@ export default class ContractorsController {
   async update({ params, request }: HttpContext) {
     const contractor = await ContractorContact.findOrFail(params.id)
 
-    const data = request.all()
+    const data = await request.validateUsing(createContractorValidator)
 
     contractor.merge({
       first_name: data.first_name,
