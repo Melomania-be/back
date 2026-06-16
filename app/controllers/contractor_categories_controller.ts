@@ -8,6 +8,7 @@ export default class ContractorCategoriesController {
   }
 
   async create({ request }: HttpContext) {
+
     const data = await request.validateUsing(createContractorCategoryValidator)
 
     return await ContractorCategory.create({

@@ -2,7 +2,6 @@ import { HttpContext } from '@adonisjs/core/http'
 import ContractorContact from '#models/contractor_contact'
 import { createContractorValidator } from '#validators/contractor'
 
-import { createContractorValidator } from '#validators/contractor'
 
 export default class ContractorsController {
   async getAll() {
