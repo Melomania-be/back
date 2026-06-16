@@ -532,6 +532,9 @@ router
 router
   .group(() => {
     router.get('/', [ContractorCategoriesController, 'getAll'])
+    router.post('/', [ContractorCategoriesController, 'create'])
+    router.put('/:id', [ContractorCategoriesController, 'update'])
+    router.delete('/:id', [ContractorCategoriesController, 'delete'])
   })
   .prefix('/contractor-category')
 
