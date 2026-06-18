@@ -11,6 +11,7 @@ import Participant from './participant.js'
 import Concert from './concert.js'
 import Contact from './contact.js'
 import Folder from './folder.js'
+import Organization from '#models/organization'
 
 export default class Project extends BaseModel {
   @column({ isPrimary: true })
@@ -78,6 +79,12 @@ export default class Project extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  @column()
+declare organizationId: number | null
+
+@belongsTo(() => Organization)
+declare organization: BelongsTo<typeof Organization>
 
   serializeExtras() {
     return { pivot_order: this.$extras.pivot_order }

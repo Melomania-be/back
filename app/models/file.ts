@@ -5,6 +5,7 @@ import Folder from './folder.js'
 import Project from './project.js'
 import Piece from './piece.js'
 import Material from './material.js'
+import Organization from '#models/organization'
 
 export default class File extends BaseModel {
   @column({ isPrimary: true })
@@ -76,4 +77,10 @@ export default class File extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  @column()
+declare organizationId: number | null
+
+@belongsTo(() => Organization)
+declare organization: BelongsTo<typeof Organization>
 }

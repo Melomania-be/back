@@ -1,8 +1,9 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, hasMany, manyToMany } from '@adonisjs/lucid/orm'
+import { BaseModel, column, hasMany, manyToMany, belongsTo } from '@adonisjs/lucid/orm'
 import Contact from './contact.js'
-import type { HasMany, ManyToMany } from '@adonisjs/lucid/types/relations'
+import type { HasMany, ManyToMany, BelongsTo } from '@adonisjs/lucid/types/relations'
 import MailTemplate from './mail_template.js'
+import Organization from '#models/organization'
 
 export default class List extends BaseModel {
   @column({ isPrimary: true })
@@ -25,4 +26,10 @@ export default class List extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  @column()
+declare organizationId: number | null
+
+@belongsTo(() => Organization)
+declare organization: BelongsTo<typeof Organization>
 }
