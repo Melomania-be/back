@@ -7,6 +7,7 @@ import File from '#models/file'
 import Material from '#models/material'
 import type { BelongsTo, HasMany, ManyToMany } from '@adonisjs/lucid/types/relations'
 import Project from '#models/project'
+import Organization from '#models/organization'
 
 export default class Piece extends BaseModel {
   @column({ isPrimary: true })
@@ -82,6 +83,12 @@ export default class Piece extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  @column()
+  declare organizationId: number | null
+
+  @belongsTo(() => Organization)
+ declare organization: BelongsTo<typeof Organization>
 
   serializeExtras() {
     return {
