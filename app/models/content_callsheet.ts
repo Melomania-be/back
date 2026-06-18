@@ -4,6 +4,8 @@ import Callsheet from '#models/callsheet'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 
 export default class ContentCallsheet extends BaseModel {
+  static table = 'content_callsheets'
+
   @column({ isPrimary: true })
   declare id: number
 
@@ -15,6 +17,12 @@ export default class ContentCallsheet extends BaseModel {
 
   @column()
   declare text: string
+
+  @column()
+  declare order: number
+
+  @column()
+  declare position: string
 
   @belongsTo(() => Callsheet, {
     foreignKey: 'callsheet_id',
