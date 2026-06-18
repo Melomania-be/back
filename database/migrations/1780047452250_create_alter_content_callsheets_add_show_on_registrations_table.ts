@@ -5,7 +5,7 @@ export default class extends BaseSchema {
 
   async up() {
     this.schema.alterTable(this.tableName, (table) => {
-      table.boolean('show_on_registration').defaultTo(false)
+      table.boolean('show_on_registration').defaultTo(false).notNullable()
     })
   }
 
