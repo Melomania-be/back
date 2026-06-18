@@ -71,6 +71,7 @@
     "@adonisjs/mail": "^9.2.1",
     "@vinejs/vine": "^2.1.0",
     "adonisjs-filters": "^1.0.5",
+    "file-type": "^22.0.1",
     "he": "^1.2.0",
     "luxon": "^3.5.0",
     "pg": "^8.12.0",
