@@ -1,14 +1,30 @@
 // import type { HttpContext } from '@adonisjs/core/http'
 import Contact from '#models/contact'
+import RecruitmentContact from '#models/recruitment_contact'
 import { simpleFilter, advancedFilter } from 'adonisjs-filters'
 import { createContactValidator, mergeContactsValidator } from '#validators/contact'
 import { HttpContext } from '@adonisjs/core/http'
 
 export default class ContactsController {
+  private async syncRecruitmentContacts(contact: Contact) {
+    await RecruitmentContact.query()
+      .where('contact_id', contact.id)
+      .update({
+        first_name: contact.first_name,
+        last_name: contact.last_name,
+        email: contact.email || null,
+        phone: contact.phone || null,
+        messenger: contact.messenger || null,
+      })
+  }
+
   async getAll(ctx: HttpContext) {
-    let baseQuery = Contact.query().preload('instruments', (instrumentsQuery) => {
-      instrumentsQuery.pivotColumns(['proficiency_level'])
-    })
+   let baseQuery = Contact.query()
+  .preload('instruments', (instrumentsQuery) => {
+    instrumentsQuery.pivotColumns(['proficiency_level'])
+  })
+  .preload('projects')
+  .preload('participants')
 
     return await simpleFilter(
       ctx,
@@ -94,6 +110,7 @@ export default class ContactsController {
     contact1.subscribed = true
 
     await contact1.save()
+    await this.syncRecruitmentContacts(contact1)
 
     await contact1.related('lists').sync(
       contact1.lists.concat(contact2.lists).map((list) => list.id),
@@ -121,6 +138,17 @@ export default class ContactsController {
       await participant2.save()
     }
 
+    await RecruitmentContact.query()
+      .where('contact_id', contact2.id)
+      .update({
+        contact_id: contact1.id,
+        first_name: contact1.first_name,
+        last_name: contact1.last_name,
+        email: contact1.email || null,
+        phone: contact1.phone || null,
+        messenger: contact1.messenger || null,
+      })
+
     await contact1.related('instruments').sync(
       contact1.instruments.concat(contact2.instruments).map((instrument) => instrument.id),
       false
@@ -137,11 +165,12 @@ export default class ContactsController {
 
     const data = await ctx.request.validateUsing(createContactValidator)
 
+    let contact
     if (!data.id) {
-      return await Contact.create({ ...data, validated: true })
+      contact = await Contact.create({ ...data, validated: true })
+    } else {
+      contact = await Contact.updateOrCreate({ id: data.id }, { ...data, validated: true })
     }
-
-    const contact = await Contact.updateOrCreate({ id: data.id }, { ...data, validated: true })
 
     if (data.instruments) {
       let toSync = Object.assign(
@@ -159,6 +188,7 @@ export default class ContactsController {
     }
 
     await contact.save()
+    await this.syncRecruitmentContacts(contact)
     return contact
   }
 
