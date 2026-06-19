@@ -4,6 +4,7 @@ import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import Project from './project.js'
 import Contact from './contact.js'
 import AccountingCategory from './accounting_category.js'
+import Organization from '#models/organization'
 
 export type PaymentStatus = 'pending' | 'paid' | 'overdue' | 'cancelled'
 export type EntryType = 'expense' | 'income'
@@ -80,6 +81,12 @@ export default class AccountingEntry extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  @column()
+declare organizationId: number | null
+
+@belongsTo(() => Organization)
+declare organization: BelongsTo<typeof Organization>
 
   isOverdue(): boolean {
     if (this.payment_status === 'paid' || !this.due_date) {
