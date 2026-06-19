@@ -36,7 +36,8 @@ const FilesystemController = () => import('#controllers/filesystem_controller')
 const SharedFolderController = () => import('#controllers/shared_folder_controller')
 const RecruitmentController = () => import('#controllers/recruitment_controller')
 const ProfilesController = () => import('#controllers/profiles_controller')
-const RecruitmentRecommendationController = () => import('#controllers/recruitment_recommendation_controller')
+const RecruitmentRecommendationController = () =>
+  import('#controllers/recruitment_recommendation_controller')
 const PasswordRecoveriesController = () => import('#controllers/password_recoveries_controller')
 
 router.group(() => {
@@ -84,10 +85,10 @@ router.group(() => {
   // Contact unsubscribe (public)
   router.put('/unsubscribe', [ContactsController, 'unsubscribe_from_mails'])
 
-  // Password recovery routes 
+  // Password recovery routes
   router.post('/forgot-password', [PasswordRecoveriesController, 'forgotPassword'])
   router.post('/reset-password', [PasswordRecoveriesController, 'resetPassword'])
- 
+
   // =============================================================================
   // ROUTES PUBLIQUES POUR AUDITIONS (CANDIDATS)
   // =============================================================================
@@ -351,7 +352,6 @@ router.group(() => {
               router.get('/stats', [RecruitmentController, 'getStats'])
             })
             .prefix('/:id/management/recruitment')
-             
           // =============================================================================
           // GESTION DES PARTICIPANTS
           // =============================================================================
@@ -628,7 +628,6 @@ router.group(() => {
           router.delete('/:id', [TemplateController, 'delete'])
         })
         .prefix('/templates')
-
     })
     .use(middleware.auth({ guards: ['api'] }))
     .use(middleware.routeLogger())
