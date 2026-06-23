@@ -1,7 +1,8 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column } from '@adonisjs/lucid/orm'
+import { column } from '@adonisjs/lucid/orm'
+import TenantModel from '#models/tenant_model'
 
-export default class AccountingCategory extends BaseModel {
+export default class AccountingCategory extends TenantModel {
   @column({ isPrimary: true })
   declare id: number
 

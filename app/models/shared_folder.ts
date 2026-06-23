@@ -1,10 +1,12 @@
 // app/models/shared_folder.ts
 import { DateTime } from 'luxon'
-import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
+import { belongsTo, column } from '@adonisjs/lucid/orm'
+import TenantModel from '#models/tenant_model'
+
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import Folder from './folder.js'
 
-export default class SharedFolder extends BaseModel {
+export default class SharedFolder extends TenantModel {
   @column({ isPrimary: true })
   declare id: number
 

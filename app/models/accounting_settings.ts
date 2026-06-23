@@ -1,9 +1,10 @@
 import { DateTime } from 'luxon'
-import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
+import { belongsTo, column } from '@adonisjs/lucid/orm'
+import TenantModel from '#models/tenant_model'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import Project from './project.js'
 
-export default class AccountingSettings extends BaseModel {
+export default class AccountingSettings extends TenantModel {
   @column({ isPrimary: true })
   declare id: number
 
@@ -102,6 +103,6 @@ export default class AccountingSettings extends BaseModel {
   }
 
   isValidTaxRate(rate: number): boolean {
-    return !isNaN(rate) && rate >= 0 && rate <= 100
+    return !Number.isNaN(rate) && rate >= 0 && rate <= 100
   }
 }

@@ -1,11 +1,12 @@
 import { DateTime } from 'luxon'
-import { BaseModel, belongsTo, hasMany, column } from '@adonisjs/lucid/orm'
+import { belongsTo, hasMany, column } from '@adonisjs/lucid/orm'
+import TenantModel from '#models/tenant_model'
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import Piece from './piece.js'
 import File from './file.js'
 import db from '@adonisjs/lucid/services/db'
 
-export default class Material extends BaseModel {
+export default class Material extends TenantModel {
   @column({ isPrimary: true })
   declare id: number
 

@@ -1,10 +1,11 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, manyToMany } from '@adonisjs/lucid/orm'
+import { column, manyToMany } from '@adonisjs/lucid/orm'
+import TenantModel from '#models/tenant_model'
 import Instrument from './instrument.js'
 import type { ManyToMany } from '@adonisjs/lucid/types/relations'
 import SectionGroup from './section_group.js'
 
-export default class Section extends BaseModel {
+export default class Section extends TenantModel {
   @column({ isPrimary: true })
   declare id: number
 

@@ -1,10 +1,11 @@
 import { DateTime } from 'luxon'
-import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
+import { belongsTo, column } from '@adonisjs/lucid/orm'
+import TenantModel from '#models/tenant_model'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import Project from './project.js'
 import Contact from './contact.js'
 
-export default class Responsibles extends BaseModel {
+export default class Responsibles extends TenantModel {
   @column()
   declare project_id: number
 

@@ -1,7 +1,8 @@
 // app/models/audition.ts - Version corrigée complète
 
 import { DateTime } from 'luxon'
-import { BaseModel, belongsTo, column, hasMany } from '@adonisjs/lucid/orm'
+import { belongsTo, column, hasMany } from '@adonisjs/lucid/orm'
+import TenantModel from '#models/tenant_model'
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import Participant from './participant.js'
 import Project from './project.js'
@@ -25,7 +26,7 @@ function safeStringify(value: any): string {
   }
 }
 
-export default class Audition extends BaseModel {
+export default class Audition extends TenantModel {
   @column({ isPrimary: true })
   declare id: number
 

@@ -1,5 +1,6 @@
 import { DateTime } from 'luxon'
-import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
+import { belongsTo, column } from '@adonisjs/lucid/orm'
+import TenantModel from '#models/tenant_model'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import Project from './project.js'
 import Contact from './contact.js'
@@ -8,7 +9,7 @@ import Section from './section.js'
 export type RecruitmentStatus = string
 export type ContactMethod = 'manual' | 'email' | 'messenger' | 'phone'
 
-export default class RecruitmentContact extends BaseModel {
+export default class RecruitmentContact extends TenantModel {
   @column({ isPrimary: true })
   declare id: number
 
@@ -159,26 +160,26 @@ export default class RecruitmentContact extends BaseModel {
 
       section: this.section
         ? {
-          id: this.section.id,
-          name: this.section.name || 'Unknown section',
-        }
+            id: this.section.id,
+            name: this.section.name || 'Unknown section',
+          }
         : null,
 
       contact: this.contact
         ? {
-          id: this.contact.id,
-          first_name: this.contact.first_name || '',
-          last_name: this.contact.last_name || '',
-          email: this.contact.email || null,
-        }
+            id: this.contact.id,
+            first_name: this.contact.first_name || '',
+            last_name: this.contact.last_name || '',
+            email: this.contact.email || null,
+          }
         : null,
 
       recommender: this.recommender
         ? {
-          id: this.recommender.id,
-          first_name: this.recommender.first_name || '',
-          last_name: this.recommender.last_name || '',
-        }
+            id: this.recommender.id,
+            first_name: this.recommender.first_name || '',
+            last_name: this.recommender.last_name || '',
+          }
         : null,
     }
   }
@@ -203,13 +204,13 @@ export default class RecruitmentContact extends BaseModel {
       recruited: { label: 'Recruited', color: 'green', icon: 'CheckCircle' },
     }
 
-   return (
-  statusConfig[this.status as keyof typeof statusConfig] || {
-    label: this.status,
-    color: 'gray',
-    icon: 'Circle'
-  }
-)
+    return (
+      statusConfig[this.status as keyof typeof statusConfig] || {
+        label: this.status,
+        color: 'gray',
+        icon: 'Circle',
+      }
+    )
   }
 
   static getAvailableStatuses(): Array<{ value: string; label: string }> {

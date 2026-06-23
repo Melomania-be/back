@@ -1,12 +1,13 @@
 // app/models/audition_pdf_file.ts
 import { DateTime } from 'luxon'
-import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
+import { belongsTo, column } from '@adonisjs/lucid/orm'
+import TenantModel from '#models/tenant_model'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import Audition from './audition.js'
 import File from './file.js'
 import Section from './section.js'
 
-export default class AuditionPdfFile extends BaseModel {
+export default class AuditionPdfFile extends TenantModel {
   @column({ isPrimary: true })
   declare id: number
 

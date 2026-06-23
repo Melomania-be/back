@@ -1,12 +1,13 @@
 // app/models/section_pdf.ts
 import { DateTime } from 'luxon'
-import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
+import { belongsTo, column } from '@adonisjs/lucid/orm'
+import TenantModel from '#models/tenant_model'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import Project from './project.js'
 import Section from './section.js'
 import File from './file.js'
 
-export default class SectionPdf extends BaseModel {
+export default class SectionPdf extends TenantModel {
   @column({ isPrimary: true })
   declare id: number
 

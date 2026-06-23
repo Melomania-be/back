@@ -624,7 +624,6 @@ router.group(() => {
           router.delete('/:id', [TemplateController, 'delete'])
         })
         .prefix('/templates')
-
     })
     .use(middleware.auth({ guards: ['api'] }))
     .use(middleware.routeLogger())

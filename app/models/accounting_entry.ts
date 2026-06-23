@@ -1,6 +1,7 @@
 import { DateTime } from 'luxon'
-import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
+import { belongsTo, column } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import TenantModel from '#models/tenant_model'
 import Project from './project.js'
 import Contact from './contact.js'
 import AccountingCategory from './accounting_category.js'
@@ -8,7 +9,7 @@ import AccountingCategory from './accounting_category.js'
 export type PaymentStatus = 'pending' | 'paid' | 'overdue' | 'cancelled'
 export type EntryType = 'expense' | 'income'
 
-export default class AccountingEntry extends BaseModel {
+export default class AccountingEntry extends TenantModel {
   @column({ isPrimary: true })
   declare id: number
 

@@ -1,5 +1,6 @@
 import { DateTime } from 'luxon'
-import { BaseModel, belongsTo, column, manyToMany, hasMany } from '@adonisjs/lucid/orm'
+import { belongsTo, column, manyToMany, hasMany } from '@adonisjs/lucid/orm'
+import TenantModel from '#models/tenant_model'
 import Composer from '#models/composer'
 import TypeOfPiece from '#models/type_of_piece'
 import Folder from '#models/folder'
@@ -8,7 +9,7 @@ import Material from '#models/material'
 import type { BelongsTo, HasMany, ManyToMany } from '@adonisjs/lucid/types/relations'
 import Project from '#models/project'
 
-export default class Piece extends BaseModel {
+export default class Piece extends TenantModel {
   @column({ isPrimary: true })
   declare id: number
 
@@ -43,7 +44,7 @@ export default class Piece extends BaseModel {
     localKey: 'id',
     pivotForeignKey: 'piece_id',
     relatedKey: 'id',
-    pivotRelatedForeignKey: 'project_id'
+    pivotRelatedForeignKey: 'project_id',
   })
   declare projects: ManyToMany<typeof Project>
 
@@ -87,7 +88,7 @@ export default class Piece extends BaseModel {
     return {
       pivot_order: this.$extras.pivot_order ?? null,
       pivot_material_id: this.$extras.pivot_material_id ?? null,
-      pivot_material_specified: Boolean(this.$extras.pivot_material_specified ?? false)
+      pivot_material_specified: Boolean(this.$extras.pivot_material_specified ?? false),
     }
   }
 
@@ -131,7 +132,7 @@ export default class Piece extends BaseModel {
       name: materialName,
       description: 'Matériel par défaut',
       is_default: true,
-      is_active: true
+      is_active: true,
     })
   }
 
@@ -144,7 +145,7 @@ export default class Piece extends BaseModel {
       pivot_order: this.$extras?.pivot_order,
       pivot_material_id: this.$extras?.pivot_material_id,
       pivot_material_specified: this.$extras?.pivot_material_specified,
-      selected_material_id: this.selected_material_id
+      selected_material_id: this.selected_material_id,
     }
   }
 }

@@ -1,11 +1,12 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column } from '@adonisjs/lucid/orm'
+import { column } from '@adonisjs/lucid/orm'
+import TenantModel from '#models/tenant_model'
 
 /**
  * @deprecated Use AccountingCategory instead
  * This model is kept for backward compatibility only
  */
-export default class ExpenseCategory extends BaseModel {
+export default class ExpenseCategory extends TenantModel {
   static table = 'accounting_categories'
 
   @column({ isPrimary: true })

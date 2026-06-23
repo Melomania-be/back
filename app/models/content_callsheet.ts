@@ -1,9 +1,10 @@
 import { DateTime } from 'luxon'
-import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
+import { belongsTo, column } from '@adonisjs/lucid/orm'
+import TenantModel from '#models/tenant_model'
 import Callsheet from '#models/callsheet'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 
-export default class ContentCallsheet extends BaseModel {
+export default class ContentCallsheet extends TenantModel {
   @column({ isPrimary: true })
   declare id: number
 

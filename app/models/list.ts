@@ -1,10 +1,11 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, hasMany, manyToMany } from '@adonisjs/lucid/orm'
+import { column, hasMany, manyToMany } from '@adonisjs/lucid/orm'
+import TenantModel from '#models/tenant_model'
 import Contact from './contact.js'
 import type { HasMany, ManyToMany } from '@adonisjs/lucid/types/relations'
 import MailTemplate from './mail_template.js'
 
-export default class List extends BaseModel {
+export default class List extends TenantModel {
   @column({ isPrimary: true })
   declare id: number
 

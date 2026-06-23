@@ -1,13 +1,14 @@
 // app/models/contact.ts - Version avec mapping des champs
 import { DateTime } from 'luxon'
-import { BaseModel, column, hasMany, manyToMany } from '@adonisjs/lucid/orm'
+import { column, hasMany, manyToMany } from '@adonisjs/lucid/orm'
+import TenantModel from '#models/tenant_model'
 import Instrument from './instrument.js'
 import type { HasMany, ManyToMany } from '@adonisjs/lucid/types/relations'
 import List from './list.js'
 import Participant from './participant.js'
 import Project from './project.js'
 
-export default class Contact extends BaseModel {
+export default class Contact extends TenantModel {
   @column({ isPrimary: true })
   declare id: number
 

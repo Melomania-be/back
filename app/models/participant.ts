@@ -1,5 +1,6 @@
 import { DateTime } from 'luxon'
-import { BaseModel, belongsTo, column, hasMany, manyToMany } from '@adonisjs/lucid/orm'
+import { belongsTo, column, hasMany, manyToMany } from '@adonisjs/lucid/orm'
+import TenantModel from '#models/tenant_model'
 import type { BelongsTo, HasMany, ManyToMany } from '@adonisjs/lucid/types/relations'
 import Project from '#models/project'
 import Section from '#models/section'
@@ -8,9 +9,9 @@ import Contact from '#models/contact'
 import Rehearsal from '#models/rehearsal'
 import Callsheet from './callsheet.js'
 import Concert from './concert.js'
-import Audition from './audition.js'  // ← Import manquant ajouté
+import Audition from './audition.js' // ← Import manquant ajouté
 
-export default class Participant extends BaseModel {
+export default class Participant extends TenantModel {
   @column({ isPrimary: true })
   declare id: number
 
