@@ -1,7 +1,7 @@
 import { BaseCommand } from '@adonisjs/core/ace'
 import { CommandOptions } from '@adonisjs/core/types/ace'
 import { execSync } from 'node:child_process'
-import { unlinkSync } from 'node:fs'
+import { unlinkSync, mkdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import mail from '@adonisjs/mail/services/main'
 import Save from '#models/save'
@@ -15,14 +15,31 @@ export default class BackupDatabase extends BaseCommand {
   }
 
   async run() {
+    // Vérifie si les backups sont activés
+    const enabledSetting = await Save.findBy('variable', 'backup_enabled')
+    if (enabledSetting?.value === 'false') {
+      this.logger.warning('Backups are disabled. Skipping...')
+      return
+    }
+
     const date = new Date().toISOString().slice(0, 10)
     const filename = `melomania_backup_${date}.sql`
-    const filepath = join('backup', filename)
+    const backupDir = join(process.cwd(), 'backup')
+    const filepath = join(backupDir, filename)
+
+    // Crée le dossier backup s'il n'existe pas
+    if (!existsSync(backupDir)) {
+      mkdirSync(backupDir, { recursive: true })
+      this.logger.info('Created backup directory')
+    }
 
     this.logger.info('Creating database dump...')
 
+    // Chemin vers pg_dump configurable via .env
+    const pgDumpPath = process.env.PG_DUMP_PATH ?? 'pg_dump'
+
     execSync(
-      `"C:\\Program Files\\PostgreSQL\\18\\bin\\pg_dump.exe" -U ${process.env.DB_USER} -h ${process.env.DB_HOST} -p ${process.env.DB_PORT} ${process.env.DB_DATABASE} -f ${filepath}`,
+      `"${pgDumpPath}" -U ${process.env.DB_USER} -h ${process.env.DB_HOST} -p ${process.env.DB_PORT} ${process.env.DB_DATABASE} -f "${filepath}"`,
       { env: { ...process.env, PGPASSWORD: process.env.DB_PASSWORD } }
     )
 
