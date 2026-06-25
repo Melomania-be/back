@@ -13,6 +13,7 @@ import type {
 import ContractorContact from '#models/contractor_contact'
 import ContractorInteractionFile from '#models/contractor_interaction_file'
 
+
 export default class ContractorInteraction extends BaseModel {
 	@column({ isPrimary: true })
 	declare id: number
@@ -28,6 +29,7 @@ export default class ContractorInteraction extends BaseModel {
 
 	@belongsTo(() => ContractorContact)
 	declare contractor: BelongsTo<typeof ContractorContact>
+
 	@hasMany(() => ContractorInteractionFile, {
   foreignKey: 'contractorInteractionId',
 })
