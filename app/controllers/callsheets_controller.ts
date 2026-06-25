@@ -2,6 +2,8 @@ import { HttpContext } from '@adonisjs/core/http'
 import Callsheet from '#models/callsheet'
 import { createCallsheetValidator, getCallsheetValidator } from '#validators/callsheet'
 import Contact from '#models/contact'
+import db from '@adonisjs/lucid/services/db'
+import ContentCallsheet from '#models/content_callsheet'
 import { simpleFilter } from 'adonisjs-filters'
 
 export default class CallsheetsController {
@@ -17,7 +19,9 @@ export default class CallsheetsController {
     const callsheet = await Callsheet.query()
       .where('id', params.id)
       .orderBy('updated_at', 'desc')
-      .preload('contents')
+      .preload('contents', (query) => {
+        query.orderBy('displayOrder', 'asc')
+      })
       .preload('project', (projectQuery) => {
         projectQuery
           .preload('responsibles')
@@ -98,5 +102,24 @@ export default class CallsheetsController {
 
     await callsheet.delete()
     return ctx.response.noContent()
+  }
+  async reorderContents({ params, request, response }: HttpContext) {
+    const { items } = request.only(['items'])
+
+    if (!items || !Array.isArray(items)) {
+      return response.badRequest('Format invalide')
+    }
+
+    await db.transaction(async (trx) => {
+      for (const item of items) {
+        await ContentCallsheet.query()
+          .useTransaction(trx)
+          .where('id', item.id)
+          .where('callsheetId', params.callsheetId)
+          .update({ displayOrder: item.display_order })
+      }
+    })
+
+    return response.ok({ message: 'Ordre mis à jour' })
   }
 }

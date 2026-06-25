@@ -12,4 +12,6 @@
 |
 */
 
-export const policies = {}
+export const policies = {
+  TaskPolicy: () => import('#policies/task_policy')
+}

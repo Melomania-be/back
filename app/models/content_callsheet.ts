@@ -14,6 +14,9 @@ export default class ContentCallsheet extends BaseModel {
   declare title: string
 
   @column()
+  declare displayOrder: number
+  
+  @column()
   declare text: string
 
   @belongsTo(() => Callsheet, {

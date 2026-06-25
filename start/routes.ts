@@ -9,6 +9,7 @@
 import router from '@adonisjs/core/services/router'
 import { middleware } from './kernel.js'
 
+const TasksController = () => import('#controllers/tasks_controller')
 const AuditionsController = () => import('#controllers/auditions_controller')
 const UsersController = () => import('#controllers/users_controller')
 const ComposersController = () => import('#controllers/composers_controller')
@@ -416,6 +417,7 @@ router.group(() => {
               router.get('/:callsheetId', [CallsheetsController, 'getOne'])
               router.post('/', [CallsheetsController, 'createOrUpdate'])
               router.delete('/:callsheetId', [CallsheetsController, 'delete'])
+              router.patch('/:callsheetId/reorder-contents', [CallsheetsController, 'reorderContents'])
             })
             .prefix('/:id/management/call_sheets')
 
@@ -527,6 +529,17 @@ router.group(() => {
           router.delete('/:id', [UsersController, 'delete'])
         })
         .prefix('/users')
+      // =============================================================================
+      // GESTION DES TÂCHES (TASK MANAGER)
+      // =============================================================================
+      router
+        .group(() => {
+          router.get('/', [TasksController, 'index'])
+          router.post('/', [TasksController, 'store'])
+          router.put('/:id', [TasksController, 'update'])
+          router.delete('/:id', [TasksController, 'destroy'])
+        })
+        .prefix('/tasks')
 
       // =============================================================================
       // GESTION DES RECOMMANDATIONS
