@@ -5,11 +5,7 @@ import { simpleFilter } from 'adonisjs-filters'
 
 export default class ComposersController {
   async getAll(ctx: HttpContext) {
-    const organizationId = ctx.auth.user?.organizationId
-
-    let baseQuery = Composer.query().if(organizationId, (query) =>
-      query.where('organization_id', organizationId!)
-    )
+    let baseQuery = Composer.query()
 
     let res = await simpleFilter(
       ctx,
@@ -28,43 +24,26 @@ export default class ComposersController {
 
   async createOrUpdate(ctx: HttpContext) {
     const data = await ctx.request.validateUsing(createComposerValidator)
-    const organizationId = ctx.auth.user?.organizationId
 
     if (data.id === undefined) {
-      return await Composer.create({ ...data, organizationId })
+      return await Composer.create(data)
     }
 
-    const composer = await Composer.query()
-      .where('id', data.id)
-      .if(organizationId, (query) => query.where('organization_id', organizationId!))
-      .firstOrFail()
-
+    const composer = await Composer.findOrFail(data.id)
     composer.merge(data)
     await composer.save()
     return composer
   }
 
-  async delete({ params, response, auth }: HttpContext) {
-    const organizationId = auth.user?.organizationId
+  async delete({ params, response }: HttpContext) {
     const composerId = params.id
-
-    const composer = await Composer.query()
-      .where('id', composerId)
-      .if(organizationId, (query) => query.where('organization_id', organizationId!))
-      .firstOrFail()
-
+    const composer = await Composer.findOrFail(composerId)
     await composer.delete()
     return response.status(204)
   }
 
-  async getPieces({ params, response, auth }: HttpContext) {
-    const organizationId = auth.user?.organizationId
-
-    const composer = await Composer.query()
-      .where('id', params.id)
-      .if(organizationId, (query) => query.where('organization_id', organizationId!))
-      .preload('pieces')
-      .first()
+  async getPieces({ params, response }: HttpContext) {
+    const composer = await Composer.query().where('id', params.id).preload('pieces').first()
 
     if (!composer) {
       return response.status(404).send('Composer not found')

@@ -1,8 +1,7 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, hasMany, belongsTo } from '@adonisjs/lucid/orm'
+import { BaseModel, column, hasMany } from '@adonisjs/lucid/orm'
 import Piece from './piece.js'
-import type { HasMany, BelongsTo } from '@adonisjs/lucid/types/relations'
-import Organization from '#models/organization'
+import type { HasMany } from '@adonisjs/lucid/types/relations'
 
 export default class Composer extends BaseModel {
   @column({ isPrimary: true })
@@ -36,10 +35,4 @@ export default class Composer extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
-
-  @column()
-  declare organizationId: number | null
-
-  @belongsTo(() => Organization)
-  declare organization: BelongsTo<typeof Organization>
 }
