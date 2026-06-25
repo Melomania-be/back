@@ -1,16 +1,23 @@
 import { test } from '@japa/runner'
+import User from '#models/user' // Ajout de l'import du modèle User
 
 test.group('Callsheet API', () => {
-  async function getToken(client: any) {
-    const response = await client.post('/sign_in').json({
-      email: 'admin@admin.admin',
-      password: 'admin'
-    })
-    return response.body().token
+
+  // Nouvelle fonction infaillible pour récupérer un token
+  async function getAuthToken() {
+    // 1. On s'assure que l'utilisateur existe
+    const user = await User.firstOrCreate(
+      { email: 'admin@admin.admin' },
+      { password: 'Password1!', fullName: 'Admin' }
+    )
+
+    // 2. On génère un token OAT directement sans passer par la route HTTP
+    const token = await User.accessTokens.create(user)
+    return token.value!.release()
   }
 
   test('should return empty array for non-existent project', async ({ client }) => {
-    const token = await getToken(client)
+    const token = await getAuthToken() // Utilisation de la nouvelle fonction
     const response = await client
       .get('/projects/99999/management/call_sheets')
       .bearerToken(token)
@@ -23,7 +30,7 @@ test.group('Callsheet API', () => {
   })
 
   test('should fail when version is missing', async ({ client }) => {
-    const token = await getToken(client)
+    const token = await getAuthToken() // Utilisation de la nouvelle fonction
     const response = await client
       .post('/projects/1/management/call_sheets')
       .bearerToken(token)
@@ -36,7 +43,7 @@ test.group('Callsheet API', () => {
   })
 
   test('should return 404 when deleting non-existent callsheet', async ({ client }) => {
-    const token = await getToken(client)
+    const token = await getAuthToken() // Utilisation de la nouvelle fonction
     const response = await client
       .delete('/projects/1/management/call_sheets/99999')
       .bearerToken(token)
