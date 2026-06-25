@@ -43,8 +43,8 @@ const OrganizationsController = () =>
 
 const ContractorCategoriesController = () =>
   import('#controllers/contractor_categories_controller')
-
-
+const ContractorInteractionsController = () =>
+  import('#controllers/contractor_interactions_controller')
 router.group(() => {
   // =============================================================================
   // ROUTES PUBLIQUES (SANS AUTHENTIFICATION)
@@ -538,6 +538,30 @@ router
   })
   .prefix('/contractor-category')
 
+
+  router
+  .group(() => {
+    router.get(
+      '/:contractorId',
+      [ContractorInteractionsController, 'getByContractor']
+    )
+
+    router.post(
+      '/',
+      [ContractorInteractionsController, 'create']
+    )
+
+    router.put(
+      '/:id',
+      [ContractorInteractionsController, 'update']
+    )
+
+    router.delete(
+      '/:id',
+      [ContractorInteractionsController, 'delete']
+    )
+  })
+  .prefix('/contractor-interaction')
       // =============================================================================
       // GESTION DES INSTRUMENTS
       // =============================================================================
