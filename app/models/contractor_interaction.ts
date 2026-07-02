@@ -2,11 +2,16 @@ import { DateTime } from 'luxon'
 import {
 	BaseModel,
 	belongsTo,
-	column
+	column,
+	hasMany
 } from '@adonisjs/lucid/orm'
-import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import type {
+        BelongsTo,
+        HasMany
+} from '@adonisjs/lucid/types/relations'
 
 import ContractorContact from '#models/contractor_contact'
+import ContractorInteractionFile from '#models/contractor_interaction_file'
 
 export default class ContractorInteraction extends BaseModel {
 	@column({ isPrimary: true })
@@ -23,6 +28,10 @@ export default class ContractorInteraction extends BaseModel {
 
 	@belongsTo(() => ContractorContact)
 	declare contractor: BelongsTo<typeof ContractorContact>
+	@hasMany(() => ContractorInteractionFile, {
+  foreignKey: 'contractorInteractionId',
+})
+declare files: HasMany<typeof ContractorInteractionFile>
 
 	@column.dateTime({ autoCreate: true })
 	declare createdAt: DateTime

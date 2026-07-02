@@ -560,6 +560,14 @@ router
       '/:id',
       [ContractorInteractionsController, 'delete']
     )
+    router.post(
+  '/:id/upload',
+  [ContractorInteractionsController, 'upload']
+)
+router.get(
+  '/file/:filename',
+  [ContractorInteractionsController, 'download']
+)
   })
   .prefix('/contractor-interaction')
       // =============================================================================
