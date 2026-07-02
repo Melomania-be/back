@@ -2,11 +2,14 @@ import { DateTime } from 'luxon'
 import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import User from '#models/user'
-import Project from '#models/project'
 
 export default class Task extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
+
+  // Clé étrangère vers l'utilisateur
+  @column()
+  declare userId: number | null
 
   @column()
   declare title: string
@@ -15,16 +18,18 @@ export default class Task extends BaseModel {
   declare description: string | null
 
   @column()
-  declare status: 'todo' | 'in_progress' | 'done'
+  declare status: string
 
+  // Nouvelle colonne de priorité
   @column()
-  declare projectId: number
+  declare priority: string
 
-  @column()
-  declare assignedTo: number | null
+  @column.dateTime()
+  declare dueDate: DateTime | null
 
-  @column()
-  declare createdBy: number
+  // Colonne pour la corbeille (Soft Delete)
+  @column.dateTime()
+  declare deletedAt: DateTime | null
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -32,9 +37,8 @@ export default class Task extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  @belongsTo(() => User, { foreignKey: 'assignedTo' })
-  declare assignee: BelongsTo<typeof User>
-
-  @belongsTo(() => Project)
-  declare project: BelongsTo<typeof Project>
+  // --- RELATIONS ---
+  // Une tâche appartient à un utilisateur
+  @belongsTo(() => User)
+  declare user: BelongsTo<typeof User>
 }

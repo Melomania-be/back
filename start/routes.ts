@@ -105,10 +105,14 @@ router.group(() => {
       // =============================================================================
       router
         .group(() => {
+          router.get('/stats', [TasksController, 'stats'])
           router.get('/', [TasksController, 'index'])
           router.post('/', [TasksController, 'store'])
           router.put('/:id', [TasksController, 'update'])
-          router.delete('/:id', [TasksController, 'destroy'])
+          router.patch('/:id/status', [TasksController, 'patchStatus'])
+          router.delete('/:id', [TasksController, 'destroy']) // Met à la corbeille
+          router.post('/:id/restore', [TasksController, 'restore']) // Sort de la corbeille
+
         })
         .prefix('/tasks')
 
