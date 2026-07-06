@@ -4,6 +4,7 @@ import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import Project from './project.js'
 import Contact from './contact.js'
 import AccountingCategory from './accounting_category.js'
+import ContractorContact from './contractor_contact.js'
 
 export type PaymentStatus = 'pending' | 'paid' | 'overdue' | 'cancelled'
 export type EntryType = 'expense' | 'income'
@@ -17,6 +18,9 @@ export default class AccountingEntry extends BaseModel {
 
   @column()
   declare contact_id: number | null
+
+@column()
+declare contractor_contact_id: number | null
 
   @column()
   declare category_id: number | null
@@ -69,6 +73,11 @@ export default class AccountingEntry extends BaseModel {
     foreignKey: 'contact_id',
   })
   declare contact: BelongsTo<typeof Contact>
+
+  @belongsTo(() => ContractorContact, {
+  foreignKey: 'contractor_contact_id',
+})
+declare contractor: BelongsTo<typeof ContractorContact>
 
   @belongsTo(() => AccountingCategory, {
     foreignKey: 'category_id',
@@ -171,6 +180,16 @@ export default class AccountingEntry extends BaseModel {
             email: this.contact.email || null,
           }
         : null,
+
+        contractor_contact_id: this.contractor_contact_id,
+
+contractor: this.contractor
+  ? {
+      id: this.contractor.id,
+      firstName: this.contractor.first_name,
+      lastName: this.contractor.last_name,
+    }
+  : null,
     }
   }
 
