@@ -45,6 +45,10 @@ const ContractorCategoriesController = () =>
   import('#controllers/contractor_categories_controller')
 const ContractorInteractionsController = () =>
   import('#controllers/contractor_interactions_controller')
+const ContractorParticipantsController = () =>
+  import('#controllers/contractor_participants_controller')
+
+
 router.group(() => {
   // =============================================================================
   // ROUTES PUBLIQUES (SANS AUTHENTIFICATION)
@@ -248,6 +252,25 @@ router.group(() => {
         })
         .prefix('/accountings')
 
+
+        router
+  .group(() => {
+    router.get(
+      '/project/:projectId',
+      [ContractorParticipantsController, 'getByProject']
+    )
+
+    router.post(
+      '/',
+      [ContractorParticipantsController, 'create']
+    )
+
+    router.delete(
+      '/:id',
+      [ContractorParticipantsController, 'delete']
+    )
+  })
+  .prefix('/contractor-participant')
       // =============================================================================
       // GESTION DES PROJETS
       // =============================================================================
