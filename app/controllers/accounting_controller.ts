@@ -208,6 +208,7 @@ export default class AccountingController {
       const contractor_contact_id = requestBody.contractor_contact_id
         ? Number(requestBody.contractor_contact_id)
         : null
+
       const attachment = requestBody.attachment?.trim() || null
       const is_individual_payment = Boolean(requestBody.is_individual_payment)
       const is_musician_fee = Boolean(requestBody.is_musician_fee)
@@ -290,9 +291,9 @@ export default class AccountingController {
         loadPromises.push(entry.load('contact'))
       }
 
-      if (entry.contractor_contact_id) {
-        loadPromises.push(entry.load('contractor'))
-      }
+if (entry.contractor_contact_id) {
+  loadPromises.push(entry.load('contractor'))
+}
 
       await Promise.all(loadPromises)
 
@@ -369,8 +370,8 @@ export default class AccountingController {
       }
 
       if (entry.contractor_contact_id) {
-        loadPromises.push(entry.load('contractor'))
-      }
+  loadPromises.push(entry.load('contractor'))
+}
 
       await Promise.all(loadPromises)
 
