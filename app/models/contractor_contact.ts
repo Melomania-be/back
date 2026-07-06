@@ -1,20 +1,17 @@
 import { DateTime } from 'luxon'
 
 import ContractorParticipant from '#models/contractor_participant'
-
 import {
   BaseModel,
   column,
   belongsTo,
   manyToMany,
-
   hasMany,
 } from '@adonisjs/lucid/orm'
 
 import type {
   BelongsTo,
   ManyToMany,
-
   HasMany,
 } from '@adonisjs/lucid/types/relations'
 
@@ -71,10 +68,8 @@ export default class ContractorContact extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-
   @hasMany(() => ContractorParticipant, {
   foreignKey: 'contractor_contact_id',
 })
 declare projectParticipations: HasMany<typeof ContractorParticipant>
-
 }
