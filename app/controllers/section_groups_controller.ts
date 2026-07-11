@@ -5,6 +5,18 @@ import { createSectionGroupValidator } from '#validators/section_group'
 //import {createSectionValidator} from '#validators/sectionGroups'
 
 export default class SectionGroupsController {
+  private getSectionSyncData(sections: Array<{ id?: number; pivot_order?: number }>) {
+    return sections.reduce(
+      (acc, section, index) => {
+        acc[section.id!] = {
+          order: section.pivot_order && section.pivot_order > 0 ? section.pivot_order : index + 1,
+        }
+        return acc
+      },
+      {} as Record<number, { order: number }>
+    )
+  }
+
   async getAll(ctx: HttpContext) {
     let baseQuery = SectionGroups.query().preload('sections', (subQuery) => {
       subQuery.preload('instruments').pivotColumns(['order']).orderBy('order', 'asc')
@@ -29,7 +41,7 @@ export default class SectionGroupsController {
         }
       }
 
-      return sectionGroup.related('sections').sync(data.sections.map((s) => s.id!))
+      return sectionGroup.related('sections').sync(this.getSectionSyncData(data.sections))
     } else {
       let sectionGroup = await SectionGroups.find(data.id)
 
@@ -47,15 +59,7 @@ export default class SectionGroupsController {
           }
         }
 
-        const sectionData = data.sections.reduce(
-          (acc, section) => {
-            acc[section.id!] = { order: section.pivot_order ?? 0 }
-            return acc
-          },
-          {} as Record<number, { order: number }>
-        )
-
-        return sectionGroup.related('sections').sync(sectionData)
+        return sectionGroup.related('sections').sync(this.getSectionSyncData(data.sections))
       }
     }
   }
