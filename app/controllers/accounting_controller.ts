@@ -537,6 +537,7 @@ if (entry.contractor_contact_id) {
     }
   }
 
+
   async getContactAccountingsproject(ctx: HttpContext) {
     try {
       const projectId = this.validateProjectId(ctx.params.id)
