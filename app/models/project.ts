@@ -11,6 +11,7 @@ import Participant from './participant.js'
 import Concert from './concert.js'
 import Contact from './contact.js'
 import Folder from './folder.js'
+import RecruitmentContact from './recruitment_contact.js'
 
 export default class Project extends BaseModel {
   @column({ isPrimary: true })
@@ -78,6 +79,11 @@ export default class Project extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  @hasMany(() => RecruitmentContact, {
+    foreignKey: 'project_id',
+  })
+  declare recruitmentContacts: HasMany<typeof RecruitmentContact>
 
   serializeExtras() {
     return { pivot_order: this.$extras.pivot_order }

@@ -5,6 +5,8 @@ import Contact from '#models/contact'
 import Participant from '#models/participant'
 import Answer from '#models/answer'
 import Project from '#models/project'
+import mail from '@adonisjs/mail/services/main'
+import RegistrationEmail from '#mails/registration_email'
 
 export default class RegistrationsController {
   async getAll() {
@@ -99,6 +101,7 @@ export default class RegistrationsController {
   }
 
   async submit(ctx: HttpContext) {
+    console.log('Submit endpoint reached')
     const data = await ctx.request.validateUsing(userRegistrationValidator)
     console.log('Data sent : ', data)
 
@@ -107,9 +110,14 @@ export default class RegistrationsController {
       last_name: data.last_name,
       email: data.email,
     }
-    let saveContact = { phone: data.phone, messenger: data.messenger, validated: false }
 
-    //Checking if the user entering his info is already in the db, if not it creates a new contact
+    let saveContact = {
+      phone: data.phone,
+      messenger: data.messenger,
+      validated: false,
+    }
+
+    // Create or retrieve the contact
     let contact = await Contact.firstOrCreate(searchContact, saveContact)
     console.log('Contact sent : ', contact)
 
@@ -127,9 +135,12 @@ export default class RegistrationsController {
     //Checking if the contact is already in the participant db with this project, if not its added
     let participant = await Participant.firstOrCreate(searchParticipant, saveParticipant)
 
+    // Save rehearsals
     const rehearsalsWithComments = data.rehearsals.reduce(
       (acc, rehearsal) => {
-        acc[rehearsal.id] = { comment: rehearsal.comment ?? '' }
+        acc[rehearsal.id] = {
+          comment: rehearsal.comment ?? '',
+        }
         return acc
       },
       {} as Record<number, { comment: string }>
@@ -137,9 +148,12 @@ export default class RegistrationsController {
     console.log('Rehearsals sent : ', rehearsalsWithComments)
     await participant.related('rehearsals').sync(rehearsalsWithComments)
 
+    // Save concerts
     const concertsWithComments = data.concerts.reduce(
       (acc, concert) => {
-        acc[concert.id] = { comment: concert.comment ?? '' }
+        acc[concert.id] = {
+          comment: concert.comment ?? '',
+        }
         return acc
       },
       {} as Record<number, { comment: string }>
@@ -147,10 +161,10 @@ export default class RegistrationsController {
     console.log('Concerts sent : ', concertsWithComments)
     await participant.related('concerts').sync(concertsWithComments)
 
-    //Puting the answer in the answer table if there is a form to fill
-    if (data.answers.length === 0) {
-      return ctx.response.json({ success: true, participant })
-    }
+    ///Puting the answer in the answer table if there is a form to fill
+    // if (data.answers.length === 0) {
+    //   return ctx.response.json({ success: true, participant })
+    // }
 
     const answer = await Answer.createMany(
       data.answers.map((answerIt) => {
@@ -162,6 +176,59 @@ export default class RegistrationsController {
       })
     )
 
-    return ctx.response.json({ success: true, participant, answer })
+    // Load the complete project for the email
+    const project = await Project.query()
+      .where('id', data.project_id)
+      .preload('responsibles')
+      .preload('pieces', (query) => {
+        query.preload('composer')
+      })
+      .preload('registration', (query) => {
+        query.preload('content')
+      })
+      .preload('rehearsals')
+      .preload('concerts')
+      .firstOrFail()
+
+    // Get the first responsible as the recruiter
+    const responsibles = (project as any).responsibles
+    const recruiter =
+      responsibles && responsibles.length > 0
+        ? {
+            name: responsibles[0].first_name + ' ' + responsibles[0].last_name,
+            email: responsibles[0].email,
+          }
+        : { name: 'Melomania Team', email: 'noreply@melomania.be' }
+
+    // Add contents from registration to project for the email
+    const projectData = project as any
+    if (projectData.registration?.content) {
+      projectData.contents = projectData.registration.content
+    }
+
+    // Send confirmation email
+    try {
+      console.log('About to send registration email...')
+      console.log('Contact email:', contact.email)
+      console.log('Recruiter:', recruiter)
+
+      const mailInstance = new RegistrationEmail(contact, project as any, recruiter)
+      console.log('RegistrationEmail instance created')
+
+      await mail.send(mailInstance)
+      console.log('Registration email sent successfully!')
+    } catch (error) {
+      console.error('Failed to send registration email:', error)
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      })
+    }
+
+    return ctx.response.json({
+      success: true,
+      participant,
+      answer,
+    })
   }
 }
