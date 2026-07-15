@@ -184,6 +184,10 @@ export default class AccountingController {
       const due_date = requestBody.due_date ? DateTime.fromISO(requestBody.due_date) : null
       const category_id = requestBody.category_id ? Number(requestBody.category_id) : null
       const contact_id = requestBody.contact_id ? Number(requestBody.contact_id) : null
+      const contractor_contact_id =
+  requestBody.contractor_contact_id
+    ? Number(requestBody.contractor_contact_id)
+    : null
       const attachment = requestBody.attachment?.trim() || null
       const is_individual_payment = Boolean(requestBody.is_individual_payment)
       const is_musician_fee = Boolean(requestBody.is_musician_fee)
@@ -224,6 +228,7 @@ export default class AccountingController {
         existingEntry.due_date = due_date
         existingEntry.category_id = category_id
         existingEntry.contact_id = contact_id
+        existingEntry.contractor_contact_id = contractor_contact_id
         existingEntry.attachment = attachment
         existingEntry.is_individual_payment = is_individual_payment
         existingEntry.is_musician_fee = is_musician_fee
@@ -244,6 +249,7 @@ export default class AccountingController {
           due_date,
           category_id,
           contact_id,
+          contractor_contact_id,
           attachment,
           is_individual_payment,
           is_musician_fee,
@@ -261,6 +267,10 @@ export default class AccountingController {
       if (entry.contact_id) {
         loadPromises.push(entry.load('contact'))
       }
+
+      if (entry.contractor_contact_id) {
+    loadPromises.push(entry.load('contractor'))
+}
 
       await Promise.all(loadPromises)
 
@@ -331,6 +341,10 @@ export default class AccountingController {
       if (entry.contact_id) {
         loadPromises.push(entry.load('contact'))
       }
+
+      if (entry.contractor_contact_id) {
+    loadPromises.push(entry.load('contractor'))
+}
 
       await Promise.all(loadPromises)
 

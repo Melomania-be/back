@@ -11,6 +11,7 @@ import Participant from './participant.js'
 import Concert from './concert.js'
 import Contact from './contact.js'
 import Folder from './folder.js'
+import ContractorParticipant from '#models/contractor_participant'
 
 export default class Project extends BaseModel {
   @column({ isPrimary: true })
@@ -72,6 +73,11 @@ export default class Project extends BaseModel {
     foreignKey: 'project_id',
   })
   declare participants: HasMany<typeof Participant>
+
+  @hasMany(() => ContractorParticipant, {
+  foreignKey: 'project_id',
+})
+declare contractorParticipants: HasMany<typeof ContractorParticipant>
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
