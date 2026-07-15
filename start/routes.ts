@@ -35,8 +35,19 @@ const AccountingsController = () => import('#controllers/accounting_controller')
 const FilesystemController = () => import('#controllers/filesystem_controller')
 const SharedFolderController = () => import('#controllers/shared_folder_controller')
 const RecruitmentController = () => import('#controllers/recruitment_controller')
+const ContractorsController = () => import('#controllers/contractors_controller')
 const RecruitmentRecommendationController = () =>
   import('#controllers/recruitment_recommendation_controller')
+const OrganizationsController = () =>
+  import('#controllers/organizations_controller')
+
+const ContractorCategoriesController = () =>
+  import('#controllers/contractor_categories_controller')
+const ContractorInteractionsController = () =>
+  import('#controllers/contractor_interactions_controller')
+const ContractorParticipantsController = () =>
+  import('#controllers/contractor_participants_controller')
+
 
 router.group(() => {
   // =============================================================================
@@ -49,7 +60,6 @@ router.group(() => {
       henlo: 'monde',
     }
   })
-
   // Authentication
   router.post('/sign_in', [UsersController, 'signIn'])
 
@@ -237,11 +247,34 @@ router.group(() => {
       router
         .group(() => {
           router.get('/:contactId', [AccountingsController, 'getContactAccountings'])
+          router.get(
+  '/contractor/:contractorId',
+  [AccountingsController, 'getContractorAccountings']
+)
           router.post('/attachment', [AccountingsController, 'uploadAttachment'])
           router.get('/attachment/:filename', [AccountingsController, 'downloadAttachment'])
         })
         .prefix('/accountings')
 
+
+        router
+  .group(() => {
+    router.get(
+      '/project/:projectId',
+      [ContractorParticipantsController, 'getByProject']
+    )
+
+    router.post(
+      '/',
+      [ContractorParticipantsController, 'create']
+    )
+
+    router.delete(
+      '/:id',
+      [ContractorParticipantsController, 'delete']
+    )
+  })
+  .prefix('/contractor-participant')
       // =============================================================================
       // GESTION DES PROJETS
       // =============================================================================
@@ -504,6 +537,66 @@ router.group(() => {
         })
         .prefix('/contact')
 
+// =============================================================================
+// GESTION DES CONTRACTORS
+// =============================================================================
+router
+  .group(() => {
+    router.get('/', [ContractorsController, 'getAll'])
+    router.get('/:id', [ContractorsController, 'getOne'])
+    router.post('/', [ContractorsController, 'create'])
+    router.put('/:id', [ContractorsController, 'update'])
+    router.delete('/:id', [ContractorsController, 'delete'])
+  })
+  .prefix('/contractor')
+
+  router
+  .group(() => {
+    router.get('/', [OrganizationsController, 'getAll'])
+  })
+  .prefix('/organization')
+
+router
+  .group(() => {
+    router.get('/', [ContractorCategoriesController, 'getAll'])
+    router.post('/', [ContractorCategoriesController, 'create'])
+    router.put('/:id', [ContractorCategoriesController, 'update'])
+    router.delete('/:id', [ContractorCategoriesController, 'delete'])
+  })
+  .prefix('/contractor-category')
+
+
+  router
+  .group(() => {
+    router.get(
+      '/:contractorId',
+      [ContractorInteractionsController, 'getByContractor']
+    )
+
+    router.post(
+      '/',
+      [ContractorInteractionsController, 'create']
+    )
+
+    router.put(
+      '/:id',
+      [ContractorInteractionsController, 'update']
+    )
+
+    router.delete(
+      '/:id',
+      [ContractorInteractionsController, 'delete']
+    )
+    router.post(
+  '/:id/upload',
+  [ContractorInteractionsController, 'upload']
+)
+router.get(
+  '/file/:filename',
+  [ContractorInteractionsController, 'download']
+)
+  })
+  .prefix('/contractor-interaction')
       // =============================================================================
       // GESTION DES INSTRUMENTS
       // =============================================================================

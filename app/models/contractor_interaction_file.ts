@@ -1,29 +1,25 @@
 import { DateTime } from 'luxon'
 import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
-import Registration from './registration.js'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 
-export default class ContentRegistration extends BaseModel {
+import ContractorInteraction from '#models/contractor_interaction'
+import File from '#models/file'
+
+export default class ContractorInteractionFile extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
 
   @column()
-  declare title: string
+  declare contractorInteractionId: number
 
   @column()
-  declare text: string
+  declare fileId: number
 
-  @column()
-  declare registration_id: number
+  @belongsTo(() => ContractorInteraction)
+  declare interaction: BelongsTo<typeof ContractorInteraction>
 
-  @column()
-  declare order: number
-
-  @column()
-  declare position: string
-
-  @belongsTo(() => Registration)
-  declare registration: BelongsTo<typeof Registration>
+  @belongsTo(() => File)
+  declare file: BelongsTo<typeof File>
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime

@@ -88,8 +88,13 @@ export default class CallsheetsController {
     }
 
     return callsheet
-      .related('contents')
-      .createMany(data.contents.map((content) => ({ text: content.text, title: content.title })))
+  .related('contents')
+  .createMany(data.contents.map((content, index) => ({
+    text: content.text,
+    title: content.title,
+    order: content.order ?? index,
+    position: content.position ?? 'below'
+  })))
   }
 
   async delete(ctx: HttpContext) {
