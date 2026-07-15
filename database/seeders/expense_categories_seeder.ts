@@ -15,6 +15,16 @@ export default class extends BaseSeeder {
         color: '#F59E0B' // Orange
       },
       {
+  name: 'Contractor payments',
+  description: 'Paiements aux prestataires',
+  color: '#2563EB' // Blue
+},
+{
+  name: 'Contractor reimbursements',
+  description: 'Remboursements aux prestataires',
+  color: '#D97706' // Orange
+},
+      {
         name: 'Sheet music printing',
         description: 'Impression de partitions',
         color: '#10B981' // Vert
