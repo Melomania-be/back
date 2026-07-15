@@ -528,6 +528,33 @@ export default class AccountingController {
     }
   }
 
+  async getContractorAccountings({ params, response }: HttpContext) {
+  try {
+    const contractorId = Number(params.contractorId)
+
+    if (isNaN(contractorId)) {
+      return response.status(400).json({ error: 'Invalid contractor ID' })
+    }
+
+    const data = await AccountingEntry.query()
+      .where('contractor_contact_id', contractorId)
+      .preload('category')
+      .preload('contractor')
+      .orderBy('id', 'desc')
+
+    const serializedData = data.map((entry) => entry.serialize())
+
+    return response.ok(serializedData)
+  } catch (error) {
+    console.error('Error in getContractorAccountings:', error)
+
+    return response.status(500).json({
+      error: 'Failed to fetch contractor accountings',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    })
+  }
+}
+
   async getContactAccountingsproject(ctx: HttpContext) {
     try {
       const projectId = this.validateProjectId(ctx.params.id)

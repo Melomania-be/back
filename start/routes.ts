@@ -247,6 +247,10 @@ router.group(() => {
       router
         .group(() => {
           router.get('/:contactId', [AccountingsController, 'getContactAccountings'])
+          router.get(
+  '/contractor/:contractorId',
+  [AccountingsController, 'getContractorAccountings']
+)
           router.post('/attachment', [AccountingsController, 'uploadAttachment'])
           router.get('/attachment/:filename', [AccountingsController, 'downloadAttachment'])
         })
