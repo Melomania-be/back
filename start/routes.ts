@@ -7,6 +7,7 @@
 |
 */
 import router from '@adonisjs/core/services/router'
+import limiter from '@adonisjs/limiter/services/main'
 import { middleware } from './kernel.js'
 
 const AuditionsController = () => import('#controllers/auditions_controller')
@@ -48,6 +49,13 @@ const ContractorInteractionsController = () =>
 const ContractorParticipantsController = () =>
   import('#controllers/contractor_participants_controller')
 
+// <-- AJOUT : Définition de la règle de rate limiting pour le login
+export const loginThrottle = limiter.define('loginThrottle', (ctx) => {
+  return limiter
+    .allowRequests(3)
+    .every('1 minute')
+    .usingKey(ctx.request.ip()) as any
+})
 
 router.group(() => {
   // =============================================================================
@@ -60,8 +68,10 @@ router.group(() => {
       henlo: 'monde',
     }
   })
+
   // Authentication
-  router.post('/sign_in', [UsersController, 'signIn'])
+  // <-- AJOUT : .use(loginThrottle) sur la route de connexion
+  router.post('/sign_in', [UsersController, 'signIn']).use(loginThrottle)
 
   // Routes fichiers publiques étendues
   router.get('/files/download/:id', [FilesController, 'download'])
@@ -248,33 +258,33 @@ router.group(() => {
         .group(() => {
           router.get('/:contactId', [AccountingsController, 'getContactAccountings'])
           router.get(
-  '/contractor/:contractorId',
-  [AccountingsController, 'getContractorAccountings']
-)
+            '/contractor/:contractorId',
+            [AccountingsController, 'getContractorAccountings']
+          )
           router.post('/attachment', [AccountingsController, 'uploadAttachment'])
           router.get('/attachment/:filename', [AccountingsController, 'downloadAttachment'])
         })
         .prefix('/accountings')
 
 
-        router
-  .group(() => {
-    router.get(
-      '/project/:projectId',
-      [ContractorParticipantsController, 'getByProject']
-    )
+      router
+        .group(() => {
+          router.get(
+            '/project/:projectId',
+            [ContractorParticipantsController, 'getByProject']
+          )
 
-    router.post(
-      '/',
-      [ContractorParticipantsController, 'create']
-    )
+          router.post(
+            '/',
+            [ContractorParticipantsController, 'create']
+          )
 
-    router.delete(
-      '/:id',
-      [ContractorParticipantsController, 'delete']
-    )
-  })
-  .prefix('/contractor-participant')
+          router.delete(
+            '/:id',
+            [ContractorParticipantsController, 'delete']
+          )
+        })
+        .prefix('/contractor-participant')
       // =============================================================================
       // GESTION DES PROJETS
       // =============================================================================
@@ -540,64 +550,64 @@ router.group(() => {
 // =============================================================================
 // GESTION DES CONTRACTORS
 // =============================================================================
-router
-  .group(() => {
-    router.get('/', [ContractorsController, 'getAll'])
-    router.get('/:id', [ContractorsController, 'getOne'])
-    router.post('/', [ContractorsController, 'create'])
-    router.put('/:id', [ContractorsController, 'update'])
-    router.delete('/:id', [ContractorsController, 'delete'])
-  })
-  .prefix('/contractor')
+      router
+        .group(() => {
+          router.get('/', [ContractorsController, 'getAll'])
+          router.get('/:id', [ContractorsController, 'getOne'])
+          router.post('/', [ContractorsController, 'create'])
+          router.put('/:id', [ContractorsController, 'update'])
+          router.delete('/:id', [ContractorsController, 'delete'])
+        })
+        .prefix('/contractor')
 
-  router
-  .group(() => {
-    router.get('/', [OrganizationsController, 'getAll'])
-    router.post('/create', [OrganizationsController, 'create'])
-  })
-  .prefix('/organization')
+      router
+        .group(() => {
+          router.get('/', [OrganizationsController, 'getAll'])
+          router.post('/create', [OrganizationsController, 'create'])
+        })
+        .prefix('/organization')
 
-router
-  .group(() => {
-    router.get('/', [ContractorCategoriesController, 'getAll'])
-    router.post('/', [ContractorCategoriesController, 'create'])
-    router.put('/:id', [ContractorCategoriesController, 'update'])
-    router.delete('/:id', [ContractorCategoriesController, 'delete'])
-  })
-  .prefix('/contractor-category')
+      router
+        .group(() => {
+          router.get('/', [ContractorCategoriesController, 'getAll'])
+          router.post('/', [ContractorCategoriesController, 'create'])
+          router.put('/:id', [ContractorCategoriesController, 'update'])
+          router.delete('/:id', [ContractorCategoriesController, 'delete'])
+        })
+        .prefix('/contractor-category')
 
 
-  router
-  .group(() => {
-    router.get(
-      '/:contractorId',
-      [ContractorInteractionsController, 'getByContractor']
-    )
+      router
+        .group(() => {
+          router.get(
+            '/:contractorId',
+            [ContractorInteractionsController, 'getByContractor']
+          )
 
-    router.post(
-      '/',
-      [ContractorInteractionsController, 'create']
-    )
+          router.post(
+            '/',
+            [ContractorInteractionsController, 'create']
+          )
 
-    router.put(
-      '/:id',
-      [ContractorInteractionsController, 'update']
-    )
+          router.put(
+            '/:id',
+            [ContractorInteractionsController, 'update']
+          )
 
-    router.delete(
-      '/:id',
-      [ContractorInteractionsController, 'delete']
-    )
-    router.post(
-  '/:id/upload',
-  [ContractorInteractionsController, 'upload']
-)
-router.get(
-  '/file/:filename',
-  [ContractorInteractionsController, 'download']
-)
-  })
-  .prefix('/contractor-interaction')
+          router.delete(
+            '/:id',
+            [ContractorInteractionsController, 'delete']
+          )
+          router.post(
+            '/:id/upload',
+            [ContractorInteractionsController, 'upload']
+          )
+          router.get(
+            '/file/:filename',
+            [ContractorInteractionsController, 'download']
+          )
+        })
+        .prefix('/contractor-interaction')
       // =============================================================================
       // GESTION DES INSTRUMENTS
       // =============================================================================
