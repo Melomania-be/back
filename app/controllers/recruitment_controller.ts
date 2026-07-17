@@ -231,11 +231,15 @@ export default class RecruitmentController {
     }
   }
 
-  async getSettings({ params, response }: HttpContext) {
+  async getSettings({ params, response, auth }: HttpContext) {
     try {
       const projectId = this.validateProjectId(params.id)
+      const organizationId = auth.user?.organizationId
 
-      const project = await Project.find(projectId)
+      const project = await Project.query()
+        .where('id', projectId)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
+        .first()
       if (!project) {
         return response.status(404).json({ error: 'Project not found' })
       }
@@ -247,6 +251,7 @@ export default class RecruitmentController {
           project_id: projectId,
           follow_up_days: 7,
           auto_follow_up_enabled: true,
+          organizationId,
         })
       }
 
@@ -269,9 +274,10 @@ export default class RecruitmentController {
     }
   }
 
-  async updateSettings({ params, request, response }: HttpContext) {
+  async updateSettings({ params, request, response, auth }: HttpContext) {
     try {
       const projectId = this.validateProjectId(params.id)
+      const organizationId = auth.user?.organizationId
 
       const requestBody = request.body()
 
@@ -295,7 +301,10 @@ export default class RecruitmentController {
         auto_follow_up_enabled: autoFollowUpEnabled
       }
 
-      const project = await Project.find(projectId)
+      const project = await Project.query()
+        .where('id', projectId)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
+        .first()
       if (!project) {
         return response.status(404).json({ error: 'Project not found' })
       }
@@ -307,6 +316,7 @@ export default class RecruitmentController {
           project_id: projectId,
           follow_up_days: validatedData.follow_up_days,
           auto_follow_up_enabled: validatedData.auto_follow_up_enabled,
+          organizationId,
         })
       } else {
         settings.follow_up_days = validatedData.follow_up_days
@@ -1286,12 +1296,14 @@ export default class RecruitmentController {
     }
   }
 
-  async getAvailableProjects({ params, response }: HttpContext) {
+  async getAvailableProjects({ params, response, auth }: HttpContext) {
     try {
       const currentProjectId = this.validateProjectId(params.id)
+      const organizationId = auth.user?.organizationId
 
       const projects = await Project.query()
         .where('id', '!=', currentProjectId)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
         .select('id', 'name', 'created_at', 'updated_at')
         .orderBy('created_at', 'desc')
 
