@@ -54,4 +54,11 @@ export default class OrganizationsController {
       },
     })
   }
+     async create({ request, response }: HttpContext) {
+    const organization = await Organization.create({
+      name: request.input('name')
+    })
+
+    return response.created(organization)
+  }
 }

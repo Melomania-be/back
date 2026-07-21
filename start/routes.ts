@@ -568,14 +568,14 @@ router
   })
   .prefix('/contractor')
 
-  router
+ router
   .group(() => {
     router.get('/', [OrganizationsController, 'getAll'])
 
-    router.post('/create', [OrganizationsController, 'create'])
+    router.post('/', [OrganizationsController, 'create'])
   })
   .prefix('/organization')
-
+  
 router
   .group(() => {
     router.get('/', [ContractorCategoriesController, 'getAll'])
