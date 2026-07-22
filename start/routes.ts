@@ -720,5 +720,6 @@ router.get(
 
     })
     .use(middleware.auth({ guards: ['api'] }))
+    .use(middleware.organization())
     .use(middleware.routeLogger())
 })
