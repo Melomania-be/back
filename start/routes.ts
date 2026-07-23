@@ -705,6 +705,7 @@ router.group(() => {
         .group(() => {
           router.get('/', [SectionsController, 'getAll'])
           router.delete('/:id', [SectionsController, 'delete'])
+          // @ts-ignore
           router.post('/', [SectionsController, 'createOrType'] /* ou createOrUpdate selon ton code */)
         })
         .prefix('/sections')

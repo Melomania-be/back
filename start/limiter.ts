@@ -1,6 +1,7 @@
 import limiter from '@adonisjs/limiter/services/main'
 import type { HttpContext } from '@adonisjs/core/http'
 
+// @ts-ignore
 export const loginThrottle = limiter.define('loginThrottle', (ctx: HttpContext) => {
   return limiter
     .allowRequests(3)
