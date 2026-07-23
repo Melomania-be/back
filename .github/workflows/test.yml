@@ -38,6 +38,7 @@ jobs:
       - name: Setup environment
         run: |
           cp .env.example .env
+          echo "DB_CONNECTION=postgres" >> .env
           echo "DB_HOST=127.0.0.1" >> .env
           echo "DB_PORT=5432" >> .env
           echo "DB_USER=admin123" >> .env
@@ -50,7 +51,7 @@ jobs:
           echo "SMTP_USERNAME=local" >> .env
           echo "SMTP_PASSWORD=local" >> .env
           echo "URL=http://localhost:3333" >> .env
-          echo "LIMITER_STORE=database" >> .env
+          echo "LIMITER_STORE=db" >> .env
 
       - name: Run migrations
         run: node ace migration:run
