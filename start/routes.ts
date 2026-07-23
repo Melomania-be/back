@@ -553,6 +553,7 @@ router
   router
   .group(() => {
     router.get('/', [OrganizationsController, 'getAll'])
+    router.post('/create', [OrganizationsController, 'create'])
   })
   .prefix('/organization')
 
