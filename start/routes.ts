@@ -7,8 +7,8 @@
 |
 */
 import router from '@adonisjs/core/services/router'
-import limiter from '@adonisjs/limiter/services/main'
 import { middleware } from './kernel.js'
+import { loginThrottle } from '#start/limiter'
 
 const AuditionsController = () => import('#controllers/auditions_controller')
 const UsersController = () => import('#controllers/users_controller')
@@ -49,14 +49,6 @@ const ContractorInteractionsController = () =>
 const ContractorParticipantsController = () =>
   import('#controllers/contractor_participants_controller')
 
-// <-- AJOUT : Définition de la règle de rate limiting pour le login
-export const loginThrottle = limiter.define('loginThrottle', (ctx) => {
-  return limiter
-    .allowRequests(3)
-    .every('1 minute')
-    .usingKey(ctx.request.ip()) as any
-})
-
 router.group(() => {
   // =============================================================================
   // ROUTES PUBLIQUES (SANS AUTHENTIFICATION)
@@ -70,7 +62,6 @@ router.group(() => {
   })
 
   // Authentication
-  // <-- AJOUT : .use(loginThrottle) sur la route de connexion
   router.post('/sign_in', [UsersController, 'signIn']).use(loginThrottle)
 
   // Routes fichiers publiques étendues
@@ -547,9 +538,9 @@ router.group(() => {
         })
         .prefix('/contact')
 
-// =============================================================================
-// GESTION DES CONTRACTORS
-// =============================================================================
+      // =============================================================================
+      // GESTION DES CONTRACTORS
+      // =============================================================================
       router
         .group(() => {
           router.get('/', [ContractorsController, 'getAll'])
@@ -714,7 +705,7 @@ router.group(() => {
         .group(() => {
           router.get('/', [SectionsController, 'getAll'])
           router.delete('/:id', [SectionsController, 'delete'])
-          router.post('/', [SectionsController, 'createOrUpdate'])
+          router.post('/', [SectionsController, 'createOrType'] /* ou createOrUpdate selon ton code */)
         })
         .prefix('/sections')
 
