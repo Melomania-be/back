@@ -573,6 +573,8 @@ router
     router.get('/', [OrganizationsController, 'getAll'])
 
     router.post('/', [OrganizationsController, 'create'])
+    router.put('/:id', [OrganizationsController, 'update'])
+    router.delete('/:id', [OrganizationsController, 'delete'])
   })
   .prefix('/organization')
   

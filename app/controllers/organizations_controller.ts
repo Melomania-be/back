@@ -54,11 +54,62 @@ export default class OrganizationsController {
       },
     })
   }
-     async create({ request, response }: HttpContext) {
-    const organization = await Organization.create({
-      name: request.input('name')
-    })
+    async create({ request, response }: HttpContext) {
+	try {
+		const organization = await Organization.create({
+			name: request.input('name')
+		});
 
-    return response.created(organization)
-  }
+		return response.created(organization);
+	} catch (error) {
+		if (error.code === '23505') {
+			return response.conflict({
+				message: 'Organization already exists'
+			});
+		}
+
+		throw error;
+	}
+}
+async update({ params, request, response }: HttpContext) {
+	try {
+		const organization = await Organization.findOrFail(params.id);
+
+		organization.merge({
+			name: request.input('name')
+		});
+
+		await organization.save();
+
+		return organization;
+	} catch (error) {
+		if (error.code === '23505') {
+			return response.conflict({
+				message: 'Organization already exists'
+			});
+		}
+
+		throw error;
+	}
+}
+
+async delete({ params, response }: HttpContext) {
+	try {
+		const organization = await Organization.findOrFail(params.id);
+
+		await organization.delete();
+
+		return response.ok({
+			message: 'Organization deleted'
+		});
+	} catch (error) {
+		if (error.code === '23503') {
+			return response.conflict({
+				message: 'Cannot delete organization because it is assigned to one or more contractors.'
+			});
+		}
+
+		throw error;
+	}
+}
 }

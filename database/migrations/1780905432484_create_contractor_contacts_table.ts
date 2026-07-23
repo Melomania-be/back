@@ -25,7 +25,7 @@ export default class extends BaseSchema {
         .unsigned()
         .references('id')
         .inTable('organizations')
-        .onDelete('SET NULL')
+        .onDelete('RESTRICT')
 
       table.timestamp('created_at')
       table.timestamp('updated_at')
