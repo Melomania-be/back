@@ -5,14 +5,14 @@ import AppSettings from '#models/app_settings'
 import fs from 'node:fs/promises'
 import { createReadStream } from 'node:fs'
 
-const IMAGE_EXTNAMES = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'avif']
+const IMAGE_EXTNAMES = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif']
+const IMAGE_MAX_SIZE = '2mb'
 
 const MIME_TYPES: Record<string, string> = {
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
   png: 'image/png',
   gif: 'image/gif',
-  svg: 'image/svg+xml',
   webp: 'image/webp',
   avif: 'image/avif',
 }
@@ -31,7 +31,7 @@ export default class AppSettingsController {
       settings.primary_color = primaryColor
     }
 
-    const logo = request.file('logo', { extnames: IMAGE_EXTNAMES })
+    const logo = request.file('logo', { size: IMAGE_MAX_SIZE, extnames: IMAGE_EXTNAMES })
     if (logo) {
       if (settings.logo_path) {
         try {
@@ -45,7 +45,10 @@ export default class AppSettingsController {
       settings.logo_file_name = logo.clientName
     }
 
-    const background = request.file('background_image', { extnames: IMAGE_EXTNAMES })
+    const background = request.file('background_image', {
+      size: IMAGE_MAX_SIZE,
+      extnames: IMAGE_EXTNAMES,
+    })
     if (background) {
       if (settings.background_image_path) {
         try {
