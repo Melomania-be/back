@@ -736,9 +736,9 @@ router.get(
         })
         .prefix('/templates')
 
-   
 
-// =============================================================================
+
+      // =============================================================================
       // GESTION DES RÉGLAGES
       // =============================================================================
       router
@@ -749,7 +749,7 @@ router.get(
         })
         .prefix('/settings')
 
- })
+})
     .use(middleware.auth({ guards: ['api'] }))
     .use(middleware.organization())
     .use(middleware.routeLogger())
