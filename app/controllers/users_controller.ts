@@ -44,10 +44,12 @@ export default class UsersController {
     const ip = ctx.request.ip()
     const now = Date.now()
 
-    // ✅ Récupérer ou initialiser le compteur pour cette IP
+    //  Récupérer ou initialiser le compteur pour cette IP
     let record = loginAttempts.get(ip) ?? { count: 0, firstAttempt: now }
 
-    // ✅ Vérifier si l'IP est bloquée pendant 15 minutes (après 10 échecs)
+
+
+    // Vérifier si l'IP est bloquée pendant 15 minutes (après 10 échecs)
     if (record.blockedUntil && now < record.blockedUntil) {
       const remainingMinutes = Math.ceil((record.blockedUntil - now) / 60000)
       ctx.logger.warn(
@@ -59,12 +61,12 @@ export default class UsersController {
       })
     }
 
-    // ✅ Réinitialiser le compteur si la fenêtre de 1 minute est expirée
+    // Réinitialiser le compteur si la fenêtre de 1 minute est expirée
     if (now - record.firstAttempt > RATE_LIMIT.windowMs) {
       record = { count: 0, firstAttempt: now }
     }
 
-    // ✅ Bloquer si plus de 5 tentatives dans la fenêtre d'1 minute
+    // Bloquer si plus de 5 tentatives dans la fenêtre d'1 minute
     if (record.count >= RATE_LIMIT.maxAttempts) {
       // Blocage dur de 15 min si 10 échecs cumulés
       if (record.count >= RATE_LIMIT.hardBlockAfter) {
@@ -85,13 +87,13 @@ export default class UsersController {
       const user = await User.verifyCredentials(credentials.email, credentials.password)
       const token = await User.accessTokens.create(user)
 
-      // ✅ Connexion réussie : réinitialiser le compteur pour cette IP
+      // Connexion réussie : réinitialiser le compteur pour cette IP
       loginAttempts.delete(ip)
 
       return token
 
     } catch (error) {
-      // ✅ Échec : incrémenter le compteur et logger l'événement de sécurité
+      // Échec : incrémenter le compteur et logger l'événement de sécurité
       record.count += 1
       loginAttempts.set(ip, record)
 
