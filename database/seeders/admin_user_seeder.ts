@@ -10,6 +10,10 @@ export default class extends BaseSeeder {
     await User.create({
       email,
       password,
+      role: 'superadmin',
+      canAccessContacts: true,
+      canExportContacts: true,
+      isActive: true,
     })
   }
 }

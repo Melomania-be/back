@@ -362,6 +362,21 @@ export default class MailingsController {
       })
     }
 
+    // ✅ AJOUT — CORRECTION V-09 : validation du customMessage
+    if (customMessage && typeof customMessage !== 'string') {
+      return response.status(400).json({
+        error: 'Le message personnalisé doit être une chaîne de caractères',
+      })
+    }
+
+    if (customMessage && customMessage.length > 500) {
+      return response.status(400).json({
+        error: 'Le message personnalisé ne peut pas dépasser 500 caractères',
+        maxLength: 500,
+        currentLength: customMessage.length,
+      })
+    }
+
     try {
       // Récupérer les données nécessaires
       let project = await Project.find(projectId)

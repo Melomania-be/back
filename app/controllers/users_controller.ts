@@ -195,4 +195,42 @@ export default class UsersController {
       })
     }
   }
+  // ✅ Modifier le rôle et les permissions d'un utilisateur (superadmin uniquement)
+  async updatePrivileges(ctx: HttpContext) {
+    if (await ctx.bouncer.denies(adminRights)) {
+      return ctx.response.forbidden({ error: 'Seul un superadmin peut modifier les privilèges' })
+    }
+
+    const { role, canAccessContacts, canExportContacts, isActive } = ctx.request.only([
+      'role', 'canAccessContacts', 'canExportContacts', 'isActive'
+    ])
+
+    const user = await User.findOrFail(ctx.params.id)
+
+    // Empêcher de modifier son propre rôle
+    if (user.id === ctx.auth.user!.id) {
+      return ctx.response.badRequest({ error: 'Vous ne pouvez pas modifier vos propres privilèges' })
+    }
+
+    if (role) user.role = role
+    if (canAccessContacts !== undefined) user.canAccessContacts = canAccessContacts
+    if (canExportContacts !== undefined) user.canExportContacts = canExportContacts
+    if (isActive !== undefined) user.isActive = isActive
+
+    await user.save()
+    return ctx.response.ok({ message: 'Privilèges mis à jour', user: user.serialize() })
+  }
+
+  // ✅ Assigner des projets à un utilisateur guest
+  async assignProjects(ctx: HttpContext) {
+    if (await ctx.bouncer.denies(adminRights)) {
+      return ctx.response.forbidden({ error: 'Seul un superadmin peut assigner des projets' })
+    }
+
+    const user = await User.findOrFail(ctx.params.id)
+    const { projectIds } = ctx.request.only(['projectIds'])
+
+    await user.related('accessibleProjects').sync(projectIds)
+    return ctx.response.ok({ message: 'Projets assignés avec succès' })
+  }
 }

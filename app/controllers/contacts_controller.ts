@@ -3,9 +3,13 @@ import Contact from '#models/contact'
 import { simpleFilter, advancedFilter } from 'adonisjs-filters'
 import { createContactValidator, mergeContactsValidator } from '#validators/contact'
 import { HttpContext } from '@adonisjs/core/http'
+import { canAccessContacts } from '#abilities/main'
 
 export default class ContactsController {
   async getAll(ctx: HttpContext) {
+    if (await ctx.bouncer.denies(canAccessContacts)) {
+      return ctx.response.forbidden({ error: 'Accès aux contacts non autorisé' })
+  }
     let baseQuery = Contact.query().preload('instruments', (instrumentsQuery) => {
       instrumentsQuery.pivotColumns(['proficiency_level'])
     })
@@ -18,7 +22,11 @@ export default class ContactsController {
     )
   }
 
-  async getOne({ params }: HttpContext) {
+  async getOne(ctx: HttpContext) {
+    const { params } = ctx
+    if (await ctx.bouncer.denies(canAccessContacts)) {
+      return ctx.response.forbidden({ error: 'Accès aux contacts non autorisé' })
+  }
     return await Contact.query()
       .where('id', params.id)
       .preload('instruments')
@@ -35,6 +43,9 @@ export default class ContactsController {
   }
 
   async advancedSearch(ctx: HttpContext) {
+    if (await ctx.bouncer.denies(canAccessContacts)) {
+      return ctx.response.forbidden({ error: 'Accès aux contacts non autorisé' })
+  }
     let baseQuery = Contact.query()
       .preload('instruments', (instrumentsQuery) => {
         instrumentsQuery.pivotColumns(['proficiency_level'])
@@ -42,7 +53,7 @@ export default class ContactsController {
       .preload('lists')
       .preload('participants')
       .preload('projects')
-      
+
     const data = await advancedFilter(ctx, baseQuery)
     return {
       data,
@@ -165,7 +176,7 @@ export default class ContactsController {
   async delete({ params, response }: HttpContext) {
     let contact = await Contact.find(params.id)
     if (contact) {
-      
+
       let participations = await contact.related('participants').query()
 
       for (let participation of participations) {
@@ -181,6 +192,9 @@ export default class ContactsController {
   }
 
   async create(ctx: HttpContext) {
+    if (await ctx.bouncer.denies(canAccessContacts)) {
+      return ctx.response.forbidden({ error: 'Accès aux contacts non autorisé' })
+  }
     const data = await ctx.request.validateUsing(createContactValidator)
 
     const existing = await Contact.query()

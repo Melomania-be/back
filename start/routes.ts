@@ -525,6 +525,9 @@ router.group(() => {
           router.put('/', [UsersController, 'create'])
           router.patch('/:id', [UsersController, 'update'])
           router.delete('/:id', [UsersController, 'delete'])
+          // ✅ NOUVELLES ROUTES — gestion des privilèges
+          router.patch('/:id/privileges', [UsersController, 'updatePrivileges'])
+          router.post('/:id/projects', [UsersController, 'assignProjects'])
         })
         .prefix('/users')
 
@@ -615,15 +618,17 @@ router.group(() => {
       // =============================================================================
       // GESTION DES TEMPLATES
       // =============================================================================
+      const SettingsController = () => import('#controllers/settings_controller')
+
       router
         .group(() => {
-          router.get('/', [TemplateController, 'getTemplates'])
-          router.put('/createOrUpdate', [TemplateController, 'createOrUpdateTemplate'])
-          router.delete('/:id', [TemplateController, 'delete'])
+          router.get('/', [SettingsController, 'index'])
+          router.post('/', [SettingsController, 'store'])
+          router.post('/send-now', [SettingsController, 'sendNow'])
         })
-        .prefix('/templates')
+        .prefix('/settings')
 
-    })
+    }) // ← fermeture du groupe protégé
     .use(middleware.auth({ guards: ['api'] }))
     .use(middleware.routeLogger())
 })
