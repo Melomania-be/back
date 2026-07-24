@@ -19,6 +19,28 @@ import Participant from '#models/participant'
 import Audition from '#models/audition'
 
 export default class MailingsController {
+  private normalizeEmail(email: string | null | undefined): string | null {
+    const normalizedEmail = email?.trim().toLowerCase()
+    return normalizedEmail || null
+  }
+
+  private canSendToContact(
+    contact: Contact | null | undefined,
+    sentEmails: Set<string>
+  ): contact is Contact {
+    if (!contact?.email || contact.subscribed !== true || contact.validated !== true) {
+      return false
+    }
+
+    const normalizedEmail = this.normalizeEmail(contact.email)
+    if (!normalizedEmail || sentEmails.has(normalizedEmail)) {
+      return false
+    }
+
+    sentEmails.add(normalizedEmail)
+    return true
+  }
+
   async sendUnique({ request, response }: HttpContext) {
     console.log('sendUnique called')
     const { listContacts, subject, content } = request.only(['listContacts', 'subject', 'content'])
@@ -30,9 +52,10 @@ export default class MailingsController {
     console.log('allContacts', allContacts)
 
     if (allContacts !== null && allContacts !== undefined) {
+      const sentEmails = new Set<string>()
       for (let contact of allContacts) {
         console.log('contact', contact)
-        if (contact.email && contact.subscribed === true && contact.validated === true) {
+        if (this.canSendToContact(contact, sentEmails)) {
           const uniqueMail = new UniquePreparation(content, subject, contact)
 
           const outgoingMail = new OutgoingMail()
@@ -100,10 +123,11 @@ export default class MailingsController {
       let registrationId = project?.registration
 
       if (participants !== null && participants !== undefined) {
+        const sentEmails = new Set<string>()
         for (let participant of participants) {
           if (participant.accepted === true) {
             let contact = await Contact.find(participant.contact_id)
-            if (contact?.email && contact?.subscribed === true && contact?.validated === true) {
+            if (this.canSendToContact(contact, sentEmails)) {
               const templatePreparation = new TemplatePreparation(
                 htmlFromDb,
                 contact,
@@ -136,10 +160,11 @@ export default class MailingsController {
 
     if (type === 'unique') {
       if (participants !== null && participants !== undefined) {
+        const sentEmails = new Set<string>()
         for (let participant of participants) {
           if (participant.accepted === true) {
             let contact = await Contact.find(participant.contact_id)
-            if (contact?.email && contact?.subscribed === true && contact?.validated === true) {
+            if (this.canSendToContact(contact, sentEmails)) {
               const uniqueMail = new UniquePreparation(content, subject, contact)
 
               const outgoingMail = new OutgoingMail()
@@ -166,77 +191,79 @@ export default class MailingsController {
   }
 
   async sendMailToIndividualContacts({ request, response }: HttpContext) {
-  console.log('sendMailToIndividualContacts called')
-  const { contactIds, type, templateId, subject, content } = request.only([
-    'contactIds',
-    'type',
-    'templateId',
-    'subject',
-    'content',
-  ])
+    console.log('sendMailToIndividualContacts called')
+    const { contactIds, type, templateId, subject, content } = request.only([
+      'contactIds',
+      'type',
+      'templateId',
+      'subject',
+      'content',
+    ])
 
-  if (!contactIds || !Array.isArray(contactIds) || contactIds.length === 0) {
-    return response.status(400).json({ message: 'No contact IDs provided' })
-  }
-
-  const contacts = await Contact.query().whereIn('id', contactIds)
-
-  if (type === 'unique') {
-    for (let contact of contacts) {
-      if (contact?.email && contact?.subscribed === true && contact?.validated === true) {
-        const uniqueMail = new UniquePreparation(content, subject, contact)
-
-        const outgoingMail = new OutgoingMail()
-        outgoingMail.type = 'unique'
-        outgoingMail.receiver_id = contact.id
-        outgoingMail.project_id = null
-        outgoingMail.mail_template_id = null
-        outgoingMail.sent = false
-        outgoingMail.createdAt = DateTime.local()
-        outgoingMail.updatedAt = DateTime.local()
-
-        await OutgoingMail.create(outgoingMail)
-        await mail.send(uniqueMail)
-        await this.updateOutgoingMail(outgoingMail)
-      }
+    if (!contactIds || !Array.isArray(contactIds) || contactIds.length === 0) {
+      return response.status(400).json({ message: 'No contact IDs provided' })
     }
-    return response.json({ message: 'Email sent successfully' })
-  }
 
-  if (type === 'template') {
-    let templateDb = await mail_template.find(templateId)
-    let htmlFromDb = templateDb?.content || ''
+    const contacts = await Contact.query().whereIn('id', contactIds)
 
-    for (let contact of contacts) {
-      if (contact?.email && contact?.subscribed === true && contact?.validated === true) {
-        const templatePreparation = new TemplatePreparation(
-          htmlFromDb,
-          contact,
-          null,
-          null,
-          { firstName: '', lastName: '', email: '', phone: '', messenger: '' },
-          null
-        )
+    if (type === 'unique') {
+      const sentEmails = new Set<string>()
+      for (let contact of contacts) {
+        if (this.canSendToContact(contact, sentEmails)) {
+          const uniqueMail = new UniquePreparation(content, subject, contact)
 
-        const outgoingMail = new OutgoingMail()
-        outgoingMail.type = 'template'
-        outgoingMail.receiver_id = contact.id
-        outgoingMail.project_id = null
-        outgoingMail.mail_template_id = templateId
-        outgoingMail.sent = false
-        outgoingMail.createdAt = DateTime.local()
-        outgoingMail.updatedAt = DateTime.local()
+          const outgoingMail = new OutgoingMail()
+          outgoingMail.type = 'unique'
+          outgoingMail.receiver_id = contact.id
+          outgoingMail.project_id = null
+          outgoingMail.mail_template_id = null
+          outgoingMail.sent = false
+          outgoingMail.createdAt = DateTime.local()
+          outgoingMail.updatedAt = DateTime.local()
 
-        await OutgoingMail.create(outgoingMail)
-        await mail.send(templatePreparation)
-        await this.updateOutgoingMail(outgoingMail)
+          await OutgoingMail.create(outgoingMail)
+          await mail.send(uniqueMail)
+          await this.updateOutgoingMail(outgoingMail)
+        }
       }
+      return response.json({ message: 'Email sent successfully' })
     }
-    return response.json({ message: 'Email sent successfully' })
-  }
 
-  return response.status(400).json({ message: 'Invalid type' })
-}
+    if (type === 'template') {
+      let templateDb = await mail_template.find(templateId)
+      let htmlFromDb = templateDb?.content || ''
+      const sentEmails = new Set<string>()
+
+      for (let contact of contacts) {
+        if (this.canSendToContact(contact, sentEmails)) {
+          const templatePreparation = new TemplatePreparation(
+            htmlFromDb,
+            contact,
+            null,
+            null,
+            { firstName: '', lastName: '', email: '', phone: '', messenger: '' },
+            null
+          )
+
+          const outgoingMail = new OutgoingMail()
+          outgoingMail.type = 'template'
+          outgoingMail.receiver_id = contact.id
+          outgoingMail.project_id = null
+          outgoingMail.mail_template_id = templateId
+          outgoingMail.sent = false
+          outgoingMail.createdAt = DateTime.local()
+          outgoingMail.updatedAt = DateTime.local()
+
+          await OutgoingMail.create(outgoingMail)
+          await mail.send(templatePreparation)
+          await this.updateOutgoingMail(outgoingMail)
+        }
+      }
+      return response.json({ message: 'Email sent successfully' })
+    }
+
+    return response.status(400).json({ message: 'Invalid type' })
+  }
 
   // ✅ FONCTION CORRIGÉE : sendAuditionRequest - Version simplifiée sans preload
   async sendAuditionRequest({ request, response }: HttpContext) {
@@ -312,7 +339,8 @@ export default class MailingsController {
       }
 
       // Créer et envoyer l'email d'audition
-      const AuditionRequest = (await import('#mails/audition_request')).default
+      const auditionRequestModule = await import('#mails/audition_request')
+      const AuditionRequest = auditionRequestModule.default
       const auditionRequestMail = new AuditionRequest(
         participant.contact,
         project,
@@ -381,11 +409,12 @@ export default class MailingsController {
     }
 
     if (allContacts !== null && allContacts !== undefined) {
+      const sentEmails = new Set<string>()
       for (let contact of allContacts) {
         console.log('contact', contact)
         let contactDb = await Contact.find(contact.id)
         if (htmlFromDb !== '') {
-          if (contactDb?.email && contactDb?.subscribed === true && contactDb?.validated === true) {
+          if (this.canSendToContact(contactDb, sentEmails)) {
             const templatePreparation = new TemplatePreparation(
               htmlFromDb,
               contact,
@@ -567,9 +596,10 @@ export default class MailingsController {
     }
 
     if (acceptedParticipants !== null && acceptedParticipants !== undefined) {
+      const sentEmails = new Set<string>()
       for (let participant of acceptedParticipants) {
         let contact = await Contact.find(participant.contact_id)
-        if (contact?.email && contact?.subscribed === true && contact?.validated === true) {
+        if (this.canSendToContact(contact, sentEmails)) {
           const callsheetNotificationMail = new CallsheetNotification(
             contact,
             project,
@@ -649,8 +679,9 @@ export default class MailingsController {
     }
     if (contacts !== null && contacts !== undefined) {
       if (registration.id !== null && registration.id !== undefined) {
+        const sentEmails = new Set<string>()
         for (let contact of contacts) {
-          if (contact?.email && contact?.subscribed === true && contact?.validated === true) {
+          if (this.canSendToContact(contact, sentEmails)) {
             const recruitmentNotification = new RecruitmentNotification(
               contact,
               registration,
@@ -728,6 +759,7 @@ export default class MailingsController {
     const outgoingMail = new OutgoingMail()
     outgoingMail.type = 'recommendation_notification'
     outgoingMail.receiver_id = recommended.id
+    outgoingMail.project_id = projectId
     outgoingMail.mail_template_id = null
     outgoingMail.sent = false
     outgoingMail.createdAt = DateTime.local()
@@ -793,6 +825,7 @@ export default class MailingsController {
     const outgoingMail = new OutgoingMail()
     outgoingMail.type = 'participation_validation_notification'
     outgoingMail.receiver_id = contact.id
+    outgoingMail.project_id = projectId
     outgoingMail.mail_template_id = null
     outgoingMail.sent = false
     outgoingMail.createdAt = DateTime.local()
@@ -809,10 +842,6 @@ export default class MailingsController {
   }
 
   async getOutgoing(ctx: HttpContext) {
-    let data: {
-      lastCallsheetNotificationSent: string | null
-      lastRecruitmentNotificationSent: string | null
-    }
     console.log('getOutgoing called')
     let lastCallsheetNotificationSent = await OutgoingMail.query()
       .where('type', 'callsheet_notification')
@@ -828,13 +857,49 @@ export default class MailingsController {
       .orderBy('created_at', 'desc')
       .first()
 
-    data = {
+    const outgoingMails = await OutgoingMail.query()
+      .where('project_id', ctx.params.id)
+      .where('sent', true)
+      .preload('receiver', (query) => {
+        query.preload('instruments')
+      })
+      .preload('mailTemplate')
+      .orderBy('created_at', 'desc')
+
+    const data = {
       lastCallsheetNotificationSent: lastCallsheetNotificationSent
         ? lastCallsheetNotificationSent.createdAt.toISO()
         : null,
       lastRecruitmentNotificationSent: lastRecruitmentNotificationSent
         ? lastRecruitmentNotificationSent.createdAt.toISO()
         : null,
+      outgoingMails: outgoingMails.map((outgoingMail) => ({
+        id: outgoingMail.id,
+        type: outgoingMail.type,
+        sent: outgoingMail.sent,
+        createdAt: outgoingMail.createdAt.toISO(),
+        updatedAt: outgoingMail.updatedAt.toISO(),
+        receiver: outgoingMail.receiver
+          ? {
+              id: outgoingMail.receiver.id,
+              firstName: outgoingMail.receiver.first_name,
+              lastName: outgoingMail.receiver.last_name,
+              email: outgoingMail.receiver.email,
+              instruments:
+                outgoingMail.receiver.instruments?.map((instrument) => ({
+                  id: instrument.id,
+                  name: instrument.name,
+                  family: instrument.family,
+                })) || [],
+            }
+          : null,
+        mailTemplate: outgoingMail.mailTemplate
+          ? {
+              id: outgoingMail.mailTemplate.id,
+              name: outgoingMail.mailTemplate.name,
+            }
+          : null,
+      })),
     }
 
     return data
