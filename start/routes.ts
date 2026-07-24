@@ -624,9 +624,8 @@ router.group(() => {
         })
         .prefix('/templates')
 
-    })
 
-// =============================================================================
+      // =============================================================================
       // GESTION DES RÉGLAGES
       // =============================================================================
       router
@@ -636,6 +635,10 @@ router.group(() => {
           router.post('/backup/now', [SettingsController, 'backupNow'])
         })
         .prefix('/settings')
+
+
+    })
+
 
     .use(middleware.auth({ guards: ['api'] }))
     .use(middleware.routeLogger())

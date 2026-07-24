@@ -14,6 +14,13 @@ export default class SettingsController {
   async store({ request, response }: HttpContext) {
     const { variable, value } = request.only(['variable', 'value'])
 
+    // backup_email uniquement configurable via .env, pas via l'API
+    if (variable === 'backup_email') {
+      return response.forbidden({
+        message: 'backup_email can only be set via environment variables'
+      })
+    }
+
     let setting = await Save.findBy('variable', variable)
 
     if (setting) {
