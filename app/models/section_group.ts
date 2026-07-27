@@ -1,8 +1,9 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column, manyToMany, hasMany } from '@adonisjs/lucid/orm'
+import { BaseModel, column, manyToMany, hasMany, belongsTo } from '@adonisjs/lucid/orm'
+import type { ManyToMany, HasMany, BelongsTo } from '@adonisjs/lucid/types/relations'
 import Section from './section.js'
-import type { ManyToMany, HasMany } from '@adonisjs/lucid/types/relations'
 import Project from './project.js'
+import Organization from '#models/organization'
 
 export default class SectionGroup extends BaseModel {
   @column({ isPrimary: true })
@@ -30,6 +31,12 @@ export default class SectionGroup extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  @column()
+  declare organizationId: number | null
+
+  @belongsTo(() => Organization)
+  declare organization: BelongsTo<typeof Organization>
 
   serializeExtras() {
     return { pivot_order: this.$extras.pivot_order }

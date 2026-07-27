@@ -4,6 +4,7 @@ import Piece from './piece.js'
 import File from './file.js'
 import Project from './project.js'
 import type { HasMany, ManyToMany, BelongsTo } from '@adonisjs/lucid/types/relations'
+import Organization from '#models/organization'
 
 export default class Folder extends BaseModel {
   @column({ isPrimary: true })
@@ -60,4 +61,10 @@ export default class Folder extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  @column()
+  declare organizationId: number | null
+
+  @belongsTo(() => Organization)
+  declare organization: BelongsTo<typeof Organization>
 }
