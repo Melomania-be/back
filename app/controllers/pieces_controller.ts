@@ -5,7 +5,10 @@ import { simpleFilter } from 'adonisjs-filters'
 
 export default class PiecesController {
   async getAll(ctx: HttpContext) {
+    const organizationId = ctx.auth.user?.organizationId
+
     let baseQuery = Piece.query()
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
       .preload('projects')
       .preload('typeOfPiece')
       .preload('composer')
@@ -23,25 +26,31 @@ export default class PiecesController {
 
   async createOrUpdate(ctx: HttpContext) {
     const data = await ctx.request.validateUsing(createPieceValidator)
+    const organizationId = ctx.auth.user?.organizationId
 
     if (data.id === undefined) {
-      return await Piece.create(data)
+      return await Piece.create({ ...data, organizationId })
     }
 
-    const piece = await Piece.firstOrCreate({ id: data.id }, data)
-
-    if (piece.$isLocal) {
-      return piece
-    }
+    const piece = await Piece.query()
+      .where('id', data.id)
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
+      .firstOrFail()
 
     piece.merge(data)
     await piece.save()
     return piece
   }
 
-  async delete({ params, response }: HttpContext) {
-    let piece = await Piece.find(params.id)
-    piece?.delete()
+  async delete({ params, response, auth }: HttpContext) {
+    const organizationId = auth.user?.organizationId
+
+    let piece = await Piece.query()
+      .where('id', params.id)
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
+      .first()
+
+    await piece?.delete()
     return response.send('piece deleted')
   }
 }

@@ -1,4 +1,4 @@
-// import type { HttpContext } from '@adonisjs/core/http'
+
 import Contact from '#models/contact'
 import RecruitmentContact from '#models/recruitment_contact'
 import { simpleFilter, advancedFilter } from 'adonisjs-filters'
@@ -19,12 +19,15 @@ export default class ContactsController {
   }
 
   async getAll(ctx: HttpContext) {
-   let baseQuery = Contact.query()
-  .preload('instruments', (instrumentsQuery) => {
-    instrumentsQuery.pivotColumns(['proficiency_level'])
-  })
-  .preload('projects')
-  .preload('participants')
+    const organizationId = ctx.auth.user?.organizationId
+
+    let baseQuery = Contact.query()
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
+      .preload('instruments', (instrumentsQuery) => {
+        instrumentsQuery.pivotColumns(['proficiency_level'])
+      })
+      .preload('projects')
+      .preload('participants')
 
     return await simpleFilter(
       ctx,
@@ -34,9 +37,12 @@ export default class ContactsController {
     )
   }
 
-  async getOne({ params }: HttpContext) {
+  async getOne({ params, auth }: HttpContext) {
+    const organizationId = auth.user?.organizationId
+
     return await Contact.query()
       .where('id', params.id)
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
       .preload('instruments')
       .preload('lists')
       .preload('participants', (query) => {
@@ -51,14 +57,17 @@ export default class ContactsController {
   }
 
   async advancedSearch(ctx: HttpContext) {
+    const organizationId = ctx.auth.user?.organizationId
+
     let baseQuery = Contact.query()
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
       .preload('instruments', (instrumentsQuery) => {
         instrumentsQuery.pivotColumns(['proficiency_level'])
       })
       .preload('lists')
       .preload('participants')
       .preload('projects')
-      
+
     const data = await advancedFilter(ctx, baseQuery)
     return {
       data,
@@ -66,7 +75,7 @@ export default class ContactsController {
         self: ['id', 'first_name', 'last_name', 'email', 'comments', 'messenger', 'phone'],
         instruments: ['id', 'family', 'name'],
         projects: ['id', 'name'],
-        participants: ['id', 'project', 'section', 'answers','project_id'],
+        participants: ['id', 'project', 'section', 'answers', 'project_id'],
         lists: ['id', 'name'],
       },
     }
@@ -76,6 +85,7 @@ export default class ContactsController {
     console.log(ctx.request.all())
 
     const data = await ctx.request.validateUsing(mergeContactsValidator)
+    const organizationId = ctx.auth.user?.organizationId
 
     if (!data.contactId1 && !data.contactId2) {
       return ctx.response.status(400).send('No contact ids provided')
@@ -91,6 +101,7 @@ export default class ContactsController {
       .preload('participants')
       .preload('projects')
       .where('id', data.contactId1)
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
       .firstOrFail()
     const contact2 = await Contact.query()
       .preload('instruments')
@@ -98,6 +109,7 @@ export default class ContactsController {
       .preload('participants')
       .preload('projects')
       .where('id', data.contactId2)
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
       .firstOrFail()
 
     contact1.first_name = data.first_name ?? contact1.first_name
@@ -114,7 +126,7 @@ export default class ContactsController {
 
     await contact1.related('lists').sync(
       contact1.lists.concat(contact2.lists).map((list) => list.id),
-      false // Avoid detaching and creating a contact instead of updating it
+      false
     )
 
     await contact1.related('projects').sync(
@@ -164,12 +176,19 @@ export default class ContactsController {
     console.log(ctx.request.all())
 
     const data = await ctx.request.validateUsing(createContactValidator)
+    const organizationId = ctx.auth.user?.organizationId
 
     let contact
     if (!data.id) {
-      contact = await Contact.create({ ...data, validated: true })
+      contact = await Contact.create({ ...data, validated: true, organizationId })
     } else {
-      contact = await Contact.updateOrCreate({ id: data.id }, { ...data, validated: true })
+      contact = await Contact.query()
+        .where('id', data.id)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
+        .firstOrFail()
+
+      contact.merge({ ...data, validated: true })
+      await contact.save()
     }
 
     if (data.instruments) {
@@ -192,10 +211,15 @@ export default class ContactsController {
     return contact
   }
 
-  async delete({ params, response }: HttpContext) {
-    let contact = await Contact.find(params.id)
+  async delete({ params, response, auth }: HttpContext) {
+    const organizationId = auth.user?.organizationId
+
+    let contact = await Contact.query()
+      .where('id', params.id)
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
+      .first()
+
     if (contact) {
-      
       let participations = await contact.related('participants').query()
 
       for (let participation of participations) {
@@ -212,22 +236,26 @@ export default class ContactsController {
 
   async create(ctx: HttpContext) {
     const data = await ctx.request.validateUsing(createContactValidator)
+    const organizationId = ctx.auth.user?.organizationId
 
     const existing = await Contact.query()
       .where('firstname', data.first_name)
       .andWhere('lastname', data.last_name)
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
       .first()
 
     if (existing) return ctx.response.send('Contact already exists.')
 
-    return await Contact.create(data)
+    return await Contact.create({ ...data, organizationId })
   }
 
   async getValidation(ctx: HttpContext) {
     console.log('getValidation called')
+    const organizationId = ctx.auth.user?.organizationId
 
     let baseQuery = Contact.query()
       .where('validated', false)
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
       .preload('instruments', (instrumentsQuery) => {
         instrumentsQuery.pivotColumns(['proficiency_level'])
       })

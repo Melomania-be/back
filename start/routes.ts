@@ -553,6 +553,7 @@ router
   router
   .group(() => {
     router.get('/', [OrganizationsController, 'getAll'])
+    router.post('/create', [OrganizationsController, 'create'])
   })
   .prefix('/organization')
 
@@ -720,5 +721,6 @@ router.get(
 
     })
     .use(middleware.auth({ guards: ['api'] }))
+    .use(middleware.organization())
     .use(middleware.routeLogger())
 })

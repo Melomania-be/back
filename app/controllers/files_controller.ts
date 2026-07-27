@@ -10,8 +10,9 @@ import { createReadStream, statSync } from 'node:fs'
 import { extname } from 'node:path'
 
 export default class FilesController {
-  async upload({ request }: HttpContext) {
+  async upload({ request, auth }: HttpContext) {
     const { file, files } = await request.validateUsing(filesUploadValidator)
+    const organizationId = auth.user?.organizationId
 
     const createdFiles = []
 
@@ -27,6 +28,7 @@ export default class FilesController {
           content: '',
           path: fileElement.filePath,
           size: fileElement.size || 0,
+          organizationId,
         })
 
         createdFiles.push(createdFile)
@@ -44,6 +46,7 @@ export default class FilesController {
         content: '',
         path: file.filePath,
         size: file.size || 0,
+        organizationId,
       })
 
       createdFiles.push(createdFile)
@@ -52,21 +55,37 @@ export default class FilesController {
     return createdFiles
   }
 
-  async getAll() {
-    return await File.all()
+  async getAll(ctx: HttpContext) {
+    const organizationId = ctx.auth.user?.organizationId
+
+    return await File.query().if(organizationId, (query) =>
+      query.where('organization_id', organizationId!)
+    )
   }
 
   async update(ctx: HttpContext) {
     const { id } = ctx.params
     const data = await ctx.request.validateUsing(filesUpdateValidator)
-    let file = await File.findOrFail(id)
+    const organizationId = ctx.auth.user?.organizationId
+
+    let file = await File.query()
+      .where('id', id)
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
+      .firstOrFail()
+
     file.merge(data)
     await file.save()
     return file
   }
 
-  async delete({ params, response }: HttpContext) {
-    let file = await File.findOrFail(params.id)
+  async delete({ params, response, auth }: HttpContext) {
+    const organizationId = auth.user?.organizationId
+
+    let file = await File.query()
+      .where('id', params.id)
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
+      .firstOrFail()
+
     const path = file.path
     try {
       await fs.unlink(path)
@@ -80,7 +99,13 @@ export default class FilesController {
   // ✅ CORRECTION : Méthode download corrigée avec gestion d'erreurs améliorée
   async download(ctx: HttpContext) {
     try {
-      const file = await File.findOrFail(ctx.params.id)
+      const organizationId = ctx.auth.user?.organizationId
+
+      const file = await File.query()
+        .where('id', ctx.params.id)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
+        .firstOrFail()
+
       console.log(`📥 Download request for file: ${file.name} (ID: ${ctx.params.id})`)
       console.log(`📁 File path: ${file.path}`)
 
@@ -93,7 +118,6 @@ export default class FilesController {
         })
       }
 
-      // Vérifier que le fichier existe physiquement
       try {
         await fs.access(file.path)
         console.log('✅ File exists on disk:', file.path)
@@ -108,7 +132,6 @@ export default class FilesController {
 
       console.log(`✅ Sending download for: ${file.name}`)
 
-      // Headers CORS pour téléchargement
       ctx.response.header('Access-Control-Allow-Origin', '*')
       ctx.response.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
       ctx.response.header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
@@ -117,17 +140,14 @@ export default class FilesController {
         'Content-Disposition, Content-Length, Content-Type'
       )
 
-      // Headers pour forcer le téléchargement
       ctx.response.header('Content-Type', file.type || 'application/octet-stream')
       ctx.response.header('Content-Disposition', `attachment; filename="${file.name}"`)
       ctx.response.header('Cache-Control', 'no-cache')
 
-      // ✅ CORRECTION : Retourner le fichier correctement
       return ctx.response.download(file.path)
     } catch (error) {
       console.error('❌ Download error:', error)
 
-      // CORS headers même en cas d'erreur
       ctx.response.header('Access-Control-Allow-Origin', '*')
       ctx.response.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
 
@@ -140,9 +160,15 @@ export default class FilesController {
   }
 
   // ✅ CORRECTION : Méthode stream corrigée avec gestion des types
-  async stream({ params, request, response }: HttpContext) {
+  async stream({ params, request, response, auth }: HttpContext) {
     try {
-      const file = await File.findOrFail(params.id)
+      const organizationId = auth.user?.organizationId
+
+      const file = await File.query()
+        .where('id', params.id)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
+        .firstOrFail()
+
       const filePath = file.path
 
       console.log(`🎬 Streaming request for file: ${file.name} (ID: ${params.id})`)
@@ -158,7 +184,6 @@ export default class FilesController {
         })
       }
 
-      // Vérifier que le fichier existe physiquement
       let stats
       try {
         await fs.access(filePath)
@@ -176,10 +201,8 @@ export default class FilesController {
       const fileSize = stats.size
       const range = request.header('range')
 
-      // ✅ CORRECTION : Détection améliorée du content-type
       const ext = extname(file.name).toLowerCase()
       const mimeTypes: Record<string, string> = {
-        // Vidéos
         '.mp4': 'video/mp4',
         '.webm': 'video/webm',
         '.avi': 'video/x-msvideo',
@@ -190,8 +213,6 @@ export default class FilesController {
         '.m4v': 'video/mp4',
         '.3gp': 'video/3gpp',
         '.ogv': 'video/ogg',
-
-        // Audio
         '.mp3': 'audio/mpeg',
         '.wav': 'audio/wav',
         '.ogg': 'audio/ogg',
@@ -201,16 +222,12 @@ export default class FilesController {
         '.wma': 'audio/x-ms-wma',
         '.opus': 'audio/opus',
         '.oga': 'audio/ogg',
-
-        // Images
         '.jpg': 'image/jpeg',
         '.jpeg': 'image/jpeg',
         '.png': 'image/png',
         '.gif': 'image/gif',
         '.webp': 'image/webp',
         '.svg': 'image/svg+xml',
-
-        // Documents
         '.pdf': 'application/pdf',
         '.txt': 'text/plain',
         '.html': 'text/html',
@@ -221,7 +238,6 @@ export default class FilesController {
       const contentType = mimeTypes[ext] || file.type || 'application/octet-stream'
       console.log(`🎵 Determined Content-Type: ${contentType}`)
 
-      // Headers CORS et cache optimisés
       response.header('Access-Control-Allow-Origin', '*')
       response.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
       response.header('Access-Control-Allow-Headers', 'Range, Content-Type')
@@ -230,17 +246,14 @@ export default class FilesController {
         'Content-Range, Accept-Ranges, Content-Length'
       )
 
-      // Gestion des range requests (crucial pour vidéos)
       if (range) {
         console.log(`📊 Range request detected: ${range}`)
 
-        // Parser le header Range (format: "bytes=start-end")
         const parts = range.replace(/bytes=/, '').split('-')
         const start = Number.parseInt(parts[0] || '0', 10)
         const end = parts[1] ? Number.parseInt(parts[1], 10) : fileSize - 1
         const chunksize = end - start + 1
 
-        // Validation des ranges
         if (start >= fileSize || end >= fileSize || start > end) {
           console.error(`❌ Invalid range: ${start}-${end} for file size ${fileSize}`)
           response.status(416)
@@ -250,7 +263,6 @@ export default class FilesController {
 
         console.log(`✅ Serving range: ${start}-${end}/${fileSize} (${chunksize} bytes)`)
 
-        // Headers pour partial content
         response.status(206)
         response.header('Content-Range', `bytes ${start}-${end}/${fileSize}`)
         response.header('Accept-Ranges', 'bytes')
@@ -258,10 +270,8 @@ export default class FilesController {
         response.header('Content-Type', contentType)
         response.header('Cache-Control', 'public, max-age=3600')
 
-        // Stream la portion demandée
         const stream = createReadStream(filePath, { start, end })
 
-        // Gestion des erreurs de stream
         stream.on('error', (error) => {
           console.error('❌ Stream error:', error)
           if (!response.hasLazyBody) {
@@ -271,7 +281,6 @@ export default class FilesController {
 
         return response.stream(stream)
       } else {
-        // Streaming complet sans range
         console.log(`📺 Serving complete file: ${fileSize} bytes`)
 
         response.header('Content-Length', fileSize.toString())
@@ -279,12 +288,10 @@ export default class FilesController {
         response.header('Accept-Ranges', 'bytes')
         response.header('Cache-Control', 'public, max-age=3600')
 
-        // Headers additionnels pour la compatibilité
         response.header('X-Content-Type-Options', 'nosniff')
 
         const stream = createReadStream(filePath)
 
-        // Gestion des erreurs de stream
         stream.on('error', (error) => {
           console.error('❌ Complete stream error:', error)
           if (!response.hasLazyBody) {
@@ -313,9 +320,14 @@ export default class FilesController {
   }
 
   // Informations sur un fichier (debugging)
-  async info({ params, response }: HttpContext) {
+  async info({ params, response, auth }: HttpContext) {
     try {
-      const file = await File.findOrFail(params.id)
+      const organizationId = auth.user?.organizationId
+
+      const file = await File.query()
+        .where('id', params.id)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
+        .firstOrFail()
 
       let fileStats = null
       let fileExists = false

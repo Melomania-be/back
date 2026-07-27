@@ -7,14 +7,18 @@ import db from '@adonisjs/lucid/services/db'
 
 export default class PieceMaterialsController {
 
-  async selectMaterial({ params, request, response }: HttpContext) {
+  async selectMaterial({ params, request, response, auth }: HttpContext) {
     try {
       const pieceId = params.pieceId
       const { materialId } = request.body()
+      const organizationId = auth.user?.organizationId
 
       console.log(`Backend: Selecting material ${materialId} for piece ${pieceId}`)
 
-      const piece = await Piece.findOrFail(pieceId)
+      const piece = await Piece.query()
+        .where('id', pieceId)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
+        .firstOrFail()
 
       if (materialId === null) {
         await this.clearPieceSelection(pieceId)
@@ -55,10 +59,16 @@ export default class PieceMaterialsController {
     }
   }
 
-  async getSelectedMaterial({ params, response }: HttpContext) {
+  async getSelectedMaterial({ params, response, auth }: HttpContext) {
     try {
       const pieceId = params.pieceId
+      const organizationId = auth.user?.organizationId
       console.log(`Backend: Getting selected material for piece ${pieceId}`)
+
+      await Piece.query()
+        .where('id', pieceId)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
+        .firstOrFail()
 
       const selection = await this.getPieceSelection(pieceId)
 

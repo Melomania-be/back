@@ -6,6 +6,9 @@ import type { HasMany, ManyToMany } from '@adonisjs/lucid/types/relations'
 import List from './list.js'
 import Participant from './participant.js'
 import Project from './project.js'
+import { belongsTo } from '@adonisjs/lucid/orm'
+import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import Organization from '#models/organization'
 
 export default class Contact extends BaseModel {
   @column({ isPrimary: true })
@@ -66,6 +69,12 @@ export default class Contact extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  @column()
+  declare organizationId: number | null
+
+  @belongsTo(() => Organization)
+  declare organization: BelongsTo<typeof Organization>
 
   // Getters pour compatibilité avec différents formats de noms
   get firstName(): string {
