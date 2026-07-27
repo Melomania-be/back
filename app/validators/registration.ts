@@ -6,6 +6,8 @@ export const createRegistrationValidator = vine.compile(
       vine.object({
         title: vine.string(),
         text: vine.string(),
+        order: vine.number().optional(),
+        position: vine.enum(['above', 'below']).optional(),
       })
     ),
     form: vine.array(

@@ -29,11 +29,16 @@ export default class AccountingController {
     return numericId
   }
 
-  async getSettings({ params, response }: HttpContext) {
+  async getSettings({ params, response, auth }: HttpContext) {
     try {
       const projectId = this.validateProjectId(params.id)
+      const organizationId = auth.user?.organizationId
 
-      const project = await Project.find(projectId)
+      const project = await Project.query()
+        .where('id', projectId)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
+        .first()
+
       if (!project) {
         return response.status(404).json({ error: 'Project not found' })
       }
@@ -49,10 +54,12 @@ export default class AccountingController {
       })
     }
   }
+  
 
-  async updateSettings({ params, request, response }: HttpContext) {
+  async updateSettings({ params, request, response, auth }: HttpContext) {
     try {
       const projectId = this.validateProjectId(params.id)
+      const organizationId = auth.user?.organizationId
       const requestBody = request.body()
 
       if (!requestBody || typeof requestBody !== 'object') {
@@ -61,7 +68,10 @@ export default class AccountingController {
         })
       }
 
-      const project = await Project.find(projectId)
+      const project = await Project.query()
+        .where('id', projectId)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
+        .first()
       if (!project) {
         return response.status(404).json({ error: 'Project not found' })
       }
@@ -103,12 +113,14 @@ export default class AccountingController {
     }
   }
 
-  async getAll(ctx: HttpContext) {
+   async getAll(ctx: HttpContext) {
     try {
       const projectId = this.validateProjectId(ctx.params.id)
+      const organizationId = ctx.auth.user?.organizationId
 
       const baseQuery = AccountingEntry.query()
         .where('project_id', projectId)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
         .preload('contact')
         .preload('category')
         .orderBy('created_at', 'desc')
@@ -137,14 +149,21 @@ export default class AccountingController {
     }
   }
 
-  async getStats({ params, response }: HttpContext) {
+  async getStats({ params, response, auth }: HttpContext) {
     try {
       const projectId = this.validateProjectId(params.id)
+      const organizationId = auth.user?.organizationId
+
+      await Project.query()
+        .where('id', projectId)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
+        .firstOrFail()
 
       const stats = await AccountingEntry.getProjectStats(projectId)
 
       const statusResults = await AccountingEntry.query()
         .where('project_id', projectId)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
         .select('payment_status')
         .count('* as total')
         .groupBy('payment_status')
@@ -166,9 +185,11 @@ export default class AccountingController {
     }
   }
 
-  async createOrUpdate({ params, request, response }: HttpContext) {
+  
+  async createOrUpdate({ params, request, response, auth }: HttpContext) {
     try {
       const projectId = this.validateProjectId(params.id)
+      const organizationId = auth.user?.organizationId
       const requestBody = request.body()
 
       const id = requestBody.id ? Number(requestBody.id) : undefined
@@ -184,6 +205,9 @@ export default class AccountingController {
       const due_date = requestBody.due_date ? DateTime.fromISO(requestBody.due_date) : null
       const category_id = requestBody.category_id ? Number(requestBody.category_id) : null
       const contact_id = requestBody.contact_id ? Number(requestBody.contact_id) : null
+      const contractor_contact_id = requestBody.contractor_contact_id
+        ? Number(requestBody.contractor_contact_id)
+        : null
       const attachment = requestBody.attachment?.trim() || null
       const is_individual_payment = Boolean(requestBody.is_individual_payment)
       const is_musician_fee = Boolean(requestBody.is_musician_fee)
@@ -208,6 +232,7 @@ export default class AccountingController {
         const existingEntry = await AccountingEntry.query()
           .where('id', id)
           .where('project_id', projectId)
+          .if(organizationId, (query) => query.where('organization_id', organizationId!))
           .first()
 
         if (!existingEntry) {
@@ -224,6 +249,7 @@ export default class AccountingController {
         existingEntry.due_date = due_date
         existingEntry.category_id = category_id
         existingEntry.contact_id = contact_id
+        existingEntry.contractor_contact_id = contractor_contact_id
         existingEntry.attachment = attachment
         existingEntry.is_individual_payment = is_individual_payment
         existingEntry.is_musician_fee = is_musician_fee
@@ -234,6 +260,7 @@ export default class AccountingController {
       } else {
         entry = await AccountingEntry.create({
           project_id: projectId,
+          organizationId,
           name,
           description,
           amount,
@@ -244,6 +271,7 @@ export default class AccountingController {
           due_date,
           category_id,
           contact_id,
+          contractor_contact_id,
           attachment,
           is_individual_payment,
           is_musician_fee,
@@ -262,6 +290,10 @@ export default class AccountingController {
         loadPromises.push(entry.load('contact'))
       }
 
+      if (entry.contractor_contact_id) {
+        loadPromises.push(entry.load('contractor'))
+      }
+
       await Promise.all(loadPromises)
 
       return response.json(entry.serialize())
@@ -271,14 +303,16 @@ export default class AccountingController {
     }
   }
 
-  async delete({ params, response }: HttpContext) {
+  async delete({ params, response, auth }: HttpContext) {
     try {
       const projectId = this.validateProjectId(params.id)
       const entryId = this.validateProjectId(params.accountingId)
+      const organizationId = auth.user?.organizationId
 
       const entry = await AccountingEntry.query()
         .where('id', entryId)
         .where('project_id', projectId)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
         .first()
 
       if (!entry) {
@@ -292,15 +326,17 @@ export default class AccountingController {
     }
   }
 
-  async updateStatus({ params, request, response }: HttpContext) {
+  async updateStatus({ params, request, response, auth }: HttpContext) {
     try {
       const projectId = this.validateProjectId(params.id)
       const entryId = this.validateProjectId(params.entryId)
+      const organizationId = auth.user?.organizationId
       const requestBody = request.body()
 
       const entry = await AccountingEntry.query()
         .where('id', entryId)
         .where('project_id', projectId)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
         .first()
 
       if (!entry) {
@@ -332,6 +368,10 @@ export default class AccountingController {
         loadPromises.push(entry.load('contact'))
       }
 
+      if (entry.contractor_contact_id) {
+        loadPromises.push(entry.load('contractor'))
+      }
+
       await Promise.all(loadPromises)
 
       return response.json(entry.serialize())
@@ -341,17 +381,21 @@ export default class AccountingController {
   }
 
   // Categories Management
-  async getCategories({ response }: HttpContext) {
+  async getCategories({ response, auth }: HttpContext) {
     try {
-      const categories = await AccountingCategory.query().orderBy('name', 'asc')
+      const organizationId = auth.user?.organizationId
+      const categories = await AccountingCategory.query()
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
+        .orderBy('name', 'asc')
       return response.json(categories.map((cat) => cat.serialize()))
     } catch (error) {
       return response.status(400).json({ error: error.message })
     }
   }
 
-  async createOrUpdateCategory({ request, response }: HttpContext) {
+  async createOrUpdateCategory({ request, response, auth }: HttpContext) {
     try {
+      const organizationId = auth.user?.organizationId
       const requestBody = request.body()
 
       const id = requestBody.id ? Number(requestBody.id) : undefined
@@ -370,7 +414,10 @@ export default class AccountingController {
       let category: AccountingCategory
 
       if (id) {
-        const existingCategory = await AccountingCategory.find(id)
+        const existingCategory = await AccountingCategory.query()
+          .where('id', id)
+          .if(organizationId, (query) => query.where('organization_id', organizationId!))
+          .first()
 
         if (!existingCategory) {
           return response.status(404).json({ error: 'Category not found' })
@@ -390,6 +437,7 @@ export default class AccountingController {
           is_default,
           color,
           icon,
+          organizationId,
         })
       }
 
@@ -399,22 +447,27 @@ export default class AccountingController {
     }
   }
 
-  async deleteCategory({ params, response }: HttpContext) {
+  async deleteCategory({ params, response, auth }: HttpContext) {
     try {
       const categoryId = Number(params.categoryId)
+      const organizationId = auth.user?.organizationId
 
       if (isNaN(categoryId)) {
         return response.status(400).json({ error: 'Invalid category ID' })
       }
 
-      const category = await AccountingCategory.find(categoryId)
+      const category = await AccountingCategory.query()
+        .where('id', categoryId)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
+        .first()
 
       if (!category) {
         return response.status(404).json({ error: 'Category not found' })
       }
 
-      // Check if category is used by any entry
-      const usedCount = await AccountingEntry.query().where('category_id', categoryId).count('* as total')
+      const usedCount = await AccountingEntry.query()
+        .where('category_id', categoryId)
+        .count('* as total')
 
       if (Number(usedCount[0].$extras.total) > 0) {
         return response.status(400).json({
@@ -430,69 +483,10 @@ export default class AccountingController {
   }
 
   // Attachment Management
-  async uploadAttachment({ request, response }: HttpContext) {
-    try {
-      const file = request.file('file', {
-        size: '10mb',
-        extnames: ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx', 'txt'],
-      })
-
-      if (!file) {
-        return response.badRequest({ error: 'No file uploaded' })
-      }
-
-      const fileName = `${cuid()}.${file.extname}`
-      const targetDir = app.makePath('uploads/accountingsAttachments')
-
-      if (!fs.existsSync(targetDir)) {
-        fs.mkdirSync(targetDir, { recursive: true })
-      }
-
-      await file.move(targetDir, {
-        name: fileName,
-      })
-
-      return response.ok({
-        fileName,
-        path: path.join('uploads/accountingsAttachments', fileName),
-      })
-    } catch (error) {
-      console.error('Error in uploadAttachment:', error)
-      return response.internalServerError({
-        error: 'Failed to upload file',
-        details: (error as Error).message,
-      })
-    }
-  }
-
-  async downloadAttachment({ params, response }: HttpContext) {
-    try {
-      const filename = params.filename
-
-      if (!filename) {
-        return response.status(400).json({ error: 'Filename is required' })
-      }
-
-      const filePath = path.join(process.cwd(), 'uploads/accountingsAttachments', filename)
-
-      if (!fs.existsSync(filePath)) {
-        return response.status(404).json({ error: 'File not found' })
-      }
-
-      return response.download(filePath, filename)
-    } catch (error) {
-      console.error('Error in downloadAttachment:', error)
-      return response.status(500).json({
-        error: 'Failed to download attachment',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      })
-    }
-  }
-
-  // Legacy compatibility methods
-  async getContactAccountings({ params, response }: HttpContext) {
+  async getContactAccountings({ params, response, auth }: HttpContext) {
     try {
       const contactId = Number(params.contactId)
+      const organizationId = auth.user?.organizationId
 
       if (isNaN(contactId)) {
         return response.status(400).json({ error: 'Invalid contact ID' })
@@ -500,6 +494,7 @@ export default class AccountingController {
 
       const data = await AccountingEntry.query()
         .where('contact_id', contactId)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
         .preload('category')
         .orderBy('id', 'desc')
 
@@ -514,12 +509,41 @@ export default class AccountingController {
     }
   }
 
+  async getContractorAccountings({ params, response, auth }: HttpContext) {
+    try {
+      const contractorId = Number(params.contractorId)
+      const organizationId = auth.user?.organizationId
+
+      if (isNaN(contractorId)) {
+        return response.status(400).json({ error: 'Invalid contractor ID' })
+      }
+
+      const data = await AccountingEntry.query()
+        .where('contractor_contact_id', contractorId)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
+        .preload('category')
+        .preload('contractor')
+        .orderBy('id', 'desc')
+
+      const serializedData = data.map((entry) => entry.serialize())
+      return response.ok(serializedData)
+    } catch (error) {
+      console.error('Error in getContractorAccountings:', error)
+      return response.status(500).json({
+        error: 'Failed to fetch contractor accountings',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      })
+    }
+  }
+
   async getContactAccountingsproject(ctx: HttpContext) {
     try {
       const projectId = this.validateProjectId(ctx.params.id)
+      const organizationId = ctx.auth.user?.organizationId
 
       const data = await AccountingEntry.query()
         .where('project_id', projectId)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
         .whereNotNull('contact_id')
         .preload('contact')
         .preload('category')
