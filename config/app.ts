@@ -20,6 +20,12 @@ export const http = defineConfig({
   allowMethodSpoofing: true,
 
   /**
+   * Active le trustProxy pour récupérer la vraie IP du client
+   * derrière le proxy/load balancer au lieu de l'IP du load balancer.
+   */
+  trustProxy: true,
+
+  /**
    * Enabling async local storage will let you access HTTP context
    * from anywhere inside your application.
    */
