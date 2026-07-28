@@ -8,7 +8,9 @@ import { defineConfig } from '@adonisjs/cors'
  */
 const corsConfig = defineConfig({
   enabled: true,
-  origin: ['http://localhost:5173', 'https://melomania.com'],
+  // On lit la variable d'environnement, on sépare les URL par des virgules,
+  // et on met localhost par défaut si rien n'est défini.
+  origin: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : ['http://localhost:5173'],
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'PATCH'],
   headers: true,
   exposeHeaders: [],
