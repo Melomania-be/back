@@ -638,6 +638,7 @@ router.get(
       // =============================================================================
       router
         .group(() => {
+          router.post('/', [MailingsController, 'sendUnique'])
           router.post('/sendRefusalEmailToParticipant', [
             MailingsController,
             'sendRefusalEmailToParticipant',
