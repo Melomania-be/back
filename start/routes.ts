@@ -38,6 +38,7 @@ const RecruitmentController = () => import('#controllers/recruitment_controller'
 const ContractorsController = () => import('#controllers/contractors_controller')
 const RecruitmentRecommendationController = () =>
   import('#controllers/recruitment_recommendation_controller')
+const NotificationsController = () => import('#controllers/notifications_controller')
 const OrganizationsController = () =>
   import('#controllers/organizations_controller')
 
@@ -621,6 +622,15 @@ router.get(
           router.delete('/:id', [UsersController, 'delete'])
         })
         .prefix('/users')
+
+      router
+        .group(() => {
+          router.get('/', [NotificationsController, 'getMine'])
+          router.post('/register-device', [NotificationsController, 'registerDeviceToken'])
+          router.post('/read-all', [NotificationsController, 'markAllAsRead'])
+          router.post('/:id/read', [NotificationsController, 'markAsRead'])
+        })
+        .prefix('/notifications')
 
       // =============================================================================
       // GESTION DES RECOMMANDATIONS

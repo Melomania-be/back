@@ -72,6 +72,7 @@
     "@adonisjs/mail": "^9.2.1",
     "@vinejs/vine": "^2.1.0",
     "adonisjs-filters": "^1.0.5",
+    "firebase-admin": "^14.2.0",
     "luxon": "^3.5.0",
     "pg": "^8.12.0",
     "reflect-metadata": "^0.2.2"
