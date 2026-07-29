@@ -44,6 +44,7 @@ router.use([
  * the routes or the routes group.
  */
 export const middleware = router.named({
+  rateLimiter: () => import('#middleware/rate_limiter_middleware'),
   organization: () => import('#middleware/organization_middleware'),
   auth: () => import('#middleware/auth_middleware'),
   routeLogger: () => import('#middleware/route_logger_middleware'),

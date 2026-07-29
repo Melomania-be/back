@@ -1,3 +1,6 @@
+import mail from '@adonisjs/mail/services/main'
+import PasswordResetMail from '#mails/password_reset_mail'
+import env from '#start/env'
 import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
 import PasswordResetToken from '#models/password_reset_token'
@@ -5,7 +8,6 @@ import stringHelpers from '@adonisjs/core/helpers/string'
 import { DateTime } from 'luxon'
 
 export default class PasswordRecoveriesController {
-  
   // 1. User submits their email to get a reset link
   async forgotPassword({ request, response }: HttpContext) {
     const email = request.input('email')
@@ -30,18 +32,24 @@ export default class PasswordRecoveriesController {
       expiresAt: DateTime.now().plus({ minutes: 30 }),
     })
 
-    // TODO: Send the actual email here!
-    // For now, we will just console.log the link you would send to their email.
-    // In Svelte, your frontend route will look something like /reset-password?token=XYZ
-    console.log(`[EMAIL SIMULATOR] Send this link to ${user.email}:`)
-    console.log(`http://localhost:5173/reset-password?token=${token}`)
+    const resetUrl = `${env.get('URL')}/reset-password?token=${token}`
+    await mail.send(new PasswordResetMail({ email: user.email, resetUrl }))
 
     return response.json({ message: 'If an account exists, a recovery email has been sent.' })
   }
 
-
   // 2. User submits the token and their new password
   async resetPassword({ request, response }: HttpContext) {
+    const newPassword = request.input('password')
+    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/
+
+    if (!newPassword || !passwordRegex.test(newPassword)) {
+      return response.status(422).send({
+        message:
+          'Password must be at least 8 characters and include an uppercase letter, a number, and a special character.',
+      })
+    }
+
     const { token, newPassword } = request.only(['token', 'newPassword'])
 
     // Find the token in the database
@@ -59,7 +67,7 @@ export default class PasswordRecoveriesController {
 
     // Find the user, update password, and save
     const user = await User.findOrFail(resetRecord.userId)
-    user.password = newPassword 
+    user.password = newPassword
     await user.save() // AdonisJS will automatically hash the password because of the User model setup!
 
     // Delete the token so it can never be used again

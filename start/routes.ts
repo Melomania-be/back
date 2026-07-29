@@ -11,6 +11,7 @@ import { middleware } from './kernel.js'
 
 const AuditionsController = () => import('#controllers/auditions_controller')
 const UsersController = () => import('#controllers/users_controller')
+const PasswordRecoveriesController = () => import('#controllers/password_recoveries_controller')
 const ComposersController = () => import('#controllers/composers_controller')
 const PiecesController = () => import('#controllers/pieces_controller')
 const ContactsController = () => import('#controllers/contacts_controller')
@@ -37,7 +38,7 @@ const SharedFolderController = () => import('#controllers/shared_folder_controll
 const RecruitmentController = () => import('#controllers/recruitment_controller')
 const RecruitmentRecommendationController = () =>
   import('#controllers/recruitment_recommendation_controller')
-
+const RateLimiterMiddleware = () => import('#middleware/rate_limiter_middleware')
 router.group(() => {
   // =============================================================================
   // ROUTES PUBLIQUES (SANS AUTHENTIFICATION)
@@ -52,7 +53,9 @@ router.group(() => {
 
   // Authentication
   router.post('/sign_in', [UsersController, 'signIn'])
-
+  router
+    .post('/forgot-password', [PasswordRecoveriesController, 'forgotPassword'])
+    .use([RateLimiterMiddleware])
   // Routes fichiers publiques étendues
   router.get('/files/download/:id', [FilesController, 'download'])
   router.get('/files/stream/:id', [FilesController, 'stream'])
