@@ -2,6 +2,7 @@ import { DateTime } from 'luxon'
 import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
 import Registration from '#models/registration'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import Organization from '#models/organization'
 
 export default class Form extends BaseModel {
   @column({ isPrimary: true })
@@ -15,6 +16,12 @@ export default class Form extends BaseModel {
 
   @column()
   declare registration_id: number
+
+  @column()
+  declare organizationId: number | null
+
+  @belongsTo(() => Organization)
+  declare organization: BelongsTo<typeof Organization>
 
   @belongsTo(() => Registration, {
     foreignKey: 'registration_id',

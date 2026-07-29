@@ -15,7 +15,7 @@ export default class CallsheetsController {
     const { params } = await ctx.request.validateUsing(getCallsheetValidator)
 
     const callsheet = await Callsheet.query()
-      .where('project_id', params.id)
+      .where('id', params.id)
       .orderBy('updated_at', 'desc')
       .preload('contents')
       .preload('project', (projectQuery) => {
@@ -29,6 +29,9 @@ export default class CallsheetsController {
               folderQuery.preload('files')
             })
             pieceQuery.preload('files')
+            pieceQuery.preload('selectedMaterial', (materialQuery) => {
+              materialQuery.preload('files')
+            })
           })
           .preload('sectionGroup', (sectionGroupQuery) => {
             sectionGroupQuery.preload('sections', (sectionQuery) => {
@@ -37,9 +40,9 @@ export default class CallsheetsController {
           })
           .preload('registration')
       })
-      .firstOrFail()
+      .first()
 
-    if (!callsheet) return ctx.response.notFound()
+    if (!callsheet) return ctx.response.notFound({ message: 'Callsheet not found' })
 
     if (params.visitorId) {
       const contact = await Contact.find(params.visitorId)
@@ -85,8 +88,13 @@ export default class CallsheetsController {
     }
 
     return callsheet
-      .related('contents')
-      .createMany(data.contents.map((content) => ({ text: content.text, title: content.title })))
+  .related('contents')
+  .createMany(data.contents.map((content, index) => ({
+    text: content.text,
+    title: content.title,
+    order: content.order ?? index,
+    position: content.position ?? 'below'
+  })))
   }
 
   async delete(ctx: HttpContext) {

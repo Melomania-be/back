@@ -1,23 +1,32 @@
-// import type { HttpContext } from '@adonisjs/core/http'
-
 import Folder from '#models/folder'
 import File from '#models/file'
 import { folderCreationValidator, folderUpdateValidator } from '#validators/folder'
 import { HttpContext } from '@adonisjs/core/http'
 
 export default class FoldersController {
-  async getAll() {
-    return await Folder.query().preload('files')
+  async getAll(ctx: HttpContext) {
+    const organizationId = ctx.auth.user?.organizationId
+
+    return await Folder.query()
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
+      .preload('files')
   }
 
   async create(ctx: HttpContext) {
     const data = await ctx.request.validateUsing(folderCreationValidator)
-    return await Folder.create(data)
+    const organizationId = ctx.auth.user?.organizationId
+
+    return await Folder.create({ ...data, organizationId })
   }
 
   async update(ctx: HttpContext) {
     const data = await ctx.request.validateUsing(folderUpdateValidator)
-    let folder = await Folder.findOrFail(data.id)
+    const organizationId = ctx.auth.user?.organizationId
+
+    let folder = await Folder.query()
+      .where('id', data.id)
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
+      .firstOrFail()
 
     folder.merge(data)
     await folder.save()
@@ -30,8 +39,14 @@ export default class FoldersController {
     return folder
   }
 
-  async delete({ params, response }: HttpContext) {
-    let folder = await Folder.findOrFail(params.id)
+  async delete({ params, response, auth }: HttpContext) {
+    const organizationId = auth.user?.organizationId
+
+    let folder = await Folder.query()
+      .where('id', params.id)
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
+      .firstOrFail()
+
     folder.delete()
     return response.send('folder deleted')
   }
