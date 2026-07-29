@@ -10,7 +10,7 @@ export default class extends BaseSchema {
       table.integer('contact_id').unsigned().nullable().references('contacts.id').onDelete('CASCADE')
       table.integer('project_id').unsigned().nullable().references('projects.id').onDelete('CASCADE')
       table.integer('actor_user_id').unsigned().nullable().references('users.id').onDelete('SET NULL')
-      table.integer('organization_id').unsigned().nullable().references('organizations.id').onDelete('CASCADE')
+      table.integer('organization_id').unsigned().nullable()
       table.string('type', 100).notNullable()
       table.string('title', 255).notNullable()
       table.text('body').notNullable()

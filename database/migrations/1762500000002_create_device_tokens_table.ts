@@ -8,7 +8,7 @@ export default class extends BaseSchema {
       table.increments('id').notNullable()
       table.integer('user_id').unsigned().nullable().references('users.id').onDelete('CASCADE')
       table.integer('contact_id').unsigned().nullable().references('contacts.id').onDelete('CASCADE')
-      table.integer('organization_id').unsigned().nullable().references('organizations.id').onDelete('CASCADE')
+      table.integer('organization_id').unsigned().nullable()
       table.string('platform', 30).notNullable()
       table.string('provider', 30).notNullable().defaultTo('fcm')
       table.string('token', 2048).notNullable()
