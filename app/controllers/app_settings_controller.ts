@@ -7,6 +7,7 @@ import { createReadStream } from 'node:fs'
 
 const IMAGE_EXTNAMES = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif']
 const IMAGE_MAX_SIZE = '2mb'
+const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/
 
 const MIME_TYPES: Record<string, string> = {
   jpg: 'image/jpeg',
@@ -28,6 +29,9 @@ export default class AppSettingsController {
 
     const primaryColor = request.input('primary_color')
     if (primaryColor) {
+      if (!HEX_COLOR_PATTERN.test(primaryColor)) {
+        return response.badRequest({ error: 'primary_color must be a hex code like #343CAD' })
+      }
       settings.primary_color = primaryColor
     }
 
