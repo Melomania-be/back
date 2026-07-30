@@ -56,23 +56,6 @@ export default class OrganizationsController {
       },
     })
   }
-    async create({ request, response }: HttpContext) {
-	try {
-		const payload = await request.validateUsing(createOrganizationValidator)
-
-const organization = await Organization.create(payload)
-
-		return response.created(organization);
-	} catch (error) {
-		if (error.code === '23505') {
-			return response.conflict({
-				message: 'Organization already exists'
-			});
-		}
-
-		throw error;
-	}
-}
 async update({ params, request, response }: HttpContext) {
 	try {
 		const organization = await Organization.findOrFail(params.id);
