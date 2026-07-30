@@ -5,7 +5,11 @@ import { createListValidator } from '#validators/list'
 
 export default class ListsController {
   async getAll(ctx: HttpContext) {
-    let baseQuery = List.query().preload('contacts')
+    const organizationId = ctx.auth.user?.organizationId
+
+    let baseQuery = List.query()
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
+      .preload('contacts')
 
     return await simpleFilter(
       ctx,
@@ -16,8 +20,11 @@ export default class ListsController {
   }
 
   async getOne(ctx: HttpContext) {
+    const organizationId = ctx.auth.user?.organizationId
+
     return List.query()
       .where('id', ctx.params.id)
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
       .preload('contacts', (query) => {
         query.preload('instruments')
       })
@@ -26,20 +33,32 @@ export default class ListsController {
 
   async createOrUpdate(ctx: HttpContext) {
     const data = await ctx.request.validateUsing(createListValidator)
+    const organizationId = ctx.auth.user?.organizationId
 
     if (data.id === null || data.id === undefined) {
-      const newList = await List.create(data)
+      const newList = await List.create({ ...data, organizationId })
 
       return await newList.related('contacts').sync(data.contacts.map((contact) => contact.id))
     }
 
-    const list = await List.updateOrCreate({ id: data.id }, data)
+    const list = await List.query()
+      .where('id', data.id)
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
+      .firstOrFail()
+
+    list.merge(data)
+    await list.save()
 
     return await list.related('contacts').sync(data.contacts.map((contact) => contact.id))
   }
 
   async delete(ctx: HttpContext) {
-    const list = await List.findOrFail(ctx.params.id)
+    const organizationId = ctx.auth.user?.organizationId
+
+    const list = await List.query()
+      .where('id', ctx.params.id)
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
+      .firstOrFail()
 
     await list.related('contacts').detach()
     await list.delete()

@@ -2,6 +2,7 @@ import { DateTime } from 'luxon'
 import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import Project from './project.js'
+import Organization from '#models/organization'
 
 export default class RecruitmentSettings extends BaseModel {
   @column({ isPrimary: true })
@@ -32,6 +33,12 @@ export default class RecruitmentSettings extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  @column()
+  declare organizationId: number | null
+
+  @belongsTo(() => Organization)
+  declare organization: BelongsTo<typeof Organization>
 
   shouldAutoImport(): boolean {
     if (!this.auto_import_enabled) return false

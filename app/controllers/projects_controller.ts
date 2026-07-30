@@ -13,7 +13,10 @@ import fs from 'node:fs/promises'
 
 export default class ProjectsController {
   async getAll(ctx: HttpContext) {
+    const organizationId = ctx.auth.user?.organizationId
+
     let baseQuery = Project.query()
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
       .preload('concerts')
       .preload('pieces')
       .preload('participants')
@@ -29,13 +32,15 @@ export default class ProjectsController {
     })
   }
 
-  async getOne({ params }: HttpContext) {
+  async getOne({ params, auth }: HttpContext) {
     const projectId = params.id
+    const organizationId = auth.user?.organizationId
 
     await this.syncProjectFiles(projectId)
 
     const data = await Project.query()
       .where('id', projectId)
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
       .preload('concerts')
       .preload('pieces', (query) => {
         query
@@ -80,9 +85,10 @@ export default class ProjectsController {
     return serializedData
   }
 
-  async getDashboard({ params }: HttpContext) {
+  async getDashboard({ params, auth }: HttpContext) {
     try {
       const projectId = params.id;
+      const organizationId = auth.user?.organizationId
 
       if (!projectId) {
         throw new Error('Project ID is required');
@@ -92,6 +98,7 @@ export default class ProjectsController {
 
       const data = await Project.query()
         .where('id', projectId)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
         .preload('concerts', (query) => {
           query.limit(3).orderBy('start_date', 'desc')
         })
@@ -223,13 +230,18 @@ export default class ProjectsController {
 
   async createOrUpdate(ctx: HttpContext) {
     const data = await ctx.request.validateUsing(createProjectValidator)
+    const organizationId = ctx.auth.user?.organizationId
 
     let project: Project
 
     if (!data.id) {
-      project = await Project.create({ name: data.name })
+      project = await Project.create({ name: data.name, organizationId })
     } else {
-      project = await Project.updateOrCreate({ id: data.id }, { name: data.name })
+      project = await Project.query()
+        .where('id', data.id)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
+        .firstOrFail()
+      project.merge({ name: data.name })
     }
 
     const sectionGroup = await SectionGroup.find(data.section_group_id)
@@ -329,8 +341,13 @@ export default class ProjectsController {
     return await project.save()
   }
 
-  async delete({ params }: HttpContext) {
-    const project = await Project.find(params.id)
+  async delete({ params, auth }: HttpContext) {
+    const organizationId = auth.user?.organizationId
+
+    const project = await Project.query()
+      .where('id', params.id)
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
+      .first()
 
     if (project === null) {
       return { message: 'Project not found' }
@@ -342,8 +359,11 @@ export default class ProjectsController {
   }
 
   async getAttendance(ctx: HttpContext) {
+    const organizationId = ctx.auth.user?.organizationId
+
     const project = await Project.query()
       .where('id', ctx.params.id)
+      .if(organizationId, (query) => query.where('organization_id', organizationId!))
       .preload('rehearsals', (query) => {
         query
           .orderBy('start_date', 'asc')

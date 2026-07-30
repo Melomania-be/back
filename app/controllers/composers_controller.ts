@@ -1,5 +1,3 @@
-// import type { HttpContext } from '@adonisjs/core/http'
-
 import Composer from '#models/composer'
 import { HttpContext } from '@adonisjs/core/http'
 import { createComposerValidator } from '#validators/composer'
@@ -31,12 +29,7 @@ export default class ComposersController {
       return await Composer.create(data)
     }
 
-    const composer = await Composer.firstOrCreate({ id: data.id }, data)
-
-    if (composer.$isLocal) {
-      return composer
-    }
-
+    const composer = await Composer.findOrFail(data.id)
     composer.merge(data)
     await composer.save()
     return composer

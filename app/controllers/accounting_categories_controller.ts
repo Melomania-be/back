@@ -3,10 +3,12 @@ import AccountingCategory from '#models/accounting_category'
 import AccountingEntry from '#models/accounting_entry'
 
 export default class AccountingCategoriesController {
-  async getAll({ response }: HttpContext) {
+  async getAll({ response, auth }: HttpContext) {
     try {
-      const categories
-        = await AccountingCategory.query().orderBy('name', 'asc')
+      const organizationId = auth.user?.organizationId
+      const categories = await AccountingCategory.query()
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
+        .orderBy('name', 'asc')
       return response.json(categories.map((cat) => cat.serialize()))
     } catch (error) {
       console.error('Error in getAll categories:', error)
@@ -17,10 +19,10 @@ export default class AccountingCategoriesController {
     }
   }
 
-  async createOrUpdate({ request, response }: HttpContext) {
+  async createOrUpdate({ request, response, auth }: HttpContext) {
     try {
+      const organizationId = auth.user?.organizationId
       const requestBody = request.body()
-
       const name = requestBody.name?.trim()
       const description = requestBody.description?.trim() || null
       const is_default = Boolean(requestBody.is_default)
@@ -37,7 +39,10 @@ export default class AccountingCategoriesController {
       let category: AccountingCategory
 
       if (id) {
-        const existingCategory = await AccountingCategory.find(id)
+        const existingCategory = await AccountingCategory.query()
+          .where('id', id)
+          .if(organizationId, (query) => query.where('organization_id', organizationId!))
+          .first()
 
         if (!existingCategory) {
           return response.status(404).json({ error: 'Category not found' })
@@ -57,6 +62,7 @@ export default class AccountingCategoriesController {
           is_default,
           color,
           icon,
+          organizationId,
         })
       }
 
@@ -70,21 +76,24 @@ export default class AccountingCategoriesController {
     }
   }
 
-  async delete({ params, response }: HttpContext) {
+  async delete({ params, response, auth }: HttpContext) {
     try {
       const categoryId = Number(params.id)
+      const organizationId = auth.user?.organizationId
 
       if (isNaN(categoryId)) {
         return response.status(400).json({ error: 'Invalid category ID' })
       }
 
-      const category = await AccountingCategory.find(categoryId)
+      const category = await AccountingCategory.query()
+        .where('id', categoryId)
+        .if(organizationId, (query) => query.where('organization_id', organizationId!))
+        .first()
 
       if (!category) {
         return response.status(404).json({ error: 'Category not found' })
       }
 
-      // Check if category is used by any entry
       const usedCount = await AccountingEntry.query()
         .where('category_id', categoryId)
         .count('* as total')

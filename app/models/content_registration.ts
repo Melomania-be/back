@@ -16,6 +16,12 @@ export default class ContentRegistration extends BaseModel {
   @column()
   declare registration_id: number
 
+  @column()
+  declare order: number
+
+  @column()
+  declare position: string
+
   @belongsTo(() => Registration)
   declare registration: BelongsTo<typeof Registration>
 

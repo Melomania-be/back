@@ -61,7 +61,14 @@ export default class RegistrationsController {
 
     if (registration) {
       await registration.related('content').query().delete()
-      registration.related('content').createMany(data.content)
+      registration.related('content').createMany(
+        data.content.map((c, index) => ({
+          title: c.title,
+          text: c.text,
+          order: c.order ?? index,
+          position: c.position ?? 'below'
+        }))
+      )
 
       for (const form of data.form) {
         if (form.id) {
@@ -78,7 +85,14 @@ export default class RegistrationsController {
       }
     } else {
       registration = await project.related('registration').create({})
-      registration.related('content').createMany(data.content)
+      registration.related('content').createMany(
+        data.content.map((c, index) => ({
+          title: c.title,
+          text: c.text,
+          order: c.order ?? index,
+          position: c.position ?? 'below'
+        }))
+      )
       registration.related('form').createMany(data.form)
     }
 
@@ -109,7 +123,6 @@ export default class RegistrationsController {
     }
     let saveContact = { phone: data.phone, messenger: data.messenger, validated: false }
 
-    //Checking if the user entering his info is already in the db, if not it creates a new contact
     let contact = await Contact.firstOrCreate(searchContact, saveContact)
     console.log('Contact sent : ', contact)
 
@@ -124,7 +137,6 @@ export default class RegistrationsController {
       last_activity: new Date(),
     }
 
-    //Checking if the contact is already in the participant db with this project, if not its added
     let participant = await Participant.firstOrCreate(searchParticipant, saveParticipant)
 
     const rehearsalsWithComments = data.rehearsals.reduce(
@@ -147,7 +159,6 @@ export default class RegistrationsController {
     console.log('Concerts sent : ', concertsWithComments)
     await participant.related('concerts').sync(concertsWithComments)
 
-    //Puting the answer in the answer table if there is a form to fill
     if (data.answers.length === 0) {
       return ctx.response.json({ success: true, participant })
     }
