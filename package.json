@@ -54,6 +54,7 @@
     "@swc/helpers": "^0.5.17",
     "@types/luxon": "^3.4.2",
     "@types/node": "^20.12.10",
+    "@types/string-similarity": "^4.0.2",
     "@types/supertest": "^7.2.0",
     "eslint": "^8.57.0",
     "hot-hook": "^0.2.5",
@@ -74,7 +75,8 @@
     "adonisjs-filters": "^1.0.5",
     "luxon": "^3.5.0",
     "pg": "^8.12.0",
-    "reflect-metadata": "^0.2.2"
+    "reflect-metadata": "^0.2.2",
+    "string-similarity": "^4.0.4"
   },
   "hotHook": {
     "boundaries": [
