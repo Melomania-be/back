@@ -3,6 +3,8 @@ import User from '#models/user'
 import type { HttpContext } from '@adonisjs/core/http'
 import hash from '@adonisjs/core/services/hash'
 
+import { createOrganizationValidator } from '#validators/organization'
+
 export default class OrganizationsController {
   async getAll({}: HttpContext) {
     return await Organization.all()
@@ -56,9 +58,9 @@ export default class OrganizationsController {
   }
     async create({ request, response }: HttpContext) {
 	try {
-		const organization = await Organization.create({
-			name: request.input('name')
-		});
+		const payload = await request.validateUsing(createOrganizationValidator)
+
+const organization = await Organization.create(payload)
 
 		return response.created(organization);
 	} catch (error) {
@@ -75,9 +77,9 @@ async update({ params, request, response }: HttpContext) {
 	try {
 		const organization = await Organization.findOrFail(params.id);
 
-		organization.merge({
-			name: request.input('name')
-		});
+		const payload = await request.validateUsing(createOrganizationValidator)
+
+organization.merge(payload)
 
 		await organization.save();
 
