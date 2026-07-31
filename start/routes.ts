@@ -36,18 +36,12 @@ const FilesystemController = () => import('#controllers/filesystem_controller')
 const SharedFolderController = () => import('#controllers/shared_folder_controller')
 const RecruitmentController = () => import('#controllers/recruitment_controller')
 const ContractorsController = () => import('#controllers/contractors_controller')
-const RecruitmentRecommendationController = () =>
-  import('#controllers/recruitment_recommendation_controller')
-const OrganizationsController = () =>
-  import('#controllers/organizations_controller')
-
-const ContractorCategoriesController = () =>
-  import('#controllers/contractor_categories_controller')
-const ContractorInteractionsController = () =>
-  import('#controllers/contractor_interactions_controller')
-const ContractorParticipantsController = () =>
-  import('#controllers/contractor_participants_controller')
-
+const RecruitmentRecommendationController = () => import('#controllers/recruitment_recommendation_controller')
+const OrganizationsController = () => import('#controllers/organizations_controller')
+const ContractorCategoriesController = () => import('#controllers/contractor_categories_controller')
+const ContractorInteractionsController = () => import('#controllers/contractor_interactions_controller')
+const ContractorParticipantsController = () => import('#controllers/contractor_participants_controller')
+const TasksController = () => import('#controllers/tasks_controller')
 
 router.group(() => {
   // =============================================================================
@@ -60,6 +54,7 @@ router.group(() => {
       henlo: 'monde',
     }
   })
+
   // Authentication
   router.post('/sign_in', [UsersController, 'signIn'])
 
@@ -111,18 +106,9 @@ router.group(() => {
   // =============================================================================
   // ROUTES PUBLIQUES POUR RECOMMANDATIONS DE RECRUTEMENT
   // =============================================================================
-  router.get('/projects/:id/recommend', [
-    RecruitmentRecommendationController,
-    'getRecommendationPage',
-  ])
-  router.post('/projects/:id/recommend', [
-    RecruitmentRecommendationController,
-    'submitRecommendation',
-  ])
-  router.get('/projects/:id/recommend/success', [
-    RecruitmentRecommendationController,
-    'confirmationPage',
-  ])
+  router.get('/projects/:id/recommend', [RecruitmentRecommendationController, 'getRecommendationPage'])
+  router.post('/projects/:id/recommend', [RecruitmentRecommendationController, 'submitRecommendation'])
+  router.get('/projects/:id/recommend/success', [RecruitmentRecommendationController, 'confirmationPage'])
 
   // =============================================================================
   // ROUTES PROTÉGÉES (AVEC AUTHENTIFICATION)
@@ -144,30 +130,16 @@ router.group(() => {
 
       router
         .group(() => {
-          // Matériels d'une pièce
           router.get('/piece/:pieceId', [MaterialsController, 'getByPiece'])
-
-          // CRUD des matériels
           router.get('/:id', [MaterialsController, 'getOne'])
           router.post('/', [MaterialsController, 'create'])
           router.put('/:id', [MaterialsController, 'update'])
           router.delete('/:id', [MaterialsController, 'delete'])
-
-          // Actions spéciales
           router.post('/:id/duplicate', [MaterialsController, 'duplicate'])
           router.post('/:id/set-default', [MaterialsController, 'setAsDefault'])
-
-          // Assignment aux projets
           router.post('/assign', [MaterialsController, 'assignToProject'])
           router.post('/assign-bulk', [MaterialsController, 'assignBulk'])
-
-          // Matériels non spécifiés pour un projet
-          router.get('/project/:projectId/unspecified', [
-            MaterialsController,
-            'getUnspecifiedMaterials',
-          ])
-
-          // Upload de fichiers pour un matériel
+          router.get('/project/:projectId/unspecified', [MaterialsController, 'getUnspecifiedMaterials'])
           router.post('/:id/files', [MaterialsController, 'uploadFiles'])
         })
         .prefix('/materials')
@@ -185,36 +157,49 @@ router.group(() => {
         .prefix('/pieces')
 
       // =============================================================================
+      // GESTION DES TÂCHES (TASK MANAGER)
+      // =============================================================================
+      router
+        .group(() => {
+          router.get('/', [TasksController, 'index'])
+          router.post('/', [TasksController, 'store'])
+          router.get('/:id', [TasksController, 'show'])
+          router.put('/:id', [TasksController, 'update'])
+          router.delete('/:id', [TasksController, 'destroy'])
+
+          // Sous-tâches 100% imbriquées sous /tasks/ pour passer le proxy Svelte
+          router.post('/:id/subtasks', [TasksController, 'storeSubtask'])
+          router.put('/:id/subtasks/:subtaskId', [TasksController, 'updateSubtask'])
+          router.delete('/:id/subtasks/:subtaskId', [TasksController, 'destroySubtask'])
+
+          // Commentaires 100% imbriqués sous /tasks/
+          router.post('/:id/comments', [TasksController, 'storeComment'])
+          router.delete('/:id/comments/:commentId', [TasksController, 'destroyComment'])
+        })
+        .prefix('/tasks')
+
+      
+
+      // =============================================================================
       // FILESYSTEM ROUTES
       // =============================================================================
       router
         .group(() => {
-          // Project filesystem
           router.get('/projects/:id', [FilesystemController, 'getProjectStructure'])
           router.post('/projects/:id/init', [FilesystemController, 'initProjectStructure'])
           router.post('/projects/:id/sync-pieces', [FilesystemController, 'syncPieceFolders'])
-
-          // Folders
           router.get('/folders/:id/contents', [FilesystemController, 'getFolderContents'])
           router.post('/folders', [FilesystemController, 'createFolder'])
           router.delete('/folders/:id', [FilesystemController, 'deleteFolder'])
           router.patch('/folders/:id', [FilesystemController, 'renameFolder'])
-
-          // Gestion des partages de dossiers
           router.post('/folders/:id/share', [SharedFolderController, 'createShare'])
           router.get('/folders/:id/share-status', [SharedFolderController, 'getShareStatus'])
           router.delete('/folders/:id/share', [SharedFolderController, 'revokeShare'])
-
-          // Files
           router.post('/upload', [FilesystemController, 'uploadFiles'])
           router.get('/files/:id/check-deletion', [FilesystemController, 'checkFileDeletion'])
           router.delete('/files/:id', [FilesystemController, 'deleteFile'])
           router.patch('/files/:id', [FilesystemController, 'renameFile'])
-
-          // General files
           router.get('/general', [FilesystemController, 'getGeneralFiles'])
-
-          // Piece scores for callsheet
           router.get('/pieces/:pieceId/scores/:fileName', [FilesystemController, 'getPieceScores'])
         })
         .prefix('/filesystem')
@@ -247,34 +232,20 @@ router.group(() => {
       router
         .group(() => {
           router.get('/:contactId', [AccountingsController, 'getContactAccountings'])
-          router.get(
-  '/contractor/:contractorId',
-  [AccountingsController, 'getContractorAccountings']
-)
+          router.get('/contractor/:contractorId', [AccountingsController, 'getContractorAccountings'])
           router.post('/attachment', [AccountingsController, 'uploadAttachment'])
           router.get('/attachment/:filename', [AccountingsController, 'downloadAttachment'])
         })
         .prefix('/accountings')
 
+      router
+        .group(() => {
+          router.get('/project/:projectId', [ContractorParticipantsController, 'getByProject'])
+          router.post('/', [ContractorParticipantsController, 'create'])
+          router.delete('/:id', [ContractorParticipantsController, 'delete'])
+        })
+        .prefix('/contractor-participant')
 
-        router
-  .group(() => {
-    router.get(
-      '/project/:projectId',
-      [ContractorParticipantsController, 'getByProject']
-    )
-
-    router.post(
-      '/',
-      [ContractorParticipantsController, 'create']
-    )
-
-    router.delete(
-      '/:id',
-      [ContractorParticipantsController, 'delete']
-    )
-  })
-  .prefix('/contractor-participant')
       // =============================================================================
       // GESTION DES PROJETS
       // =============================================================================
@@ -292,90 +263,48 @@ router.group(() => {
           // =============================================================================
           router
             .group(() => {
-              // Paramètres de comptabilité
               router.get('/settings', [AccountingsController, 'getSettings'])
               router.put('/settings', [AccountingsController, 'updateSettings'])
-
-              // Entrées comptables - Routes principales
               router.get('/', [AccountingsController, 'getAll'])
               router.post('/', [AccountingsController, 'createOrUpdate'])
               router.delete('/:accountingId', [AccountingsController, 'delete'])
               router.put('/entries/:entryId/status', [AccountingsController, 'updateStatus'])
-
-              // Catégories comptables
               router.get('/categories', [AccountingsController, 'getCategories'])
               router.post('/categories', [AccountingsController, 'createOrUpdateCategory'])
               router.delete('/categories/:categoryId', [AccountingsController, 'deleteCategory'])
-
-              // Statistiques
               router.get('/stats', [AccountingsController, 'getStats'])
-
-              // Routes spécifiques aux contacts
               router.get('/participant', [AccountingsController, 'getContactAccountingsproject'])
             })
             .prefix('/:id/management/accounting')
 
           // ROUTES MATÉRIELS POUR PROJETS
-          router.get('/:id/material-selections', [
-            PieceMaterialsController,
-            'getProjectMaterialSelections',
-          ])
-          router.post('/:id/sync-material-selections', [
-            PieceMaterialsController,
-            'syncWithCallsheets',
-          ])
-          router.get('/:id/assigned-materials', [
-            MaterialsController,
-            'getProjectAssignedMaterials',
-          ])
+          router.get('/:id/material-selections', [PieceMaterialsController, 'getProjectMaterialSelections'])
+          router.post('/:id/sync-material-selections', [PieceMaterialsController, 'syncWithCallsheets'])
+          router.get('/:id/assigned-materials', [MaterialsController, 'getProjectAssignedMaterials'])
 
           // =============================================================================
           // GESTION DU RECRUTEMENT
           // =============================================================================
           router
             .group(() => {
-              // Paramètres de recrutement
               router.get('/settings', [RecruitmentController, 'getSettings'])
               router.put('/settings', [RecruitmentController, 'updateSettings'])
-
               router.post('/auto-import-all', [RecruitmentController, 'autoImportAllContacts'])
-
-              // Contacts de recrutement - Routes principales
               router.get('/contacts', [RecruitmentController, 'getContacts'])
               router.get('/', [RecruitmentController, 'getContacts'])
               router.post('/contacts/manual', [RecruitmentController, 'createManualContact'])
               router.post('/contacts', [RecruitmentController, 'createManualContact'])
               router.post('/contacts/import', [RecruitmentController, 'importContacts'])
-              router.put('/contacts/:contactId/status', [
-                RecruitmentController,
-                'updateContactStatus',
-              ])
-              router.put('/contacts/:contactId', [RecruitmentController, 'updateContactStatus']) // Alias
+              router.put('/contacts/:contactId/status', [RecruitmentController, 'updateContactStatus'])
+              router.put('/contacts/:contactId', [RecruitmentController, 'updateContactStatus'])
               router.delete('/contacts/:contactId', [RecruitmentController, 'deleteContact'])
-
-              // Recherche de contacts
               router.post('/search-contacts', [RecruitmentController, 'searchContacts'])
-
-              router.post('/send-recommendation-email', [
-                RecruitmentController,
-                'sendRecommendationEmail',
-              ])
-
-              // Envoi d'emails
+              router.post('/send-recommendation-email', [RecruitmentController, 'sendRecommendationEmail'])
               router.post('/send-emails', [RecruitmentController, 'sendRecruitmentEmails'])
-
-              // Import depuis projet
               router.get('/import-project', [RecruitmentController, 'getAvailableProjects'])
               router.post('/import-project', [RecruitmentController, 'importFromProject'])
-
-              // Recommandations
               router.get('/recommendations', [RecruitmentController, 'getRecommendations'])
-              router.post('/recommendations/:recommendationId/handle', [
-                RecruitmentController,
-                'handleRecommendation',
-              ])
-
-              // Statistiques
+              router.post('/recommendations/:recommendationId/handle', [RecruitmentController, 'handleRecommendation'])
               router.get('/stats', [RecruitmentController, 'getStats'])
             })
             .prefix('/:id/management/recruitment')
@@ -390,12 +319,7 @@ router.group(() => {
               router.get('/answers', [ParticipantsController, 'getParticipantsAnswers'])
               router.get('/:participantId', [ParticipantsController, 'getOne'])
               router.delete('/:participantId', [ParticipantsController, 'delete'])
-
-              // Demander une audition pour un participant
-              router.post('/:participantId/request-audition', [
-                AuditionsController,
-                'requestAudition',
-              ])
+              router.post('/:participantId/request-audition', [AuditionsController, 'requestAudition'])
             })
             .prefix('/:id/management/participants')
 
@@ -412,10 +336,7 @@ router.group(() => {
               router.get('/section-pdfs', [AuditionsController, 'getProjectPdfs'])
               router.post('/bulk-send-pdfs', [AuditionsController, 'bulkSendPdfsToSection'])
               router.delete('/pdf/:pdfFileId', [AuditionsController, 'deleteAuditionPdf'])
-              router.delete('/section-pdfs/:pdfFileId', [
-                AuditionsController,
-                'removePdfFromSection',
-              ])
+              router.delete('/section-pdfs/:pdfFileId', [AuditionsController, 'removePdfFromSection'])
               router.get('/debug-files', [AuditionsController, 'debugFiles'])
             })
             .prefix('/:id/management/auditions')
@@ -498,7 +419,7 @@ router.group(() => {
         .prefix('/type_of_pieces')
 
       // =============================================================================
-      // GESTION DES FICHIERS (ANCIEN SYSTÈME - GARDÉ POUR COMPATIBILITÉ)
+      // GESTION DES FICHIERS
       // =============================================================================
       router
         .group(() => {
@@ -511,7 +432,7 @@ router.group(() => {
         .prefix('/files')
 
       // =============================================================================
-      // GESTION DES DOSSIERS (ANCIEN SYSTÈME - GARDÉ POUR COMPATIBILITÉ)
+      // GESTION DES DOSSIERS
       // =============================================================================
       router
         .group(() => {
@@ -537,67 +458,46 @@ router.group(() => {
         })
         .prefix('/contact')
 
-// =============================================================================
-// GESTION DES CONTRACTORS
-// =============================================================================
-router
-  .group(() => {
-    router.get('/', [ContractorsController, 'getAll'])
-    router.get('/:id', [ContractorsController, 'getOne'])
-    router.post('/', [ContractorsController, 'create'])
-    router.put('/:id', [ContractorsController, 'update'])
-    router.delete('/:id', [ContractorsController, 'delete'])
-  })
-  .prefix('/contractor')
+      // =============================================================================
+      // GESTION DES CONTRACTORS
+      // =============================================================================
+      router
+        .group(() => {
+          router.get('/', [ContractorsController, 'getAll'])
+          router.get('/:id', [ContractorsController, 'getOne'])
+          router.post('/', [ContractorsController, 'create'])
+          router.put('/:id', [ContractorsController, 'update'])
+          router.delete('/:id', [ContractorsController, 'delete'])
+        })
+        .prefix('/contractor')
 
-  router
-  .group(() => {
-    router.get('/', [OrganizationsController, 'getAll'])
-    router.post('/create', [OrganizationsController, 'create'])
-  })
-  .prefix('/organization')
+      router
+        .group(() => {
+          router.get('/', [OrganizationsController, 'getAll'])
+          router.post('/create', [OrganizationsController, 'create'])
+        })
+        .prefix('/organization')
 
-router
-  .group(() => {
-    router.get('/', [ContractorCategoriesController, 'getAll'])
-    router.post('/', [ContractorCategoriesController, 'create'])
-    router.put('/:id', [ContractorCategoriesController, 'update'])
-    router.delete('/:id', [ContractorCategoriesController, 'delete'])
-  })
-  .prefix('/contractor-category')
+      router
+        .group(() => {
+          router.get('/', [ContractorCategoriesController, 'getAll'])
+          router.post('/', [ContractorCategoriesController, 'create'])
+          router.put('/:id', [ContractorCategoriesController, 'update'])
+          router.delete('/:id', [ContractorCategoriesController, 'delete'])
+        })
+        .prefix('/contractor-category')
 
+      router
+        .group(() => {
+          router.get('/:contractorId', [ContractorInteractionsController, 'getByContractor'])
+          router.post('/', [ContractorInteractionsController, 'create'])
+          router.put('/:id', [ContractorInteractionsController, 'update'])
+          router.delete('/:id', [ContractorInteractionsController, 'delete'])
+          router.post('/:id/upload', [ContractorInteractionsController, 'upload'])
+          router.get('/file/:filename', [ContractorInteractionsController, 'download'])
+        })
+        .prefix('/contractor-interaction')
 
-  router
-  .group(() => {
-    router.get(
-      '/:contractorId',
-      [ContractorInteractionsController, 'getByContractor']
-    )
-
-    router.post(
-      '/',
-      [ContractorInteractionsController, 'create']
-    )
-
-    router.put(
-      '/:id',
-      [ContractorInteractionsController, 'update']
-    )
-
-    router.delete(
-      '/:id',
-      [ContractorInteractionsController, 'delete']
-    )
-    router.post(
-  '/:id/upload',
-  [ContractorInteractionsController, 'upload']
-)
-router.get(
-  '/file/:filename',
-  [ContractorInteractionsController, 'download']
-)
-  })
-  .prefix('/contractor-interaction')
       // =============================================================================
       // GESTION DES INSTRUMENTS
       // =============================================================================
@@ -638,30 +538,14 @@ router.get(
       // =============================================================================
       router
         .group(() => {
-          router.post('/sendRefusalEmailToParticipant', [
-            MailingsController,
-            'sendRefusalEmailToParticipant',
-          ])
+          router.post('/sendRefusalEmailToParticipant', [MailingsController, 'sendRefusalEmailToParticipant'])
           router.post('/sendAuditionRequest', [MailingsController, 'sendAuditionRequest'])
           router.post('/sendTemplateToList', [MailingsController, 'sendTemplateToList'])
-          router.post('/sendCallsheetNotification', [
-            MailingsController,
-            'sendCallsheetNotification',
-          ])
-          router.post('/sendRecommendedNotification', [
-            MailingsController,
-            'sendRecommendedNotification',
-          ])
-          router.post('/sendRecruitmentNotification', [
-            MailingsController,
-            'sendRecruitmentNotification',
-          ])
-          router.post('/sendParticipationValidationNotification', [
-            MailingsController,
-            'sendParticipationValidationNotification',
-          ])
+          router.post('/sendCallsheetNotification', [MailingsController, 'sendCallsheetNotification'])
+          router.post('/sendRecommendedNotification', [MailingsController, 'sendRecommendedNotification'])
+          router.post('/sendRecruitmentNotification', [MailingsController, 'sendRecruitmentNotification'])
+          router.post('/sendParticipationValidationNotification', [MailingsController, 'sendParticipationValidationNotification'])
           router.post('/sendMailToParticipants', [MailingsController, 'sendMailToParticipants'])
-
           router.post('/sendMailToIndividualContacts', [MailingsController, 'sendMailToIndividualContacts'])
 
           router
