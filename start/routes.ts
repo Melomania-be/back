@@ -39,6 +39,9 @@ const RecruitmentController = () => import('#controllers/recruitment_controller'
 const RecruitmentRecommendationController = () =>
   import('#controllers/recruitment_recommendation_controller')
 const RateLimiterMiddleware = () => import('#middleware/rate_limiter_middleware')
+const ContractorsController = () => import('#controllers/contractors_controller')
+const ContractorInteractionsController = () =>
+  import('#controllers/contractor_interactions_controller')
 router.group(() => {
   // =============================================================================
   // ROUTES PUBLIQUES (SANS AUTHENTIFICATION)
@@ -634,3 +637,23 @@ router.group(() => {
     .use(middleware.auth({ guards: ['api'] }))
     .use(middleware.routeLogger())
 })
+router
+  .group(() => {
+    router.get('/', [ContractorsController, 'getAll'])
+    router.get('/:id', [ContractorsController, 'getOne'])
+    router.post('/', [ContractorsController, 'create'])
+    router.put('/:id', [ContractorsController, 'update'])
+    router.delete('/:id', [ContractorsController, 'delete'])
+  })
+  .prefix('/contractors')
+
+router
+  .group(() => {
+    router.get('/contractor/:contractorId', [ContractorInteractionsController, 'getByContractor'])
+    router.post('/', [ContractorInteractionsController, 'create'])
+    router.put('/:id', [ContractorInteractionsController, 'update'])
+    router.delete('/:id', [ContractorInteractionsController, 'delete'])
+    router.post('/:id/upload', [ContractorInteractionsController, 'upload'])
+    router.get('/download/:filename', [ContractorInteractionsController, 'download'])
+  })
+  .prefix('/contractor-interactions')
