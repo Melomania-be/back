@@ -40,6 +40,12 @@ const RecruitmentRecommendationController = () =>
   import('#controllers/recruitment_recommendation_controller')
 const RateLimiterMiddleware = () => import('#middleware/rate_limiter_middleware')
 const ContractorsController = () => import('#controllers/contractors_controller')
+const AppSettingsController = () => import('#controllers/app_settings_controller')
+const OrganizationsController = () =>
+  import('#controllers/organizations_controller')
+
+const ContractorCategoriesController = () =>
+  import('#controllers/contractor_categories_controller')
 const ContractorInteractionsController = () =>
   import('#controllers/contractor_interactions_controller')
 router.group(() => {
@@ -53,6 +59,13 @@ router.group(() => {
       henlo: 'monde',
     }
   })
+
+  // =============================================================================
+  // PARAMÈTRES VISUELS DE L'APPLICATION (PUBLICS POUR LA LECTURE)
+  // =============================================================================
+  router.get('/app_settings', [AppSettingsController, 'getSettings'])
+  router.get('/app_settings/logo', [AppSettingsController, 'getLogo'])
+  router.get('/app_settings/background', [AppSettingsController, 'getBackground'])
 
   // Authentication
   router.post('/sign_in', [UsersController, 'signIn'])
@@ -132,6 +145,13 @@ router.group(() => {
 
       // Sign out
       router.get('/sign_out', [UsersController, 'signOut'])
+
+      // =============================================================================
+      // PARAMÈTRES VISUELS DE L'APPLICATION (PROTÉGÉS POUR L'ÉCRITURE)
+      // =============================================================================
+      router.put('/app_settings', [AppSettingsController, 'updateSettings'])
+      router.delete('/app_settings/logo', [AppSettingsController, 'removeLogo'])
+      router.delete('/app_settings/background', [AppSettingsController, 'removeBackground'])
 
       // ============================================================================
       // GESTION DES MATÉRIELS
