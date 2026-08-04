@@ -15,7 +15,7 @@ import type {
   HasMany,
 } from '@adonisjs/lucid/types/relations'
 
-import Organization from './organization.js'
+import Company from './company.js'
 import ContractorCategory from './contractor_category.js'
 
 export default class ContractorContact extends BaseModel {
@@ -52,10 +52,10 @@ export default class ContractorContact extends BaseModel {
   @column()
   declare organization_id: number | null
 
-  @belongsTo(() => Organization, {
+  @belongsTo(() => Company, {
     foreignKey: 'organization_id',
   })
-  declare organization: BelongsTo<typeof Organization>
+  declare company: BelongsTo<typeof Company>
 
   @manyToMany(() => ContractorCategory, {
     pivotTable: 'contractor_contact_categories',

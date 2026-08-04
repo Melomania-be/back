@@ -41,9 +41,10 @@ const RecruitmentRecommendationController = () =>
 
 const AppSettingsController = () => import('#controllers/app_settings_controller')
 
+const CompaniesController = () =>
+  import('#controllers/companies_controller')
 const OrganizationsController = () =>
   import('#controllers/organizations_controller')
-
 const ContractorCategoriesController = () =>
   import('#controllers/contractor_categories_controller')
 
@@ -269,8 +270,8 @@ router.group(() => {
   '/contractor/:contractorId',
   [AccountingsController, 'getContractorAccountings']
 )
-          router.post('/attachment', [AccountingsController, 'uploadAttachment'])
-          router.get('/attachment/:filename', [AccountingsController, 'downloadAttachment'])
+          //router.post('/attachment', [AccountingsController, 'uploadAttachment'])
+          //router.get('/attachment/:filename', [AccountingsController, 'downloadAttachment'])
         })
         .prefix('/accountings')
 
@@ -571,13 +572,19 @@ router
  router
   .group(() => {
     router.get('/', [OrganizationsController, 'getAll'])
-
     router.post('/', [OrganizationsController, 'create'])
-    router.put('/:id', [OrganizationsController, 'update'])
-    router.delete('/:id', [OrganizationsController, 'delete'])
   })
   .prefix('/organization')
   
+router
+  .group(() => {
+    router.get('/', [CompaniesController, 'getAll'])
+    router.post('/', [CompaniesController, 'create'])
+    router.put('/:id', [CompaniesController, 'update'])
+    router.delete('/:id', [CompaniesController, 'delete'])
+  })
+  .prefix('/company')
+
 router
   .group(() => {
     router.get('/', [ContractorCategoriesController, 'getAll'])
