@@ -12,6 +12,9 @@ export default class Company extends BaseModel {
   @column()
   declare name: string
 
+@column()
+declare comments: string | null
+
   @hasMany(() => ContractorContact, {
     foreignKey: 'organization_id',
   })
