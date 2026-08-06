@@ -270,8 +270,8 @@ router.group(() => {
   '/contractor/:contractorId',
   [AccountingsController, 'getContractorAccountings']
 )
-          //router.post('/attachment', [AccountingsController, 'uploadAttachment'])
-          //router.get('/attachment/:filename', [AccountingsController, 'downloadAttachment'])
+          router.post('/attachment', [AccountingsController, 'uploadAttachment'])
+          router.get('/attachment/:filename', [AccountingsController, 'downloadAttachment'])
         })
         .prefix('/accountings')
 
@@ -573,6 +573,7 @@ router
   .group(() => {
     router.get('/', [OrganizationsController, 'getAll'])
     router.post('/', [OrganizationsController, 'create'])
+    router.post('/create', [OrganizationsController, 'create'])
   })
   .prefix('/organization')
   

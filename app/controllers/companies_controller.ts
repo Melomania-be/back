@@ -3,9 +3,15 @@ import type { HttpContext } from '@adonisjs/core/http'
 import { createCompanyValidator } from '#validators/company'
 
 export default class CompaniesController {
-  async getAll({}: HttpContext) {
-    return await Company.all()
+  async getAll({ auth }: HttpContext) {
+  const organizationId = auth.user?.organizationId
+
+  if (!organizationId) {
+    return []
   }
+
+  return await Company.query().where('id', organizationId)
+}
 
   async create({ request, response }: HttpContext) {
     try {
