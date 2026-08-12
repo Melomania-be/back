@@ -1,8 +1,6 @@
 import env from '#start/env'
 import { BaseMail } from '@adonisjs/mail'
 import MailTemplate from '#models/mail_template'
-import Project from '#models/project'
-import Contact from '#models/contact'
 
 export default class RegistrationEmail extends BaseMail {
   contact: {
@@ -14,19 +12,32 @@ export default class RegistrationEmail extends BaseMail {
   project: {
     id: number
     name: string
-    events?: Array<{
+
+    rehearsals?: Array<{
       id: number
-      type: 'concert' | 'rehearsal'
       start_date: string
       end_date: string | null
       place: string
-      comment: string
+      comment?: string
     }>
+
+    concerts?: Array<{
+      id: number
+      start_date: string
+      end_date: string | null
+      place: string
+      comment?: string
+    }>
+
     pieces?: Array<{
       id: number
       name: string
-      composer: { name: string }
+      composer?: {
+        short_name?: string
+        long_name?: string
+      }
     }>
+
     contents?: Array<{
       title: string
       text: string
@@ -42,42 +53,47 @@ export default class RegistrationEmail extends BaseMail {
 
   constructor(
     contact: { first_name: string; last_name: string; email: string },
-    project: { id: number; name: string },
-    recruiter: { name: string; email: string },
-    recommendedBy?: string
+    project: {
+      id: number
+      name: string
+      rehearsals?: Array<{
+        id: number
+        start_date: string
+        end_date: string | null
+        place: string
+        comment?: string
+      }>
+      concerts?: Array<{
+        id: number
+        start_date: string
+        end_date: string | null
+        place: string
+        comment?: string
+      }>
+      pieces?: Array<{
+        id: number
+        name: string
+        composer?: {
+          short_name?: string
+          long_name?: string
+        }
+      }>
+      contents?: Array<{
+        title: string
+        text: string
+      }>
+    },
+    recruiter: { name: string; email: string }
   ) {
     super()
-    this.from = env.get('SMTP_USERNAME')
     this.contact = contact
     this.project = project
     this.recruiter = recruiter
-    this.subject = `Invitation à rejoindre le projet "${project.name}"`
+    this.subject = `Registration confirmation for "${project.name}"`
   }
 
   private getFrontendUrl(): string {
-    const envUrl = env.get('FRONTEND_URL')
-    const nodeEnv = env.get('NODE_ENV', 'development')
-    const host = env.get('HOST', 'localhost')
-
-    if (envUrl && !envUrl.includes('localhost') && envUrl.trim() !== '') {
-      return envUrl
-    }
-
-    if (host && host !== 'localhost' && host !== '127.0.0.1') {
-      if (nodeEnv === 'development' || host.includes('universe.wf')) {
-        return 'http://tool.sc1ciro3903.universe.wf'
-      }
-
-      const isProduction = nodeEnv === 'production'
-      if (isProduction || host.includes('melomania.be')) {
-        return 'https://tool.melomania.be'
-      }
-
-      const protocol = isProduction ? 'https' : 'http'
-      return `${protocol}://${host}`
-    }
-
-    return 'http://localhost:5173'
+    return env.get('FRONTEND_URL')
   }
 
   private replaceTemplateVariables(htmlContent: string, variables: Record<string, string>): string {
@@ -101,7 +117,17 @@ export default class RegistrationEmail extends BaseMail {
   }
 
   private formatEvents(): string {
-    const events = this.project.events || []
+    const rehearsals = (this.project.rehearsals || []).map((event) => ({
+      ...event,
+      type: 'rehearsal' as const,
+    }))
+
+    const concerts = (this.project.concerts || []).map((event) => ({
+      ...event,
+      type: 'concert' as const,
+    }))
+
+    const events = [...rehearsals, ...concerts]
 
     if (events.length === 0) {
       return '<p style="color: #666;">No events scheduled.</p>'
@@ -116,6 +142,7 @@ export default class RegistrationEmail extends BaseMail {
           month: 'long',
           day: 'numeric',
         })
+
         const eventTime = event.end_date
           ? `${new Date(event.start_date).toLocaleTimeString('en-US', {
               hour: '2-digit',
@@ -130,15 +157,30 @@ export default class RegistrationEmail extends BaseMail {
             })
 
         const eventLabel = event.type === 'rehearsal' ? 'Rehearsal' : 'Concert'
-        const background = event.type === 'rehearsal' ? '#e8f4ff' : '#f3e8ff'
-        const borderColor = event.type === 'rehearsal' ? '#6b9ad9' : '#a584d2'
 
-        return `<div style="padding: 15px; margin: 10px 0; background-color: ${background}; border-left: 4px solid ${borderColor};">
-        <p style="margin: 5px 0; font-weight: bold;">${eventLabel} • ${eventDate}</p>
-        <p style="margin: 5px 0; color: #555;">${eventTime}</p>
-        <p style="margin: 5px 0; color: #555;">${event.place}</p>
-        ${event.comment ? `<p style="margin: 5px 0; color: #555; font-size: 14px;">${event.comment}</p>` : ''}
-      </div>`
+        return `
+          <div style="padding: 15px; margin: 10px 0; border-left: 4px solid #999;">
+            <p style="margin: 5px 0; font-weight: bold;">
+              ${eventLabel} • ${eventDate}
+            </p>
+
+            <p style="margin: 5px 0; color: #555;">
+              ${eventTime}
+            </p>
+
+            <p style="margin: 5px 0; color: #555;">
+              ${this.escapeHtml(event.place || '')}
+            </p>
+
+            ${
+              event.comment
+                ? `<p style="margin: 5px 0; color: #555; font-size: 14px;">
+                  ${this.escapeHtml(event.comment)}
+                  </p>`
+                : ''
+            }
+          </div>
+        `
       })
       .join('')
   }
@@ -149,14 +191,32 @@ export default class RegistrationEmail extends BaseMail {
     }
 
     return this.project.pieces
-      .map(
-        (piece) =>
-          `<div style="padding: 12px; margin: 8px 0; background-color: #fffaf0; border-left: 3px solid #999;">
-        <p style="margin: 5px 0; font-weight: bold;">${piece.composer?.name || 'Unknown Composer'}</p>
-        <p style="margin: 5px 0; color: #666; font-size: 14px;">${piece.name}</p>
-      </div>`
-      )
+      .map((piece) => {
+        const composerName =
+          piece.composer?.long_name || piece.composer?.short_name || 'Unknown Composer'
+
+        return `
+          <div style="padding: 12px; margin: 8px 0; background-color: #fffaf0; border-left: 3px solid #999;">
+            <p style="margin: 5px 0; font-weight: bold;">
+              ${this.escapeHtml(composerName)}
+            </p>
+
+            <p style="margin: 5px 0; color: #666; font-size: 14px;">
+              ${this.escapeHtml(piece.name)}
+            </p>
+          </div>
+        `
+      })
       .join('')
+  }
+
+  private escapeHtml(value: string): string {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;')
   }
 
   private formatInformation(): string {
@@ -168,7 +228,7 @@ export default class RegistrationEmail extends BaseMail {
       .map(
         (content) =>
           `<div style="margin: 10px 0; padding: 15px; background-color: #f4f6f8; border: 1px solid #ddd; border-radius: 4px;">
-        <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: bold; color: #333;">${content.title}</h3>
+        <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: bold; color: #333;">${this.escapeHtml(content.title)}</h3>
         <p style="margin: 0; color: #555; line-height: 1.5;">${content.text}</p>
       </div>`
       )
@@ -343,7 +403,7 @@ export default class RegistrationEmail extends BaseMail {
             <div class="divider"></div>
 
             <p style="margin-bottom: 20px; font-size: 15px;">
-                We would be delighted to count on your participation.
+                Thank you for registering.
             </p>
 
             <p style="margin-bottom: 30px;">
@@ -376,54 +436,45 @@ export default class RegistrationEmail extends BaseMail {
   }
 
   async prepare() {
-    try {
-      const url = this.getFrontendUrl()
+    const url = this.getFrontendUrl()
 
-      let template = await MailTemplate.query().where('name', 'registration_email.html').first()
+    let template = await MailTemplate.query().where('name', 'registration_email.html').first()
 
-      if (!template) {
-        template = await MailTemplate.query().where('name', 'default_registration.html').first()
-      }
-
-      let htmlContent = ''
-
-      if (template) {
-        htmlContent = template.content
-      } else {
-        htmlContent = this.getDefaultTemplate()
-      }
-
-      const eventsHtml = this.formatEvents()
-      const programHtml = this.formatProgram()
-      const informationHtml = this.formatInformation()
-
-      const templateVariables = {
-        URL: url,
-        NAME: `${this.contact.first_name} ${this.contact.last_name}`,
-        PROJECT: this.project.name,
-        COMPANY_NAME: this.recruiter.name,
-        COMPANY_EMAIL: this.recruiter.email,
-        REGISTRATION_URL: `${url}/registration/${this.project.id}`,
-        UNSUBSCRIBE_URL: `${url}/unsubscribe?email=${encodeURIComponent(this.contact.email)}&project=${this.project.id}`,
-      }
-
-      htmlContent = this.replaceTemplateVariables(htmlContent, templateVariables)
-
-      // Replace HTML content directly to avoid escaping issues with $ signs
-      htmlContent = htmlContent.replace(/\${EVENTS_HTML}/g, eventsHtml)
-      htmlContent = htmlContent.replace(/\${PROGRAM_HTML}/g, programHtml)
-      htmlContent = htmlContent.replace(/\${INFORMATION_HTML}/g, informationHtml)
-
-      const fromAddress = env.get('MAIL_FROM_ADDRESS', env.get('SMTP_USERNAME'))
-
-      this.message
-        .to(this.contact.email)
-        .from(`${this.recruiter.name} <${fromAddress}>`)
-        .replyTo(this.recruiter.email)
-        .subject(this.subject)
-        .html(htmlContent)
-    } catch (error) {
-      throw error
+    if (!template) {
+      template = await MailTemplate.query().where('name', 'default_registration.html').first()
     }
+
+    let htmlContent = template ? template.content : this.getDefaultTemplate()
+
+    const eventsHtml = this.formatEvents()
+    const programHtml = this.formatProgram()
+    const informationHtml = this.formatInformation()
+
+    const templateVariables = {
+      URL: url,
+      NAME: this.escapeHtml(`${this.contact.first_name} ${this.contact.last_name}`),
+      PROJECT: this.escapeHtml(this.project.name),
+      COMPANY_NAME: this.escapeHtml(this.recruiter.name),
+      COMPANY_EMAIL: this.escapeHtml(this.recruiter.email),
+      REGISTRATION_URL: `${url}/registration/${this.project.id}`,
+      UNSUBSCRIBE_URL:
+        `${url}/unsubscribe?email=${encodeURIComponent(this.contact.email)}` +
+        `&project=${this.project.id}`,
+    }
+
+    htmlContent = this.replaceTemplateVariables(htmlContent, templateVariables)
+
+    htmlContent = htmlContent.replace(/\${EVENTS_HTML}/g, eventsHtml)
+    htmlContent = htmlContent.replace(/\${PROGRAM_HTML}/g, programHtml)
+    htmlContent = htmlContent.replace(/\${INFORMATION_HTML}/g, informationHtml)
+
+    const fromAddress = env.get('MAIL_FROM_ADDRESS', env.get('SMTP_USERNAME'))
+
+    this.message
+      .to(this.contact.email)
+      .from(`${this.recruiter.name} <${fromAddress}>`)
+      .replyTo(this.recruiter.email)
+      .subject(this.subject)
+      .html(htmlContent)
   }
 }

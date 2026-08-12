@@ -101,39 +101,36 @@ export default class RegistrationsController {
   }
 
   async submit(ctx: HttpContext) {
-    console.log('Submit endpoint reached')
     const data = await ctx.request.validateUsing(userRegistrationValidator)
-    console.log('Data sent : ', data)
 
-    let searchContact = {
+    const searchContact = {
       first_name: data.first_name,
       last_name: data.last_name,
       email: data.email,
     }
 
-    let saveContact = {
+    const saveContact = {
       phone: data.phone,
       messenger: data.messenger,
       validated: false,
     }
 
     // Create or retrieve the contact
-    let contact = await Contact.firstOrCreate(searchContact, saveContact)
-    console.log('Contact sent : ', contact)
+    const contact = await Contact.firstOrCreate(searchContact, saveContact)
 
-    let searchParticipant = {
+    const searchParticipant = {
       contact_id: contact.id,
       project_id: data.project_id,
     }
 
-    let saveParticipant = {
+    const saveParticipant = {
       section_id: data.section_id,
       accepted: false,
       last_activity: new Date(),
     }
 
-    //Checking if the contact is already in the participant db with this project, if not its added
-    let participant = await Participant.firstOrCreate(searchParticipant, saveParticipant)
+    // Create or retrieve the participant
+    const participant = await Participant.firstOrCreate(searchParticipant, saveParticipant)
 
     // Save rehearsals
     const rehearsalsWithComments = data.rehearsals.reduce(
@@ -141,11 +138,12 @@ export default class RegistrationsController {
         acc[rehearsal.id] = {
           comment: rehearsal.comment ?? '',
         }
+
         return acc
       },
       {} as Record<number, { comment: string }>
     )
-    console.log('Rehearsals sent : ', rehearsalsWithComments)
+
     await participant.related('rehearsals').sync(rehearsalsWithComments)
 
     // Save concerts
@@ -154,29 +152,28 @@ export default class RegistrationsController {
         acc[concert.id] = {
           comment: concert.comment ?? '',
         }
+
         return acc
       },
       {} as Record<number, { comment: string }>
     )
-    console.log('Concerts sent : ', concertsWithComments)
+
     await participant.related('concerts').sync(concertsWithComments)
 
-    ///Puting the answer in the answer table if there is a form to fill
-    // if (data.answers.length === 0) {
-    //   return ctx.response.json({ success: true, participant })
-    // }
+    // Save answers only when the registration form contains answers
+    let answers: Answer[] = []
 
-    const answer = await Answer.createMany(
-      data.answers.map((answerIt) => {
-        return {
+    if (data.answers.length > 0) {
+      answers = await Answer.createMany(
+        data.answers.map((answerIt) => ({
           text: answerIt.text ?? '',
           form_id: answerIt.form_id,
           participant_id: participant.id,
-        }
-      })
-    )
+        }))
+      )
+    }
 
-    // Load the complete project for the email
+    // Load all project information required by the email
     const project = await Project.query()
       .where('id', data.project_id)
       .preload('responsibles')
@@ -190,45 +187,63 @@ export default class RegistrationsController {
       .preload('concerts')
       .firstOrFail()
 
-    // Get the first responsible as the recruiter
-    const responsibles = (project as any).responsibles
-    const recruiter =
-      responsibles && responsibles.length > 0
-        ? {
-            name: responsibles[0].first_name + ' ' + responsibles[0].last_name,
-            email: responsibles[0].email,
-          }
-        : { name: 'Melomania Team', email: 'noreply@melomania.be' }
+    // Use the first project responsible as the email contact
+    const responsible = project.responsibles?.[0]
 
-    // Add contents from registration to project for the email
-    const projectData = project as any
-    if (projectData.registration?.content) {
-      projectData.contents = projectData.registration.content
+    const recruiter = {
+      name: 'Melomania',
+      email: 'noreply@melomania.be',
     }
 
-    // Send confirmation email
+    const projectData = {
+      id: project.id,
+      name: project.name,
+
+      rehearsals: project.rehearsals.map((rehearsal) => ({
+        id: rehearsal.id,
+        start_date: rehearsal.start_date,
+        end_date: rehearsal.end_date,
+        place: rehearsal.place,
+        comment: rehearsal.comment,
+      })),
+
+      concerts: project.concerts.map((concert) => ({
+        id: concert.id,
+        start_date: concert.start_date,
+        end_date: concert.end_date,
+        place: concert.place,
+        comment: concert.comment,
+      })),
+
+      pieces: project.pieces.map((piece) => ({
+        id: piece.id,
+        name: piece.name,
+        composer: piece.composer
+          ? {
+              short_name: piece.composer.short_name,
+              long_name: piece.composer.long_name,
+            }
+          : undefined,
+      })),
+
+      contents:
+        project.registration?.content?.map((content) => ({
+          title: content.title,
+          text: content.text,
+        })) ?? [],
+    }
+
+    // Send the registration confirmation email
     try {
-      console.log('About to send registration email...')
-      console.log('Contact email:', contact.email)
-      console.log('Recruiter:', recruiter)
-
-      const mailInstance = new RegistrationEmail(contact, project as any, recruiter)
-      console.log('RegistrationEmail instance created')
-
-      await mail.send(mailInstance)
-      console.log('Registration email sent successfully!')
+      await mail.send(new RegistrationEmail(contact, projectData, recruiter))
     } catch (error) {
-      console.error('Failed to send registration email:', error)
-      console.error('Error details:', {
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      })
+      console.error('Failed to send registration confirmation email:', error)
     }
 
     return ctx.response.json({
       success: true,
       participant,
-      answer,
+      answers,
     })
   }
 }
