@@ -50,7 +50,7 @@ test.group('Users API', () => {
       .put('/users')
       .bearerToken(token)
       .json({
-        email: 'testuser@test.com',
+        email: `testuser${Date.now()}@test.com`,
         password: 'password123',
         password_confirmation: 'password123',
         fullName: 'Test User'
