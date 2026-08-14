@@ -4,7 +4,7 @@ export default class extends BaseSchema {
   protected tableName = 'tasks'
 
   async up() {
-    this.schema.dropTableIfExists(this.tableName)
+
 
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id').primary()
@@ -40,7 +40,5 @@ export default class extends BaseSchema {
     })
   }
 
-  async down() {
-    this.schema.dropTable(this.tableName)
-  }
+  
 }
