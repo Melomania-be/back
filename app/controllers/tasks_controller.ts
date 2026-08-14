@@ -1,16 +1,15 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import Task from '#models/task'
 import { createTaskValidator, updateTaskValidator } from '#validators/task'
-import Subtask from '#models/subtask'
-import TaskComment from '#models/task_comment'
 
 export default class TasksController {
 
-  // 1. Récupérer les tâches (avec filtres optionnels)
-  async index({ request }: HttpContext) {
+  // 1. Récupérer les tâches
+  async index({ request, auth }: HttpContext) {
     const { projectId, eventId, sectionId } = request.qs()
 
     const query = Task.query()
+      .where('organizationId', auth.user!.organizationId!)
       .preload('assignee')
       .preload('creator')
       .preload('section')
@@ -34,73 +33,35 @@ export default class TasksController {
     const task = await Task.create({
       ...payload,
       createdBy: auth.user!.id,
+      organizationId: auth.user!.organizationId!,
     })
 
     return task
   }
 
   // 3. Voir une seule tâche en détail
-  async show({ params }: HttpContext) {
+  async show({ params, auth }: HttpContext) {
     return await Task.query()
       .where('id', params.id)
+      .where('organizationId', auth.user!.organizationId!) // 👈 Ajout du "!" ici
       .preload('assignee')
       .preload('creator')
       .preload('section')
       .preload('piece')
-      .preload('subtasks') // 👈 On n'oublie pas de charger les sous-tâches
+      .preload('subtasks')
       .preload('comments', (commentsQuery) => {
         commentsQuery.preload('user')
       })
       .firstOrFail()
   }
 
-  // 4. LE CHEVAL DE TROIE : Gère les mises à jour ET les sous-tâches/commentaires !
-  async update({ params, request, response, auth }: HttpContext) {
-    // On regarde si Svelte nous envoie une action spécifique
-    const action = request.input('_action')
+  // 4. Mettre à jour une tâche
+  async update({ params, request, auth }: HttpContext) {
+    const task = await Task.query()
+      .where('id', params.id)
+      .where('organizationId', auth.user!.organizationId!)
+      .firstOrFail()
 
-    // --- SOUS-TÂCHES ---
-    if (action === 'add_subtask') {
-      const task = await Task.findOrFail(params.id)
-      const subtask = await task.related('subtasks').create({
-        title: request.input('title'),
-        isCompleted: false,
-      })
-      return response.created(subtask)
-    }
-
-    if (action === 'toggle_subtask') {
-      const subtask = await Subtask.findOrFail(request.input('subtaskId'))
-      subtask.isCompleted = request.input('isCompleted')
-      await subtask.save()
-      return response.ok(subtask)
-    }
-
-    if (action === 'delete_subtask') {
-      const subtask = await Subtask.findOrFail(request.input('subtaskId'))
-      await subtask.delete()
-      return response.ok({ success: true })
-    }
-
-    // --- COMMENTAIRES ---
-    if (action === 'add_comment') {
-      const task = await Task.findOrFail(params.id)
-      const comment = await task.related('comments').create({
-        content: request.input('content'),
-        userId: auth.user!.id,
-      })
-      await comment.load('user') // Charge les infos user pour le front
-      return response.created(comment)
-    }
-
-    if (action === 'delete_comment') {
-      const comment = await TaskComment.findOrFail(request.input('commentId'))
-      await comment.delete()
-      return response.ok({ success: true })
-    }
-
-    // --- SI AUCUNE ACTION SPÉCIFIQUE : COMPORTEMENT NORMAL DE LA TÂCHE ---
-    const task = await Task.findOrFail(params.id)
     const payload = await request.validateUsing(updateTaskValidator)
 
     task.merge(payload)
@@ -110,8 +71,12 @@ export default class TasksController {
   }
 
   // 5. Supprimer une tâche
-  async destroy({ params, response }: HttpContext) {
-    const task = await Task.findOrFail(params.id)
+  async destroy({ params, response, auth }: HttpContext) {
+    const task = await Task.query()
+      .where('id', params.id)
+      .where('organizationId', auth.user!.organizationId!)
+      .firstOrFail()
+
     await task.delete()
 
     return response.noContent()

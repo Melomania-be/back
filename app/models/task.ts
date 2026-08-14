@@ -91,4 +91,7 @@ export default class Task extends BaseModel {
 
   @hasMany(() => TaskComment)
   declare comments: HasMany<typeof TaskComment>
+
+  @column()
+  declare organizationId: number
 }
