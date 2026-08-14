@@ -27,11 +27,9 @@ export default class User extends compose(BaseModel, AuthFinder) {
   @column()
   declare password: string
 
-  // ✅ NOUVEAU : rôle de l'utilisateur
   @column()
   declare role: UserRole
 
-  // ✅ NOUVEAU : permissions granulaires
   @column()
   declare canAccessContacts: boolean
 
@@ -41,7 +39,6 @@ export default class User extends compose(BaseModel, AuthFinder) {
   @column()
   declare isActive: boolean
 
-  // ✅ NOUVEAU : projets accessibles pour les guests
   @manyToMany(() => Project, {
     pivotTable: 'user_project_access',
   })
@@ -53,7 +50,6 @@ export default class User extends compose(BaseModel, AuthFinder) {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
 
-  // ✅ Helpers de vérification de rôle
   get isSuperAdmin(): boolean {
     return this.role === 'superadmin'
   }

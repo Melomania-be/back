@@ -16,6 +16,9 @@ export default class ContentCallsheet extends BaseModel {
   @column()
   declare text: string
 
+  @column()
+  declare position: number
+
   @belongsTo(() => Callsheet, {
     foreignKey: 'callsheet_id',
     localKey: 'id',

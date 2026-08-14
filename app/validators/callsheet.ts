@@ -10,6 +10,7 @@ export const createCallsheetValidator = vine.compile(
         id: vine.number().optional(),
         title: vine.string(),
         text: vine.string(),
+        position: vine.number().optional(),
       })
     ),
   })

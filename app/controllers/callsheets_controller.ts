@@ -17,7 +17,10 @@ export default class CallsheetsController {
     const callsheet = await Callsheet.query()
       .where('project_id', params.id)
       .orderBy('updated_at', 'desc')
-      .preload('contents')
+      // ✅ Trier les blocs de contenu par position
+      .preload('contents', (contentsQuery) => {
+        contentsQuery.orderBy('position', 'asc')
+      })
       .preload('project', (projectQuery) => {
         projectQuery
           .preload('responsibles')
@@ -84,9 +87,16 @@ export default class CallsheetsController {
       callsheet = await Callsheet.create({ project_id: data.project_id, version: data.version })
     }
 
+    // ✅ Inclut la position lors de la création des contenus
     return callsheet
       .related('contents')
-      .createMany(data.contents.map((content) => ({ text: content.text, title: content.title })))
+      .createMany(
+        data.contents.map((content, index) => ({
+          text: content.text,
+          title: content.title,
+          position: content.position !== undefined ? content.position : index,
+        }))
+      )
   }
 
   async delete(ctx: HttpContext) {
