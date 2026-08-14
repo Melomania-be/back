@@ -37,11 +37,16 @@ const SharedFolderController = () => import('#controllers/shared_folder_controll
 const RecruitmentController = () => import('#controllers/recruitment_controller')
 const ContractorsController = () => import('#controllers/contractors_controller')
 const RecruitmentRecommendationController = () => import('#controllers/recruitment_recommendation_controller')
+const AppSettingsController = () => import('#controllers/app_settings_controller')
 const OrganizationsController = () => import('#controllers/organizations_controller')
 const ContractorCategoriesController = () => import('#controllers/contractor_categories_controller')
 const ContractorInteractionsController = () => import('#controllers/contractor_interactions_controller')
 const ContractorParticipantsController = () => import('#controllers/contractor_participants_controller')
+
+// Contrôleurs du Task Manager
 const TasksController = () => import('#controllers/tasks_controller')
+const SubtasksController = () => import('#controllers/subtasks_controller')
+const TaskCommentsController = () => import('#controllers/task_comments_controller')
 
 router.group(() => {
   // =============================================================================
@@ -54,6 +59,13 @@ router.group(() => {
       henlo: 'monde',
     }
   })
+
+  // =============================================================================
+  // PARAMÈTRES VISUELS DE L'APPLICATION (PUBLICS POUR LA LECTURE)
+  // =============================================================================
+  router.get('/app_settings', [AppSettingsController, 'getSettings'])
+  router.get('/app_settings/logo', [AppSettingsController, 'getLogo'])
+  router.get('/app_settings/background', [AppSettingsController, 'getBackground'])
 
   // Authentication
   router.post('/sign_in', [UsersController, 'signIn'])
@@ -123,6 +135,13 @@ router.group(() => {
       // Sign out
       router.get('/sign_out', [UsersController, 'signOut'])
 
+      // =============================================================================
+      // PARAMÈTRES VISUELS DE L'APPLICATION (PROTÉGÉS POUR L'ÉCRITURE)
+      // =============================================================================
+      router.put('/app_settings', [AppSettingsController, 'updateSettings'])
+      router.delete('/app_settings/logo', [AppSettingsController, 'removeLogo'])
+      router.delete('/app_settings/background', [AppSettingsController, 'removeBackground'])
+
       // ============================================================================
       // GESTION DES MATÉRIELS
       // ============================================================================
@@ -161,24 +180,23 @@ router.group(() => {
       // =============================================================================
       router
         .group(() => {
+          // Tâches
           router.get('/', [TasksController, 'index'])
           router.post('/', [TasksController, 'store'])
           router.get('/:id', [TasksController, 'show'])
           router.put('/:id', [TasksController, 'update'])
           router.delete('/:id', [TasksController, 'destroy'])
 
-          // Sous-tâches 100% imbriquées sous /tasks/ pour passer le proxy Svelte
-          router.post('/:id/subtasks', [TasksController, 'storeSubtask'])
-          router.put('/:id/subtasks/:subtaskId', [TasksController, 'updateSubtask'])
-          router.delete('/:id/subtasks/:subtaskId', [TasksController, 'destroySubtask'])
+          // Sous-tâches 100% imbriquées
+          router.post('/:task_id/subtasks', [SubtasksController, 'store'])
+          router.put('/:task_id/subtasks/:id', [SubtasksController, 'update'])
+          router.delete('/:task_id/subtasks/:id', [SubtasksController, 'destroy'])
 
-          // Commentaires 100% imbriqués sous /tasks/
-          router.post('/:id/comments', [TasksController, 'storeComment'])
-          router.delete('/:id/comments/:commentId', [TasksController, 'destroyComment'])
+          // Commentaires 100% imbriqués
+          router.post('/:task_id/comments', [TaskCommentsController, 'store'])
+          router.delete('/:task_id/comments/:id', [TaskCommentsController, 'destroy'])
         })
         .prefix('/tasks')
-
-      
 
       // =============================================================================
       // FILESYSTEM ROUTES
@@ -538,6 +556,7 @@ router.group(() => {
       // =============================================================================
       router
         .group(() => {
+          router.post('/', [MailingsController, 'sendUnique'])
           router.post('/sendRefusalEmailToParticipant', [MailingsController, 'sendRefusalEmailToParticipant'])
           router.post('/sendAuditionRequest', [MailingsController, 'sendAuditionRequest'])
           router.post('/sendTemplateToList', [MailingsController, 'sendTemplateToList'])
