@@ -8,7 +8,6 @@
 */
 import router from '@adonisjs/core/services/router'
 import { middleware } from './kernel.js'
-import { throttle } from '@adonisjs/limiter/services/main'
 
 const AuditionsController = () => import('#controllers/auditions_controller')
 const UsersController = () => import('#controllers/users_controller')
@@ -38,8 +37,6 @@ const SharedFolderController = () => import('#controllers/shared_folder_controll
 const RecruitmentController = () => import('#controllers/recruitment_controller')
 const RecruitmentRecommendationController = () =>
   import('#controllers/recruitment_recommendation_controller')
-
-// NEW IMPORTS ADDED HERE
 const PasswordRecoveriesController = () => import('#controllers/password_recoveries_controller')
 const ProfilesController = () => import('#controllers/profiles_controller')
 const OrganizationsController = () => import('#controllers/organizations_controller')
@@ -64,7 +61,7 @@ router.group(() => {
   router.post('/sign_in', [UsersController, 'signIn'])
 
   router.post('/reset-password', [PasswordRecoveriesController, 'resetPassword']).use(
-    throttle({
+    middleware.throttle({
       requests: 3,
       duration: '15 mins',
       prefix: 'password_reset',
@@ -154,9 +151,7 @@ router.group(() => {
       router
         .group(() => {
           router.get('/', [OrganizationsController, 'getAll'])
-          router.get('/:id', [OrganizationsController, 'getOne'])
-          router.post('/', [OrganizationsController, 'createOrUpdate'])
-          router.delete('/:id', [OrganizationsController, 'delete'])
+          router.post('/', [OrganizationsController, 'create'])
         })
         .prefix('/organization')
 
@@ -164,7 +159,8 @@ router.group(() => {
         .group(() => {
           router.get('/', [ContractorsController, 'getAll'])
           router.get('/:id', [ContractorsController, 'getOne'])
-          router.post('/', [ContractorsController, 'createOrUpdate'])
+          router.post('/', [ContractorsController, 'create'])
+          router.put('/:id', [ContractorsController, 'update'])
           router.delete('/:id', [ContractorsController, 'delete'])
         })
         .prefix('/contractor')
@@ -172,15 +168,16 @@ router.group(() => {
       router
         .group(() => {
           router.get('/', [ContractorCategoriesController, 'getAll'])
-          router.post('/', [ContractorCategoriesController, 'createOrUpdate'])
+          router.post('/', [ContractorCategoriesController, 'create'])
+          router.put('/:id', [ContractorCategoriesController, 'update'])
           router.delete('/:id', [ContractorCategoriesController, 'delete'])
         })
         .prefix('/contractor-category')
 
       router
         .group(() => {
-          router.get('/', [ContractorParticipantsController, 'getAll'])
-          router.post('/', [ContractorParticipantsController, 'createOrUpdate'])
+          router.get('/project/:projectId', [ContractorParticipantsController, 'getByProject'])
+          router.post('/', [ContractorParticipantsController, 'create'])
           router.delete('/:id', [ContractorParticipantsController, 'delete'])
         })
         .prefix('/contractor-participant')

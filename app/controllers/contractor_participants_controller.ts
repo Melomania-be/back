@@ -11,16 +11,13 @@ export default class ContractorParticipantsController {
   }
 
   async create({ request }: HttpContext) {
-  const data = request.only([
-    'project_id',
-    'contractor_contact_id',
-  ])
+    const data = request.only(['project_id', 'contractor_contact_id'])
 
-  return await ContractorParticipant.create({
-    projectId: data.project_id,
-    contractorContactId: data.contractor_contact_id,
-  })
-}
+    return await ContractorParticipant.create({
+      projectId: data.project_id,
+      contractorContactId: data.contractor_contact_id,
+    })
+  }
 
   async delete({ params }: HttpContext) {
     const participant = await ContractorParticipant.findOrFail(params.id)
