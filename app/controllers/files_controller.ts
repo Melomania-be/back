@@ -104,7 +104,14 @@ export default class FilesController {
       const file = await File.query()
         .where('id', ctx.params.id)
         .if(organizationId, (query) => query.where('organization_id', organizationId!))
-        .firstOrFail()
+        .first()
+
+      if (!file) {
+        return ctx.response.status(404).json({
+          error: 'File not found',
+          fileId: ctx.params.id,
+        })
+      }
 
       console.log(`📥 Download request for file: ${file.name} (ID: ${ctx.params.id})`)
       console.log(`📁 File path: ${file.path}`)
@@ -167,7 +174,14 @@ export default class FilesController {
       const file = await File.query()
         .where('id', params.id)
         .if(organizationId, (query) => query.where('organization_id', organizationId!))
-        .firstOrFail()
+        .first()
+
+      if (!file) {
+        return response.status(404).json({
+          error: 'File not found',
+          fileId: params.id,
+        })
+      }
 
       const filePath = file.path
 
