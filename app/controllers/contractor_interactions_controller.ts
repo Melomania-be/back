@@ -11,14 +11,14 @@ import File from '#models/file'
 import ContractorInteractionFile from '#models/contractor_interaction_file'
 
 export default class ContractorInteractionsController {
-  async getByContractor({ params }: HttpContext) {
-    return await ContractorInteraction.query()
-  .where('contractor_contact_id', params.contractorId)
-  .preload('files', (query) => {
-    query.preload('file')
-  })
-  .orderBy('interaction_date', 'desc')
-  }
+async getByContractor({ params }: HttpContext) {
+  return await ContractorInteraction.query()
+    .where('contractor_contact_id', params.contractorId)
+    .preload('files', (query) => {
+      query.preload('file')
+    })
+    .orderBy('interaction_date', 'desc')
+}
 
   async upload({ params, request, response }: HttpContext) {
   const interaction = await ContractorInteraction.find(params.id)
@@ -29,7 +29,7 @@ export default class ContractorInteractionsController {
     })
   }
 
-  const file = request.file('file')
+const file = request.file('file')
 
   if (!file) {
     return response.badRequest({

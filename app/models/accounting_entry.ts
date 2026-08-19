@@ -5,6 +5,7 @@ import Project from './project.js'
 import Contact from './contact.js'
 import AccountingCategory from './accounting_category.js'
 import Organization from '#models/organization'
+
 import ContractorContact from './contractor_contact.js'
 
 export type PaymentStatus = 'pending' | 'paid' | 'overdue' | 'cancelled'

@@ -2,17 +2,18 @@ import { HttpContext } from '@adonisjs/core/http'
 import ContractorContact from '#models/contractor_contact'
 import { createContractorValidator } from '#validators/contractor'
 
+
 export default class ContractorsController {
   async getAll() {
     return await ContractorContact.query()
-      .preload('organization')
+      .preload('company')
       .preload('categories')
   }
 
   async getOne({ params }: HttpContext) {
     return await ContractorContact.query()
       .where('id', params.id)
-      .preload('organization')
+      .preload('company')
       .preload('categories')
       .firstOrFail()
   }
