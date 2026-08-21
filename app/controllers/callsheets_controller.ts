@@ -13,9 +13,10 @@ export default class CallsheetsController {
 
   async getOne(ctx: HttpContext) {
     const { params } = await ctx.request.validateUsing(getCallsheetValidator)
+    const callsheetId = params.callsheetId ?? params.id
 
     const callsheet = await Callsheet.query()
-      .where('id', params.id)
+      .where('id', callsheetId)
       .orderBy('updated_at', 'desc')
       .preload('contents')
       .preload('project', (projectQuery) => {

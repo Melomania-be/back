@@ -1,4 +1,3 @@
-
 import Contact from '#models/contact'
 import RecruitmentContact from '#models/recruitment_contact'
 import { simpleFilter, advancedFilter } from 'adonisjs-filters'
@@ -219,19 +218,20 @@ export default class ContactsController {
       .if(organizationId, (query) => query.where('organization_id', organizationId!))
       .first()
 
-    if (contact) {
-      let participations = await contact.related('participants').query()
-
-      for (let participation of participations) {
-        await participation.related('answers').query().delete()
-        await participation.related('rehearsals').query().delete()
-        await participation.delete()
-      }
-
-      await contact.delete()
-      return response.send('contact deleted')
+    if (!contact) {
+      return response.status(404).send('contact not found')
     }
-    return response.send('contact not found')
+
+    let participations = await contact.related('participants').query()
+
+    for (let participation of participations) {
+      await participation.related('answers').query().delete()
+      await participation.related('rehearsals').query().delete()
+      await participation.delete()
+    }
+
+    await contact.delete()
+    return response.send('contact deleted')
   }
 
   async create(ctx: HttpContext) {
