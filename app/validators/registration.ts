@@ -8,6 +8,7 @@ export const createRegistrationValidator = vine.compile(
         text: vine.string(),
         order: vine.number().optional(),
         position: vine.enum(['above', 'below']).optional(),
+        showOnRegistration: vine.boolean().optional()
       })
     ),
     form: vine.array(
