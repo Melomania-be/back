@@ -1,10 +1,11 @@
 import { test } from '@japa/runner'
+import env from '#start/env'
 
 test.group('Project API', () => {
   async function getToken(client: any) {
     const response = await client.post('/sign_in').json({
-      email: 'admin@admin.admin',
-      password: 'admin',
+      email: env.get('ADMIN_EMAIL'),
+      password: env.get('ADMIN_PASSWORD'),
     })
     return response.body().token
   }
