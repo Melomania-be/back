@@ -5,8 +5,46 @@ import Contact from '#models/contact'
 import Participant from '#models/participant'
 import Answer from '#models/answer'
 import Project from '#models/project'
+import NotificationService from '#services/notification_service'
 
 export default class RegistrationsController {
+  private async createProjectRegistrationNotifications(params: {
+    projectId: number
+    applicantContact: Contact
+    participantId: number
+  }) {
+    const project = await Project.query()
+      .where('id', params.projectId)
+      .preload('responsibles')
+      .first()
+
+    if (!project || project.responsibles.length === 0) {
+      return
+    }
+
+    const applicantName = [params.applicantContact.first_name, params.applicantContact.last_name]
+      .filter(Boolean)
+      .join(' ')
+      .trim()
+
+    for (const responsible of project.responsibles) {
+      await NotificationService.createForContact(responsible.id, {
+        type: 'project_application_submitted',
+        title: `New application for ${project.name}`,
+        body: applicantName
+          ? `${applicantName} submitted an application for the project ${project.name}.`
+          : `A new application was submitted for the project ${project.name}.`,
+        projectId: project.id,
+        data: {
+          project_id: project.id,
+          participant_id: params.participantId,
+          applicant_contact_id: params.applicantContact.id,
+          type: 'project_application_submitted',
+        },
+      })
+    }
+  }
+
   async getAll() {
     return await Registration.query()
   }
@@ -159,7 +197,21 @@ export default class RegistrationsController {
     console.log('Concerts sent : ', concertsWithComments)
     await participant.related('concerts').sync(concertsWithComments)
 
+    const createNotifications = async () => {
+      try {
+        await this.createProjectRegistrationNotifications({
+          projectId: data.project_id,
+          applicantContact: contact,
+          participantId: participant.id,
+        })
+      } catch (error) {
+        console.error('Failed to create project registration notifications', error)
+      }
+    }
+
     if (data.answers.length === 0) {
+      await createNotifications()
+
       return ctx.response.json({ success: true, participant })
     }
 
@@ -172,6 +224,8 @@ export default class RegistrationsController {
         }
       })
     )
+
+    await createNotifications()
 
     return ctx.response.json({ success: true, participant, answer })
   }

@@ -14,6 +14,7 @@ import vine from '@vinejs/vine'
 import mail from '@adonisjs/mail/services/main'
 import RecruitmentEmail from '#mails/recruitment_email'
 import RecommendationEmail from '#mails/recommendation_email'
+import NotificationService from '#services/notification_service'
 
 interface ImportResult {
   imported: any[]
@@ -35,6 +36,48 @@ interface ContactResult {
 }
 
 export default class RecruitmentController {
+  private formatRecruitmentStatus(status: string): string {
+    const labels: Record<string, string> = {
+      not_yet_contacted: 'Not yet contacted',
+      awaiting_response: 'Awaiting response',
+      to_follow_up: 'Follow up',
+      not_available: 'Not available',
+      pending_validation: 'Pending validation',
+      cancelled: 'Cancelled',
+      recruited: 'Recruited',
+    }
+
+    return labels[status] || status.replace(/_/g, ' ')
+  }
+
+  private async notifyRecruitmentContactStatusChange(
+    recruitmentContact: RecruitmentContact,
+    projectId: number,
+    previousStatus: string
+  ) {
+    if (!recruitmentContact.contact_id || previousStatus === recruitmentContact.status) {
+      return
+    }
+
+    const project = await Project.find(projectId)
+    const previousStatusLabel = this.formatRecruitmentStatus(previousStatus)
+    const newStatusLabel = this.formatRecruitmentStatus(recruitmentContact.status)
+
+    await NotificationService.createForContact(recruitmentContact.contact_id, {
+      type: 'recruitment_status_changed',
+      title: `Recruitment status updated${project ? ` in ${project.name}` : ''}`,
+      body: `Your recruitment status changed from ${previousStatusLabel} to ${newStatusLabel}.`,
+      projectId,
+      data: {
+        project_id: projectId,
+        recruitment_contact_id: recruitmentContact.id,
+        previous_status: previousStatusLabel,
+        new_status: newStatusLabel,
+        contact_name: recruitmentContact.displayName,
+      },
+    })
+  }
+
   private normalizeEmail(value: string | null | undefined): string {
     return (value || '').trim().toLowerCase()
   }
@@ -641,10 +684,12 @@ export default class RecruitmentController {
 
           await mail.send(recruitmentMail)
 
+          const previousStatus = contact.status
           contact.status = 'awaiting_response'
           contact.contact_method = 'email'
           contact.contact_date = DateTime.now()
           await contact.save()
+          await this.notifyRecruitmentContactStatusChange(contact, projectId, previousStatus)
 
           results.sent.push({
             contact_id: contact.id,
@@ -754,10 +799,12 @@ export default class RecruitmentController {
 
         await mail.send(recommendationMail)
 
+        const previousStatus = contact.status
         contact.status = 'awaiting_response'
         contact.contact_method = 'email'
         contact.contact_date = DateTime.now()
         await contact.save()
+        await this.notifyRecruitmentContactStatusChange(contact, projectId, previousStatus)
 
         return response.json({
           success: true,
@@ -1057,6 +1104,7 @@ export default class RecruitmentController {
         return response.status(404).json({ error: 'Contact not found' })
       }
 
+      const previousStatus = contact.status
       if (requestBody.status !== undefined) contact.status = requestBody.status
       if (requestBody.contact_method !== undefined) contact.contact_method = requestBody.contact_method || null
       if (requestBody.notes !== undefined) contact.notes = requestBody.notes?.trim() || null
@@ -1067,6 +1115,7 @@ export default class RecruitmentController {
         contact.contact_date = DateTime.now()
       }
       await contact.save()
+      await this.notifyRecruitmentContactStatusChange(contact, projectId, previousStatus)
 
       const loadPromises = []
 
@@ -1726,8 +1775,10 @@ export default class RecruitmentController {
     let updatedCount = 0
     for (const contact of contactsToUpdate) {
       if (contact.shouldFollowUp(followUpDays)) {
+        const previousStatus = contact.status
         contact.status = 'to_follow_up'
         await contact.save()
+        await this.notifyRecruitmentContactStatusChange(contact, projectId, previousStatus)
         updatedCount++
       }
     }

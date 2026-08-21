@@ -5,8 +5,52 @@ import { simpleFilter } from 'adonisjs-filters'
 import Section from '#models/section'
 import RecruitmentContact from '#models/recruitment_contact'
 import Contact from '#models/contact'
+import NotificationService from '#services/notification_service'
+import Project from '#models/project'
 
 export default class ParticipantsController {
+  private formatRecruitmentStatus(status: string): string {
+    const labels: Record<string, string> = {
+      not_yet_contacted: 'Not yet contacted',
+      awaiting_response: 'Awaiting response',
+      to_follow_up: 'Follow up',
+      not_available: 'Not available',
+      pending_validation: 'Pending validation',
+      cancelled: 'Cancelled',
+      recruited: 'Recruited',
+    }
+
+    return labels[status] || status.replace(/_/g, ' ')
+  }
+
+  private async notifyRecruitmentContactStatusChange(
+    recruitmentContact: RecruitmentContact,
+    projectId: number,
+    previousStatus: string
+  ) {
+    if (!recruitmentContact.contact_id || previousStatus === recruitmentContact.status) {
+      return
+    }
+
+    const project = await Project.find(projectId)
+    const previousStatusLabel = this.formatRecruitmentStatus(previousStatus)
+    const newStatusLabel = this.formatRecruitmentStatus(recruitmentContact.status)
+
+    await NotificationService.createForContact(recruitmentContact.contact_id, {
+      type: 'recruitment_status_changed',
+      title: `Recruitment status updated${project ? ` in ${project.name}` : ''}`,
+      body: `Your recruitment status changed from ${previousStatusLabel} to ${newStatusLabel}.`,
+      projectId,
+      data: {
+        project_id: projectId,
+        recruitment_contact_id: recruitmentContact.id,
+        previous_status: previousStatusLabel,
+        new_status: newStatusLabel,
+        contact_name: recruitmentContact.displayName,
+      },
+    })
+  }
+
   async getAll(ctx: HttpContext) {
     const baseQuery = Participant.query()
       .preload('contact')
@@ -274,7 +318,13 @@ export default class ParticipantsController {
 
       if (existingRecruitment) {
         if (existingRecruitment.status !== 'recruited') {
+          const previousStatus = existingRecruitment.status
           await existingRecruitment.merge({ status: 'recruited' }).save()
+          await this.notifyRecruitmentContactStatusChange(
+            existingRecruitment,
+            projectId,
+            previousStatus
+          )
         }
         return
       }
@@ -309,8 +359,14 @@ export default class ParticipantsController {
         .first()
 
       if (recruitmentContact) {
+        const previousStatus = recruitmentContact.status
         recruitmentContact.status = 'cancelled'
         await recruitmentContact.save()
+        await this.notifyRecruitmentContactStatusChange(
+          recruitmentContact,
+          projectId,
+          previousStatus
+        )
         console.log(`Updated recruitment contact ${recruitmentContact.id} status to cancelled`)
       }
     } catch (error) {

@@ -44,4 +44,7 @@ export default await Env.create(new URL('../', import.meta.url), {
   SMTP_PASSWORD: Env.schema.string(),
 
   URL: Env.schema.string(),
+  FIREBASE_PROJECT_ID: Env.schema.string.optional(),
+  FIREBASE_CLIENT_EMAIL: Env.schema.string.optional(),
+  FIREBASE_PRIVATE_KEY: Env.schema.string.optional(),
 })
