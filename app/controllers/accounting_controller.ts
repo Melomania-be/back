@@ -8,8 +8,8 @@ import { DateTime } from 'luxon'
 import { simpleFilter } from 'adonisjs-filters'
 import { cuid } from '@adonisjs/core/helpers'
 import app from '@adonisjs/core/services/app'
-import path from 'path'
-import fs from 'fs'
+import path from 'node:path'
+import fs from 'node:fs'
 
 export default class AccountingController {
   private validateProjectId(projectId: string | undefined): number {
@@ -54,7 +54,6 @@ export default class AccountingController {
       })
     }
   }
-  
 
   async updateSettings({ params, request, response, auth }: HttpContext) {
     try {
@@ -113,7 +112,7 @@ export default class AccountingController {
     }
   }
 
-   async getAll(ctx: HttpContext) {
+  async getAll(ctx: HttpContext) {
     try {
       const projectId = this.validateProjectId(ctx.params.id)
       const organizationId = ctx.auth.user?.organizationId
@@ -185,7 +184,6 @@ export default class AccountingController {
     }
   }
 
-  
   async createOrUpdate({ params, request, response, auth }: HttpContext) {
     try {
       const projectId = this.validateProjectId(params.id)
@@ -345,9 +343,7 @@ export default class AccountingController {
 
       const data = {
         payment_status: requestBody.payment_status,
-        payment_date: requestBody.payment_date
-          ? DateTime.fromISO(requestBody.payment_date)
-          : null,
+        payment_date: requestBody.payment_date ? DateTime.fromISO(requestBody.payment_date) : null,
         notes: requestBody.notes?.trim() || null,
       }
 
@@ -555,6 +551,64 @@ export default class AccountingController {
       console.error('Error in getContactAccountingsproject:', error)
       return ctx.response.status(500).json({
         error: 'Failed to fetch contact accountings',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      })
+    }
+  }
+  // =============================================================================
+  // Attachment Management
+  // =============================================================================
+
+  async uploadAttachment({ request, response }: HttpContext) {
+    try {
+      // Look for a file in the request named 'file' (or change to 'attachment' based on your frontend)
+      const file = request.file('file', {
+        size: '10mb',
+        extnames: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
+      })
+
+      if (!file) {
+        return response.status(400).json({ error: 'No file was uploaded' })
+      }
+
+      if (!file.isValid) {
+        return response.status(400).json({ error: file.errors })
+      }
+
+      // Generate a unique filename to prevent overwrites and move it
+      const fileName = `${cuid()}.${file.extname}`
+      await file.move(app.makePath('uploads/accounting_attachments'), {
+        name: fileName,
+      })
+
+      return response.ok({
+        message: 'Attachment uploaded successfully',
+        filename: fileName,
+      })
+    } catch (error) {
+      console.error('Error uploading attachment:', error)
+      return response.status(500).json({
+        error: 'Failed to upload attachment',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      })
+    }
+  }
+
+  async downloadAttachment({ params, response }: HttpContext) {
+    try {
+      const fileName = params.filename
+      const filePath = app.makePath('uploads/accounting_attachments', fileName)
+
+      // Verify the file exists before attempting to send it
+      if (!fs.existsSync(filePath)) {
+        return response.status(404).json({ error: 'Attachment not found' })
+      }
+
+      return response.download(filePath)
+    } catch (error) {
+      console.error('Error downloading attachment:', error)
+      return response.status(500).json({
+        error: 'Failed to download attachment',
         details: error instanceof Error ? error.message : 'Unknown error',
       })
     }

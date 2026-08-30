@@ -67,11 +67,11 @@ export default class Accounting extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
-  public serializeExtras() {
+  serializeExtras() {
     return {}
   }
 
-  public serialize() {
+  serialize(): Record<string, unknown> {
     return {
       id: this.id,
       billDate: this.bill_date ? this.bill_date.toFormat('yyyy-MM-dd') : null,
@@ -85,7 +85,7 @@ export default class Accounting extends BaseModel {
       isIndividualPayment: Boolean(this.is_individual_payment),
       isMusicianFee: Boolean(this.is_musician_fee),
       createdAt: this.createdAt ? this.createdAt.toISO() : null,
-      updatedAt: this.updatedAt ? this.updatedAt.toISO() : null
+      updatedAt: this.updatedAt ? this.updatedAt.toISO() : null,
     }
   }
 }

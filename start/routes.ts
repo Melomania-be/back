@@ -35,20 +35,15 @@ const AccountingsController = () => import('#controllers/accounting_controller')
 const FilesystemController = () => import('#controllers/filesystem_controller')
 const SharedFolderController = () => import('#controllers/shared_folder_controller')
 const RecruitmentController = () => import('#controllers/recruitment_controller')
-const ContractorsController = () => import('#controllers/contractors_controller')
 const RecruitmentRecommendationController = () =>
   import('#controllers/recruitment_recommendation_controller')
-const AppSettingsController = () => import('#controllers/app_settings_controller')
-const OrganizationsController = () =>
-  import('#controllers/organizations_controller')
-
-const ContractorCategoriesController = () =>
-  import('#controllers/contractor_categories_controller')
-const ContractorInteractionsController = () =>
-  import('#controllers/contractor_interactions_controller')
+const PasswordRecoveriesController = () => import('#controllers/password_recoveries_controller')
+const ProfilesController = () => import('#controllers/profiles_controller')
+const OrganizationsController = () => import('#controllers/organizations_controller')
+const ContractorsController = () => import('#controllers/contractors_controller')
+const ContractorCategoriesController = () => import('#controllers/contractor_categories_controller')
 const ContractorParticipantsController = () =>
   import('#controllers/contractor_participants_controller')
-
 
 router.group(() => {
   // =============================================================================
@@ -62,15 +57,16 @@ router.group(() => {
     }
   })
 
-  // =============================================================================
-  // PARAMÈTRES VISUELS DE L'APPLICATION (PUBLICS POUR LA LECTURE)
-  // =============================================================================
-  router.get('/app_settings', [AppSettingsController, 'getSettings'])
-  router.get('/app_settings/logo', [AppSettingsController, 'getLogo'])
-  router.get('/app_settings/background', [AppSettingsController, 'getBackground'])
-
-  // Authentication
+  // Authentication & Password Recovery
   router.post('/sign_in', [UsersController, 'signIn'])
+
+  router.post('/reset-password', [PasswordRecoveriesController, 'resetPassword']).use(
+    middleware.throttle({
+      requests: 3,
+      duration: '15 mins',
+      prefix: 'password_reset',
+    })
+  )
 
   // Routes fichiers publiques étendues
   router.get('/files/download/:id', [FilesController, 'download'])
@@ -146,12 +142,45 @@ router.group(() => {
       // Sign out
       router.get('/sign_out', [UsersController, 'signOut'])
 
-      // =============================================================================
-      // PARAMÈTRES VISUELS DE L'APPLICATION (PROTÉGÉS POUR L'ÉCRITURE)
-      // =============================================================================
-      router.put('/app_settings', [AppSettingsController, 'updateSettings'])
-      router.delete('/app_settings/logo', [AppSettingsController, 'removeLogo'])
-      router.delete('/app_settings/background', [AppSettingsController, 'removeBackground'])
+      // User Profile Update
+      router.put('/profiles/:id', [ProfilesController, 'update'])
+
+      // ============================================================================
+      // GESTION DES ORGANISATIONS ET CONTRACTORS (Restored)
+      // ============================================================================
+      router
+        .group(() => {
+          router.get('/', [OrganizationsController, 'getAll'])
+          router.post('/', [OrganizationsController, 'create'])
+        })
+        .prefix('/organization')
+
+      router
+        .group(() => {
+          router.get('/', [ContractorsController, 'getAll'])
+          router.get('/:id', [ContractorsController, 'getOne'])
+          router.post('/', [ContractorsController, 'create'])
+          router.put('/:id', [ContractorsController, 'update'])
+          router.delete('/:id', [ContractorsController, 'delete'])
+        })
+        .prefix('/contractor')
+
+      router
+        .group(() => {
+          router.get('/', [ContractorCategoriesController, 'getAll'])
+          router.post('/', [ContractorCategoriesController, 'create'])
+          router.put('/:id', [ContractorCategoriesController, 'update'])
+          router.delete('/:id', [ContractorCategoriesController, 'delete'])
+        })
+        .prefix('/contractor-category')
+
+      router
+        .group(() => {
+          router.get('/project/:projectId', [ContractorParticipantsController, 'getByProject'])
+          router.post('/', [ContractorParticipantsController, 'create'])
+          router.delete('/:id', [ContractorParticipantsController, 'delete'])
+        })
+        .prefix('/contractor-participant')
 
       // ============================================================================
       // GESTION DES MATÉRIELS
@@ -263,34 +292,11 @@ router.group(() => {
       router
         .group(() => {
           router.get('/:contactId', [AccountingsController, 'getContactAccountings'])
-          router.get(
-  '/contractor/:contractorId',
-  [AccountingsController, 'getContractorAccountings']
-)
           router.post('/attachment', [AccountingsController, 'uploadAttachment'])
           router.get('/attachment/:filename', [AccountingsController, 'downloadAttachment'])
         })
         .prefix('/accountings')
 
-
-        router
-  .group(() => {
-    router.get(
-      '/project/:projectId',
-      [ContractorParticipantsController, 'getByProject']
-    )
-
-    router.post(
-      '/',
-      [ContractorParticipantsController, 'create']
-    )
-
-    router.delete(
-      '/:id',
-      [ContractorParticipantsController, 'delete']
-    )
-  })
-  .prefix('/contractor-participant')
       // =============================================================================
       // GESTION DES PROJETS
       // =============================================================================
@@ -553,67 +559,6 @@ router.group(() => {
         })
         .prefix('/contact')
 
-// =============================================================================
-// GESTION DES CONTRACTORS
-// =============================================================================
-router
-  .group(() => {
-    router.get('/', [ContractorsController, 'getAll'])
-    router.get('/:id', [ContractorsController, 'getOne'])
-    router.post('/', [ContractorsController, 'create'])
-    router.put('/:id', [ContractorsController, 'update'])
-    router.delete('/:id', [ContractorsController, 'delete'])
-  })
-  .prefix('/contractor')
-
-  router
-  .group(() => {
-    router.get('/', [OrganizationsController, 'getAll'])
-    router.post('/create', [OrganizationsController, 'create'])
-  })
-  .prefix('/organization')
-
-router
-  .group(() => {
-    router.get('/', [ContractorCategoriesController, 'getAll'])
-    router.post('/', [ContractorCategoriesController, 'create'])
-    router.put('/:id', [ContractorCategoriesController, 'update'])
-    router.delete('/:id', [ContractorCategoriesController, 'delete'])
-  })
-  .prefix('/contractor-category')
-
-
-  router
-  .group(() => {
-    router.get(
-      '/:contractorId',
-      [ContractorInteractionsController, 'getByContractor']
-    )
-
-    router.post(
-      '/',
-      [ContractorInteractionsController, 'create']
-    )
-
-    router.put(
-      '/:id',
-      [ContractorInteractionsController, 'update']
-    )
-
-    router.delete(
-      '/:id',
-      [ContractorInteractionsController, 'delete']
-    )
-    router.post(
-  '/:id/upload',
-  [ContractorInteractionsController, 'upload']
-)
-router.get(
-  '/file/:filename',
-  [ContractorInteractionsController, 'download']
-)
-  })
-  .prefix('/contractor-interaction')
       // =============================================================================
       // GESTION DES INSTRUMENTS
       // =============================================================================
@@ -679,7 +624,10 @@ router.get(
           ])
           router.post('/sendMailToParticipants', [MailingsController, 'sendMailToParticipants'])
 
-          router.post('/sendMailToIndividualContacts', [MailingsController, 'sendMailToIndividualContacts'])
+          router.post('/sendMailToIndividualContacts', [
+            MailingsController,
+            'sendMailToIndividualContacts',
+          ])
 
           router
             .group(() => {
@@ -735,9 +683,7 @@ router.get(
           router.delete('/:id', [TemplateController, 'delete'])
         })
         .prefix('/templates')
-
     })
     .use(middleware.auth({ guards: ['api'] }))
-    .use(middleware.organization())
     .use(middleware.routeLogger())
 })

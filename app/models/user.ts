@@ -1,11 +1,11 @@
 import { DateTime } from 'luxon'
 import hash from '@adonisjs/core/services/hash'
 import { compose } from '@adonisjs/core/helpers'
-import { BaseModel, column } from '@adonisjs/lucid/orm'
+import { BaseModel, column, hasMany, belongsTo } from '@adonisjs/lucid/orm'
 import { withAuthFinder } from '@adonisjs/auth/mixins/lucid'
 import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
-import { belongsTo } from '@adonisjs/lucid/orm'
-import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import type { HasMany, BelongsTo } from '@adonisjs/lucid/types/relations'
+import ActivityLog from '#models/activity_log'
 import Organization from '#models/organization'
 
 const AuthFinder = withAuthFinder(() => hash.use('scrypt'), {
@@ -21,22 +21,31 @@ export default class User extends compose(BaseModel, AuthFinder) {
   declare fullName: string | null
 
   @column()
+  declare phone: string | null
+
+  @column()
+  declare avatarUrl: string | null
+
+  @column()
   declare email: string
 
   @column()
   declare password: string
+
+  @column()
+  declare organizationId: number | null
+
+  @belongsTo(() => Organization)
+  declare organization: BelongsTo<typeof Organization>
+
+  @hasMany(() => ActivityLog)
+  declare activityLogs: HasMany<typeof ActivityLog>
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime | null
-  
-  @column()
- declare organizationId: number | null
-
- @belongsTo(() => Organization)
- declare organization: BelongsTo<typeof Organization>
 
   static accessTokens = DbAccessTokensProvider.forModel(User, {
     expiresIn: '30 days',
